@@ -1,22 +1,22 @@
 {% extends "base.html" %}{% block body %}
 <div class="card"><h2 style="margin:0">{{ v.platform|upper }} → {{ acc.username_original or '(pending LinkedIn page)' }} <span class="badge">{{ v.state }}</span></h2>
 <p class="muted">{{ v.variant_id }} · route {{ v.route_role }} · series “{{ v.series }}” · {{ v.format }} · north star: {{ north.label }}</p>
-<p>Asset: <b>{{ asset.title }}</b> ({{ asset.asset_id }}) · source identity: {{ asset.source_brand_name }} · license: {{ asset.license or '—' }} · rights expire: {{ asset.rights_expires_at or '—' }} {% if asset.is_sample %}<span class="badge warn">SAMPLE DATA</span>{% endif %}</p>
+<p>Asset: <a href="{{ base }}/asset/{{ asset.asset_id }}"><b>{{ asset.title }}</b></a> ({{ asset.asset_id }}) · source identity: {{ asset.source_brand_name }} · license: {{ asset.license or '—' }} · rights expire: {{ asset.rights_expires_at or '—' }} {% if asset.is_sample %}<span class="badge warn">SAMPLE DATA</span>{% endif %}</p>
 <p>{% for b in v.risk_flags.blockers %}<span class="badge bad">{{ b }}</span>{% endfor %}{% for f in v.risk_flags.review_flags %}<span class="badge warn">{{ f }}</span>{% endfor %}{% for l in v.risk_flags.labels %}<br><span class="muted">label: {{ l }}</span>{% endfor %}{% if v.risk_flags.two_person_signoff %}<br><b>Two-person signoff required.</b>{% endif %}</p>
 <p>Live publishing: {% if live_ok %}<span class="badge ok">allowed</span>{% else %}<span class="badge">not allowed</span> <span class="muted">{{ reasons|join(' · ') }}</span>{% endif %}</p></div>
 <div class="grid">
-<div class="card"><h3>Edit copy</h3><form method="post" action="/variant/{{ v.variant_id }}/edit">
+<div class="card"><h3>Edit copy</h3><form method="post" action="{{ base }}/variant/{{ v.variant_id }}/edit">
 <label>Hook</label><input name="hook" value="{{ v.hook }}"><label>Caption (exact text that would post)</label><textarea name="caption" rows="10">{{ v.caption }}</textarea>
-<label>CTA</label><input name="cta" value="{{ v.cta }}"><label>Your name</label><input name="actor" required><br><br><button>Save (invalidates prior approval)</button></form>
+<label>CTA</label><input name="cta" value="{{ v.cta }}"><label>Your name</label>{% if not user %}<input name="actor" required>{% endif %}<br><br><button>Save (invalidates prior approval)</button></form>
 {% if v.validation.errors %}<h4>Validation</h4>{% for e in v.validation.errors %}<div class="badge bad">{{ e }}</div>{% endfor %}{% endif %}
 <p class="muted">Hashtags: {{ v.hashtags|join(' ') }} — {{ v.hashtag_rationale }}</p><p class="muted">Test: {{ v.test_hypothesis }}</p></div>
-<div class="card"><h3>Approve / reject</h3><form method="post" action="/variant/{{ v.variant_id }}/approve"><input name="reviewer" placeholder="reviewer name" required><input name="note" placeholder="note"><br><br><button class="primary">Approve exact text</button></form><br>
-<form method="post" action="/variant/{{ v.variant_id }}/reject"><input name="reviewer" placeholder="reviewer name" required><input name="note" placeholder="reason (required)" required><br><br><button class="danger">Reject</button></form>
-<h4>Schedule</h4><form method="post" action="/variant/{{ v.variant_id }}/schedule"><input name="slot_at" value="{{ planned.slot_at if planned else '' }}" placeholder="2026-10-21T18:30"><input name="actor" placeholder="your name" required><br><br><button>Schedule (approved only)</button></form><br>
-<form method="post" action="/variant/{{ v.variant_id }}/cancel"><input type="hidden" name="actor" value="dashboard"><button>Cancel</button></form>
+<div class="card"><h3>Approve / reject</h3><form method="post" action="{{ base }}/variant/{{ v.variant_id }}/approve">{% if not user %}<input name="reviewer" placeholder="reviewer name" required>{% endif %}<input name="note" placeholder="note"><br><br><button class="primary">Approve exact text</button></form><br>
+<form method="post" action="{{ base }}/variant/{{ v.variant_id }}/reject">{% if not user %}<input name="reviewer" placeholder="reviewer name" required>{% endif %}<input name="note" placeholder="reason (required)" required><br><br><button class="danger">Reject</button></form>
+<h4>Schedule</h4><form method="post" action="{{ base }}/variant/{{ v.variant_id }}/schedule"><input name="slot_at" value="{{ planned.slot_at if planned else '' }}" placeholder="2026-10-21T18:30">{% if not user %}<input name="actor" placeholder="your name" required>{% endif %}<br><br><button>Schedule (approved only)</button></form><br>
+<form method="post" action="{{ base }}/variant/{{ v.variant_id }}/cancel"><input type="hidden" name="actor" value="dashboard"><button>Cancel</button></form>
 <h4>Approval trail</h4><table>{% for a in approvals %}<tr><td>{{ a.at }}</td><td>{{ a.decision }}</td><td>{{ a.reviewer }}</td><td class="muted">{{ a.note }}</td></tr>{% endfor %}</table></div>
-<div class="card"><h3>Media</h3>{% if render_url and render_url.endswith('.mp4') %}<video src="{{ render_url }}" controls muted playsinline></video>{% elif render_url %}<img src="{{ render_url }}" style="max-width:100%">{% else %}<p class="muted">Not rendered yet ({{ v.render_status }}).</p>{% endif %}
-<form method="post" action="/variant/{{ v.variant_id }}/render"><button>Render from EDL</button></form>
+<div class="card"><h3>Media</h3>{% if render_url and '.mp4' in render_url %}<video src="{{ render_url }}" controls muted playsinline></video>{% elif render_url %}<img src="{{ render_url }}" style="max-width:100%">{% else %}<p class="muted">Not rendered yet ({{ v.render_status }}).</p>{% endif %}
+<form method="post" action="{{ base }}/variant/{{ v.variant_id }}/render"><button>Render from EDL</button></form>
 <h4>Edit decision list</h4><table>{% for s in v.edl.segments %}<tr><td>{{ '%.2f'|format(s.source_in) }}–{{ '%.2f'|format(s.source_out) }}s</td><td>{{ s.purpose }}</td><td class="muted">{{ s.source_timecode }}</td></tr>{% endfor %}</table><p class="muted">{{ v.edl.notes }}</p></div>
 </div>
 <div class="card"><h3>Score (explainable)</h3><table>{% for k, x in v.score_breakdown.parts.items() %}<tr><td>{{ k }}</td><td>{{ x.score }}</td><td class="muted">{{ x.why }}</td></tr>{% endfor %}</table></div>

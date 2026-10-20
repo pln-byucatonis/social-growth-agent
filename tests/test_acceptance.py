@@ -22,7 +22,8 @@ class InventoryTests(unittest.TestCase):
         self.db, self.s = make(packs=False)
 
     def test_28_entries_load_verbatim_without_drops_or_dedupe(self):
-        rows = list(csv.DictReader(open(CONFIG_DIR / "accounts.csv")))
+        with open(CONFIG_DIR / "accounts.csv") as f:
+            rows = list(csv.DictReader(f))
         self.assertEqual(len(rows), 28)
         user = self.db.all("accounts", "source='user_csv'")
         self.assertEqual(len(user), 28)

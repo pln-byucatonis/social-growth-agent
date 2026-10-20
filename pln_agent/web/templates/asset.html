@@ -1,0 +1,30 @@
+{% extends "base.html" %}{% block body %}
+<div class="card"><h2 style="margin:0">{{ a.title }}</h2>
+<p class="muted">{{ a.asset_id }} · {{ a.brand_id }} (source identity: {{ a.source_brand_name }}) · {{ a.provenance }}{% if a.content_id %} · ops clip <code>{{ a.content_id }}</code>{% endif %}</p>
+<p>{{ a.description }}</p>
+<p>{% if rights_eval.ok %}<span class="badge ok">rights clear</span>{% endif %}{% for b in rights_eval.blockers %}<span class="badge bad">{{ b }}</span>{% endfor %}{% for f in rights_eval.review_flags %}<span class="badge warn">{{ f }}</span>{% endfor %}</p>
+{% for l in rights_eval.labels %}<p class="muted">label: {{ l }}</p>{% endfor %}</div>
+<div class="grid">
+<div class="card"><h3>Rights &amp; identity record</h3>
+<form method="post" action="{{ base }}/asset/{{ a.asset_id }}/rights">
+<label>Licence / ownership</label><input name="license" value="{{ rights_row.license or a.license or '' }}">
+<label>Owner</label><input name="owner" value="{{ rights_row.owner or a.owner or '' }}">
+<label>Territory (comma-separated, or WORLDWIDE)</label><input name="territory" value="{{ (rights_row.territory or a.territory or [])|join(',') }}">
+<label>Rights expire (YYYY-MM-DD)</label><input name="expires" value="{{ rights_row.rights_expires_at or a.rights_expires_at or '' }}">
+<label><input type="checkbox" name="rights_verified" style="width:auto" {{ 'checked' if a.rights_verified }}> Media rights verified</label><br>
+<label><input type="checkbox" name="people_verified" style="width:auto" {{ 'checked' if a.people_verified }}> People / athlete identities verified</label><br>
+<label><input type="checkbox" name="music_cleared" style="width:auto" {{ 'checked' if a.music_cleared }}> Audio / music cleared</label><br>
+<label><input type="checkbox" name="sponsor_approved" style="width:auto" {{ 'checked' if a.sponsor_approved }}> Sponsor appearance approved</label>
+<label>Evidence / note</label><input name="note" value="{{ rights_row.note or '' }}">
+{% if not user %}<label>Your name</label><input name="actor" required>{% endif %}
+<label><input type="checkbox" name="regenerate" style="width:auto" checked> Regenerate posts after saving</label><br><br>
+<button class="primary">Save rights record</button></form>
+{% if rights_row.updated_by %}<p class="muted">Last set by {{ rights_row.updated_by }} at {{ rights_row.updated_at }}</p>{% endif %}</div>
+<div class="card"><h3>People detected</h3>{% if a.people %}<table>{% for p in a.people %}<tr><td>{{ p.name }}</td><td>{% if p.verified %}<span class="badge ok">verified</span>{% else %}<span class="badge warn">unverified{% if p.detected_by %} ({{ p.detected_by }}){% endif %}</span>{% endif %}</td></tr>{% endfor %}</table>
+<p class="muted">Machine-detected names are never used in copy until identities are verified.</p>{% else %}<p class="muted">None tagged.</p>{% endif %}
+<h3>Moments (timecoded)</h3><table>{% for m in a.moments %}<tr><td>{{ '%.2f'|format(m.start) }}–{{ '%.2f'|format(m.end) }}s</td><td>{{ m.kind }}</td><td>{{ m.label }}</td><td class="muted">{{ m.description }}</td></tr>{% endfor %}</table>
+{% if a.transcript %}<h3>Transcript</h3><pre>{{ a.transcript[0].text }}</pre>{% endif %}</div>
+</div>
+<div class="card tablewrap"><h3>Posts from this asset</h3><table>{% for v in variants %}<tr><td>{{ v.platform }}</td><td><a href="{{ base }}/variant/{{ v.variant_id }}">{{ v.hook }}</a></td><td>{{ v.account_id }}</td><td><span class="badge">{{ v.state }}</span></td></tr>{% else %}<tr><td class="muted">No posts yet. They're generated once rights are clear.</td></tr>{% endfor %}</table></div>
+<div class="card"><h3>Audit</h3><table>{% for r in audit %}<tr><td>{{ r.at }}</td><td>{{ r.actor }}</td><td>{{ r.action }}</td><td class="muted">{{ r.detail }}</td></tr>{% endfor %}</table></div>
+{% endblock %}

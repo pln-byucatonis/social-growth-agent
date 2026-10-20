@@ -1,19 +1,27 @@
-"""Human approval dashboard (FastAPI + server-rendered Jinja; HTMX optional enhancement).
+"""Human approval dashboard (FastAPI + server-rendered Jinja).
 
-Local-first: binds 127.0.0.1 by default. Set PLN_DASHBOARD_PASSWORD to require HTTP Basic auth.
+Two ways to run it:
+* Local: binds 127.0.0.1. Optional HTTP Basic auth via PLN_DASHBOARD_PASSWORD; reviewers type their name.
+* Behind the ops portal (ops.proleaguenetwork.com → /api/social-agent/*): PLN_AGENT_API_KEY is set, every
+  request must carry it as a bearer token (only the ops proxy has it), and the signed-in Cognito user arrives
+  in X-PLN-User-Email / X-PLN-User-Admin. Reviewer identity comes from that header, not a form field, and
+  changes require an ops admin. X-Forwarded-Prefix makes every link resolve under the proxy path.
+
 Every action goes through the same workflow functions as the CLI, so gates and audit are identical.
 """
 from __future__ import annotations
 
 import base64
 import os
+import re
 import secrets
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -23,9 +31,11 @@ from ..adapters import get_adapter
 from ..calendar_planner import plan_week
 from ..config import load_settings
 from ..db import DB
+from ..editorial import generate_pack
 from ..experiments import recommendations
 from ..media import render_variant
 from ..metrics import NORTH_STAR
+from ..rights import evaluate
 from ..workflow import (WorkflowError, approve, cancel, edit_variant, kill_switch_on, reject, run_publisher, schedule,
                         set_kill_switch)
 
@@ -36,17 +46,54 @@ templates = Jinja2Templates(directory=str(HERE / "templates"))
 settings.render_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/renders", StaticFiles(directory=str(settings.render_dir)), name="renders")
 _db: DB | None = None
+_PREFIX_RE = re.compile(r"^(/[A-Za-z0-9._-]+)*$")
 
 
 def db() -> DB:
     global _db
     if _db is None:
         _db = DB(settings.database_url)
+        if not _db.one("SELECT account_id FROM accounts LIMIT 1"):  # first boot of a fresh database
+            from ..accounts import load_accounts
+            load_accounts(_db, actor="bootstrap")
+            mig.sync_decisions(_db)
+        if os.environ.get("PLN_WORKER", "").lower() in ("1", "on", "true"):
+            from ..worker import start_background
+            start_background(DB(settings.database_url), settings)  # own connection for the thread
     return _db
 
 
+@app.on_event("startup")
+def _warm():
+    if os.environ.get("PLN_WORKER", "").lower() in ("1", "on", "true"):
+        db()
+
+
 @app.middleware("http")
-async def basic_auth(request: Request, call_next):
+async def auth(request: Request, call_next):
+    request.state.user = None
+    request.state.admin = False
+    if request.url.path == "/healthz":
+        return await call_next(request)
+    if request.url.path == "/internal/tick":  # scheduler → service; key only, no user identity
+        key = settings.agent_api_key or os.environ.get("PLN_AGENT_API_KEY", "")
+        hdr = request.headers.get("authorization", "")
+        if not (key and hdr.startswith("Bearer ") and secrets.compare_digest(hdr[7:], key)):
+            return JSONResponse({"error": "unauthorized"}, status_code=401)
+        return await call_next(request)
+    key = settings.agent_api_key or os.environ.get("PLN_AGENT_API_KEY", "")
+    if key:
+        hdr = request.headers.get("authorization", "")
+        if not (hdr.startswith("Bearer ") and secrets.compare_digest(hdr[7:], key)):
+            return JSONResponse({"error": "unauthorized"}, status_code=401)
+        email = (request.headers.get("x-pln-user-email") or "").strip().lower()
+        if not email:
+            return JSONResponse({"error": "missing user identity"}, status_code=401)
+        request.state.user = email
+        request.state.admin = request.headers.get("x-pln-user-admin") == "1"
+        if request.method not in ("GET", "HEAD") and not request.state.admin:
+            return JSONResponse({"error": "ops admin required for changes"}, status_code=403)
+        return await call_next(request)
     pw = os.environ.get("PLN_DASHBOARD_PASSWORD")
     if pw:
         hdr = request.headers.get("authorization", "")
@@ -62,15 +109,33 @@ async def basic_auth(request: Request, call_next):
     return await call_next(request)
 
 
+def base(request: Request) -> str:
+    p = request.headers.get("x-forwarded-prefix", "").rstrip("/")
+    return p if _PREFIX_RE.match(p) else ""
+
+
+def who(request: Request, typed: str) -> str:
+    """The acting reviewer: the ops-portal user when proxied, else the typed name (local mode)."""
+    name = request.state.user or (typed or "").strip()
+    if not name:
+        raise WorkflowError("Enter your name (reviewer identity is recorded in the audit log).")
+    return name
+
+
 def ctx(request: Request, **kw) -> dict:
     return {"request": request, "dry_run": settings.dry_run, "publishing_enabled": settings.publishing_enabled,
-            "kill": kill_switch_on(db()), **kw}
+            "kill": kill_switch_on(db()), "base": base(request), "user": request.state.user,
+            "ops_connected": bool(settings.ops_database_url),
+            "msg": request.query_params.get("msg"), "err": request.query_params.get("err"), **kw}
 
 
-def back(url: str, msg: str = "", err: str = "") -> RedirectResponse:
-    from urllib.parse import urlencode
+def back(request: Request, url: str, msg: str = "", err: str = "") -> RedirectResponse:
     q = urlencode({k: v for k, v in (("msg", msg), ("err", err)) if v})
-    return RedirectResponse(url + ("?" + q if q else ""), status_code=303)
+    return RedirectResponse(base(request) + url + ("?" + q if q else ""), status_code=303)
+
+
+def page(request: Request, name: str, **kw):
+    return templates.TemplateResponse(request, name, ctx(request, **kw))
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -78,14 +143,16 @@ def home(request: Request):
     d = db()
     counts = {r["state"]: r["n"] for r in d.query("SELECT state, COUNT(*) AS n FROM variants GROUP BY state")}
     jobs = d.all("publish_jobs", order="updated_at DESC")[:15]
-    return templates.TemplateResponse(request, "home.html", ctx(request, counts=counts, jobs=jobs, recs=recommendations(d)[:25],
-                                                       msg=request.query_params.get("msg"), err=request.query_params.get("err")))
+    return page(request, "home.html", counts=counts, jobs=jobs, recs=recommendations(d)[:25])
 
 
 @app.post("/kill")
-def kill(state: str = Form(...), actor: str = Form(...), reason: str = Form("")):
-    set_kill_switch(db(), state == "on", actor or "dashboard", reason)
-    return back("/", f"Emergency stop {state.upper()}")
+def kill(request: Request, state: str = Form(...), actor: str = Form(""), reason: str = Form("")):
+    try:
+        set_kill_switch(db(), state == "on", who(request, actor), reason)
+    except WorkflowError as e:
+        return back(request, "/", err=str(e))
+    return back(request, "/", f"Emergency stop {state.upper()}")
 
 
 @app.get("/queue", response_class=HTMLResponse)
@@ -99,9 +166,8 @@ def queue(request: Request, platform: str = "", state: str = ""):
     vs = d.all("variants", " AND ".join(where), params, order="platform, state, score DESC")
     accs = {a["account_id"]: a for a in d.all("accounts")}
     perm = {k: publish_eligibility(a, settings, kill_switch_on(d)) for k, a in accs.items()}
-    return templates.TemplateResponse(request, "queue.html", ctx(request, variants=vs, accs=accs, perm=perm, platform=platform, state=state,
-                                                        platforms=sorted({v["platform"] for v in d.all("variants")}),
-                                                        msg=request.query_params.get("msg"), err=request.query_params.get("err")))
+    return page(request, "queue.html", variants=vs, accs=accs, perm=perm, platform=platform, state=state,
+                platforms=sorted({v["platform"] for v in d.all("variants")}))
 
 
 @app.get("/variant/{vid:path}", response_class=HTMLResponse)
@@ -118,75 +184,181 @@ def variant(request: Request, vid: str):
     jobs = d.all("publish_jobs", "variant_id=?", [vid])
     planned = d.one("SELECT slot_at FROM schedules WHERE variant_id=? AND state='planned'", [vid])
     render_url = ""
-    if v.get("render_path"):
-        rp = Path(v["render_path"])
+    if (v.get("render_path") or "").startswith("s3://"):
+        from ..media import resolve_media
+        render_url = resolve_media(v["render_path"])
+    elif v.get("render_path"):
         try:
-            render_url = "/renders/" + str(rp.relative_to(settings.render_dir))
+            render_url = base(request) + "/renders/" + str(Path(v["render_path"]).relative_to(settings.render_dir))
         except ValueError:
             render_url = ""
     preview = get_adapter(acc["platform"], settings=settings).simulate(v, acc, "preview")
-    return templates.TemplateResponse(request, "variant.html", ctx(request, v=v, acc=acc, asset=asset, live_ok=ok, reasons=reasons,
-                                                          approvals=approvals, audit=audit, jobs=jobs, planned=planned,
-                                                          render_url=render_url, would_send=preview.raw["would_send"],
-                                                          north=NORTH_STAR.get(v["platform"], {}),
-                                                          msg=request.query_params.get("msg"), err=request.query_params.get("err")))
+    return page(request, "variant.html", v=v, acc=acc, asset=asset, live_ok=ok, reasons=reasons, approvals=approvals,
+                audit=audit, jobs=jobs, planned=planned, render_url=render_url,
+                would_send=preview.raw["would_send"], north=NORTH_STAR.get(v["platform"], {}))
 
 
 @app.post("/variant/{vid:path}/edit")
-def do_edit(vid: str, actor: str = Form(...), hook: str = Form(...), caption: str = Form(...), cta: str = Form(...)):
+def do_edit(request: Request, vid: str, actor: str = Form(""), hook: str = Form(...), caption: str = Form(...),
+            cta: str = Form(...)):
     try:
-        v = edit_variant(db(), vid, {"hook": hook, "caption": caption, "cta": cta}, actor)
-        return back(f"/variant/{vid}", f"Saved. State: {v['state']} (any prior approval was invalidated)")
+        v = edit_variant(db(), vid, {"hook": hook, "caption": caption, "cta": cta}, who(request, actor))
+        return back(request, f"/variant/{vid}", f"Saved. State: {v['state']} (any prior approval was invalidated)")
     except WorkflowError as e:
-        return back(f"/variant/{vid}", err=str(e))
+        return back(request, f"/variant/{vid}", err=str(e))
 
 
 @app.post("/variant/{vid:path}/approve")
-def do_approve(vid: str, reviewer: str = Form(...), note: str = Form("")):
+def do_approve(request: Request, vid: str, reviewer: str = Form(""), note: str = Form("")):
     try:
-        r = approve(db(), vid, reviewer, note)
-        return back(f"/variant/{vid}", f"Recorded approval by {reviewer}: state={r['state']} ({len(r['approvers'])}/{r['needed']})")
+        name = who(request, reviewer)
+        r = approve(db(), vid, name, note)
+        return back(request, f"/variant/{vid}", f"Recorded approval by {name}: state={r['state']} ({len(r['approvers'])}/{r['needed']})")
     except WorkflowError as e:
-        return back(f"/variant/{vid}", err=str(e))
+        return back(request, f"/variant/{vid}", err=str(e))
 
 
 @app.post("/variant/{vid:path}/reject")
-def do_reject(vid: str, reviewer: str = Form(...), note: str = Form(...)):
+def do_reject(request: Request, vid: str, reviewer: str = Form(""), note: str = Form(...)):
     try:
-        reject(db(), vid, reviewer, note)
-        return back(f"/variant/{vid}", "Rejected")
+        reject(db(), vid, who(request, reviewer), note)
+        return back(request, f"/variant/{vid}", "Rejected")
     except WorkflowError as e:
-        return back(f"/variant/{vid}", err=str(e))
+        return back(request, f"/variant/{vid}", err=str(e))
 
 
 @app.post("/variant/{vid:path}/schedule")
-def do_schedule(vid: str, actor: str = Form(...), slot_at: str = Form(...)):
+def do_schedule(request: Request, vid: str, actor: str = Form(""), slot_at: str = Form(...)):
     try:
         at = datetime.fromisoformat(slot_at)
         at = at if at.tzinfo else at.replace(tzinfo=ZoneInfo(settings.timezone))
-        j = schedule(db(), vid, at, actor)
-        return back(f"/variant/{vid}", f"Scheduled job {j['job_id']}")
+        j = schedule(db(), vid, at, who(request, actor))
+        return back(request, f"/variant/{vid}", f"Scheduled job {j['job_id']}")
     except (WorkflowError, ValueError) as e:
-        return back(f"/variant/{vid}", err=str(e))
+        return back(request, f"/variant/{vid}", err=str(e))
 
 
 @app.post("/variant/{vid:path}/cancel")
-def do_cancel(vid: str, actor: str = Form(...), reason: str = Form("cancelled from dashboard")):
-    cancel(db(), vid, actor, reason)
-    return back(f"/variant/{vid}", "Cancelled")
+def do_cancel(request: Request, vid: str, actor: str = Form(""), reason: str = Form("cancelled from dashboard")):
+    cancel(db(), vid, request.state.user or actor or "dashboard", reason)
+    return back(request, f"/variant/{vid}", "Cancelled")
 
 
 @app.post("/variant/{vid:path}/render")
-def do_render(vid: str):
-    r = render_variant(db(), vid, settings, actor="dashboard")
-    return back(f"/variant/{vid}", f"Render: {r['status']}")
+def do_render(request: Request, vid: str):
+    r = render_variant(db(), vid, settings, actor=request.state.user or "dashboard")
+    return back(request, f"/variant/{vid}", f"Render: {r['status']}")
 
 
 @app.post("/publish/run")
-def do_publish():
+def do_publish(request: Request):
     res = run_publisher(db(), settings)
-    return back("/", f"Publisher ran: {res or 'nothing due'}")
+    return back(request, "/", f"Publisher ran: {res or 'nothing due'}")
 
+
+# --- assets + rights ------------------------------------------------------------------------------
+
+@app.get("/assets", response_class=HTMLResponse)
+def assets(request: Request, brand: str = "", rights: str = ""):
+    d = db()
+    rows = d.all("assets", "brand_id=?" if brand else "", [brand] if brand else [], order="ingested_at DESC")
+    out = []
+    for a in rows:
+        r = evaluate(a)
+        if rights == "blocked" and r.ok or rights == "clear" and not r.ok:
+            continue
+        n = d.one("SELECT COUNT(*) AS n FROM variants WHERE asset_id=?", [a["asset_id"]])["n"]
+        out.append({**a, "rights_eval": r.as_dict(), "variants": n})
+    brands = sorted({a["brand_id"] for a in d.all("assets")})
+    return page(request, "assets.html", assets=out[:300], total=len(out), brand=brand, rights=rights, brands=brands)
+
+
+@app.get("/asset/{aid}", response_class=HTMLResponse)
+def asset_detail(request: Request, aid: str):
+    d = db()
+    a = d.get("assets", "asset_id", aid)
+    if not a:
+        raise HTTPException(404)
+    return page(request, "asset.html", a=a, rights_eval=evaluate(a).as_dict(),
+                rights_row=d.get("asset_rights", "asset_id", aid) or {},
+                variants=d.all("variants", "asset_id=?", [aid], order="platform"),
+                audit=d.all("audit_log", "entity_id=?", [aid], order="id DESC")[:30])
+
+
+def _rights_fields(license: str, owner: str, territory: str, expires: str, rights_verified: str, people_verified: str,
+                   music_cleared: str, sponsor_approved: str, note: str) -> dict:
+    return {"license": license.strip(), "owner": owner.strip(),
+            "territory": [t.strip().upper() for t in territory.split(",") if t.strip()],
+            "rights_expires_at": expires.strip() or None, "rights_verified": rights_verified == "on",
+            "people_verified": people_verified == "on", "music_cleared": music_cleared == "on",
+            "sponsor_approved": sponsor_approved == "on", "note": note.strip()}
+
+
+@app.post("/asset/{aid}/rights")
+def asset_rights(request: Request, aid: str, actor: str = Form(""), license: str = Form(""), owner: str = Form(""),
+                 territory: str = Form(""), expires: str = Form(""), rights_verified: str = Form(""),
+                 people_verified: str = Form(""), music_cleared: str = Form(""), sponsor_approved: str = Form(""),
+                 note: str = Form(""), regenerate: str = Form("")):
+    from ..ops_sources import set_asset_rights
+    try:
+        name = who(request, actor)
+        set_asset_rights(db(), aid, name, **_rights_fields(license, owner, territory, expires, rights_verified,
+                                                           people_verified, music_cleared, sponsor_approved, note))
+        msg = "Rights record saved"
+        if regenerate:
+            p = generate_pack(db(), aid, settings, actor=name)
+            msg += f"; regenerated {len(p['variants'])} variants"
+        return back(request, f"/asset/{aid}", msg)
+    except (WorkflowError, ValueError, KeyError) as e:
+        return back(request, f"/asset/{aid}", err=str(e))
+
+
+@app.post("/assets/rights-bulk")
+def assets_rights_bulk(request: Request, brand: str = Form(...), actor: str = Form(""), license: str = Form(...),
+                       owner: str = Form(""), territory: str = Form(...), expires: str = Form(""),
+                       rights_verified: str = Form(""), music_cleared: str = Form(""), note: str = Form("")):
+    """Apply one rights record (e.g. 'PLN-owned production, WORLDWIDE') to every asset of a brand.
+    People verification is deliberately NOT bulk-settable: identities are checked clip by clip."""
+    from ..ops_sources import set_asset_rights
+    try:
+        name = who(request, actor)
+        ids = [a["asset_id"] for a in db().all("assets", "brand_id=?", [brand])]
+        fields = _rights_fields(license, owner, territory, expires, rights_verified, "", music_cleared, "", note)
+        fields.pop("people_verified"), fields.pop("sponsor_approved")
+        for aid in ids:
+            set_asset_rights(db(), aid, name, **fields)
+        return back(request, f"/assets?brand={brand}", f"Rights applied to {len(ids)} {brand} assets")
+    except (WorkflowError, ValueError) as e:
+        return back(request, f"/assets?brand={brand}", err=str(e))
+
+
+@app.post("/assets/plan")
+def assets_plan(request: Request, brand: str = Form("")):
+    """(Re)generate editorial packs for rights-clear assets."""
+    d = db()
+    n = 0
+    for a in d.all("assets", "brand_id=?" if brand else "", [brand] if brand else []):
+        if evaluate(a).ok:
+            generate_pack(d, a["asset_id"], settings, actor=request.state.user or "dashboard")
+            n += 1
+    return back(request, "/assets" + (f"?brand={brand}" if brand else ""), f"Planned {n} rights-clear assets")
+
+
+@app.post("/ops/import")
+def ops_import(request: Request, limit: int = Form(100), min_score: int = Form(60), property: str = Form("")):
+    from ..ops_sources import import_ops_accounts, import_ops_clips
+    if not settings.ops_database_url:
+        return back(request, "/assets", err="PLN_OPS_DATABASE_URL is not configured")
+    ops = DB(settings.ops_database_url, init=False)
+    actor = request.state.user or "dashboard"
+    a = import_ops_accounts(db(), ops, actor)
+    c = import_ops_clips(db(), ops, settings.ops_assets_bucket, limit=limit, min_score=min_score,
+                         properties=[property] if property else None, actor=actor)
+    return back(request, "/assets", f"Accounts: {len(a['matched'])} matched, {len(a['added'])} added · "
+                                    f"Clips imported: {c['imported']} ({len(c['skipped'])} skipped)")
+
+
+# --- calendar, accounts, migration, audit ---------------------------------------------------------
 
 @app.get("/calendar", response_class=HTMLResponse)
 def calendar(request: Request, start: str = ""):
@@ -195,7 +367,7 @@ def calendar(request: Request, start: str = ""):
     days: dict[str, list] = {}
     for p in plan["placed"]:
         days.setdefault(p["slot"].strftime("%a %b %d"), []).append(p)
-    return templates.TemplateResponse(request, "calendar.html", ctx(request, plan=plan, days=days, start=s.isoformat()))
+    return page(request, "calendar.html", plan=plan, days=days, start=s.isoformat())
 
 
 @app.get("/accounts", response_class=HTMLResponse)
@@ -206,43 +378,57 @@ def accounts(request: Request):
         ok, reasons = publish_eligibility(a, settings, kill_switch_on(d))
         rows.append({**a, "live_ok": ok, "reasons": reasons})
     caps = {p: get_adapter(p, settings=settings).capabilities() for p in sorted({a["platform"] for a in rows})}
-    return templates.TemplateResponse(request, "accounts.html", ctx(request, rows=rows, caps=caps))
+    return page(request, "accounts.html", rows=rows, caps=caps)
 
 
 @app.get("/migration", response_class=HTMLResponse)
 def migration(request: Request):
     d = db()
     mig.sync_decisions(d)
-    return templates.TemplateResponse(request, "migration.html", ctx(
-        request, sheets=mig.decision_sheet(d), proposals=d.all("profile_change_proposals", order="account_id, field"),
-        plan=[t for t in mig.ninety_day_plan() if t["phase"] != "report"], ann=mig.announcement_variants("instagram"),
-        report=mig.weekly_report(d), msg=request.query_params.get("msg"), err=request.query_params.get("err")))
+    return page(request, "migration.html", sheets=mig.decision_sheet(d),
+                proposals=d.all("profile_change_proposals", order="account_id, field"),
+                plan=[t for t in mig.ninety_day_plan() if t["phase"] != "report"],
+                ann=mig.announcement_variants("instagram"), report=mig.weekly_report(d))
 
 
 @app.post("/migration/approve")
-def migration_approve(platform: str = Form(...), actor: str = Form(...)):
-    mig.approve_decision(db(), platform, actor)
-    return back("/migration", f"{platform} decision approved")
+def migration_approve(request: Request, platform: str = Form(...), actor: str = Form("")):
+    try:
+        mig.approve_decision(db(), platform, who(request, actor))
+    except WorkflowError as e:
+        return back(request, "/migration", err=str(e))
+    return back(request, "/migration", f"{platform} decision approved")
 
 
 @app.post("/migration/propose")
-def migration_propose(actor: str = Form("dashboard")):
-    n = len(mig.propose_profile_changes(db(), actor))
-    return back("/migration", f"{n} proposals created")
+def migration_propose(request: Request, actor: str = Form("")):
+    n = len(mig.propose_profile_changes(db(), request.state.user or actor or "dashboard"))
+    return back(request, "/migration", f"{n} proposals created")
 
 
 @app.post("/migration/proposal/{pid}")
-def migration_review(pid: int, decision: str = Form(...), actor: str = Form(...)):
+def migration_review(request: Request, pid: int, decision: str = Form(...), actor: str = Form("")):
     try:
-        mig.review_proposal(db(), pid, decision, actor)
-        return back("/migration", f"Proposal #{pid} → {decision}")
-    except PermissionError as e:
-        return back("/migration", err=str(e))
+        mig.review_proposal(db(), pid, decision, who(request, actor))
+        return back(request, "/migration", f"Proposal #{pid} → {decision}")
+    except (PermissionError, WorkflowError) as e:
+        return back(request, "/migration", err=str(e))
 
 
 @app.get("/audit", response_class=HTMLResponse)
 def audit(request: Request):
-    return templates.TemplateResponse(request, "audit.html", ctx(request, rows=db().all("audit_log", order="id DESC")[:300]))
+    return page(request, "audit.html", rows=db().all("audit_log", order="id DESC")[:300])
+
+
+@app.post("/internal/tick")
+def internal_tick(ops: int = 0):
+    """One worker pass (publisher + status poll; `?ops=1` also refreshes from the ops portal).
+    Called by EventBridge Scheduler: App Runner throttles CPU between requests, so a background
+    thread is not a reliable clock there."""
+    from ..worker import tick
+    r = tick(db(), settings, bool(ops))
+    return {"ok": True, "planned": r["planned"], "publisher": r["publisher"],
+            "ops_clips": (r.get("ops_clips") or {}).get("imported")}
 
 
 @app.get("/healthz")

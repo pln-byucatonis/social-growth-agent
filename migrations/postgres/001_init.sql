@@ -30,9 +30,10 @@ CREATE TABLE IF NOT EXISTS accounts (
   campaign TEXT,
   notes TEXT,
   source TEXT NOT NULL,
+  ops_account_id INTEGER,
   csv_row INTEGER,
-  created_at TIMESTAMPTZ,
-  updated_at TIMESTAMPTZ
+  created_at TEXT,
+  updated_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS assets (
@@ -70,13 +71,28 @@ CREATE TABLE IF NOT EXISTS assets (
   probe JSONB,
   transcript JSONB,
   is_sample BOOLEAN NOT NULL DEFAULT FALSE,
-  ingested_at TIMESTAMPTZ
+  ingested_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS asset_rights (
+  asset_id TEXT PRIMARY KEY,
+  license TEXT,
+  owner TEXT,
+  territory JSONB,
+  rights_expires_at TEXT,
+  rights_verified BOOLEAN NOT NULL DEFAULT FALSE,
+  people_verified BOOLEAN NOT NULL DEFAULT FALSE,
+  music_cleared BOOLEAN NOT NULL DEFAULT FALSE,
+  sponsor_approved BOOLEAN NOT NULL DEFAULT FALSE,
+  note TEXT,
+  updated_by TEXT,
+  updated_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS editorial_packs (
   pack_id TEXT PRIMARY KEY,
   asset_id TEXT NOT NULL,
-  created_at TIMESTAMPTZ,
+  created_at TEXT,
   summary JSONB
 );
 
@@ -112,8 +128,8 @@ CREATE TABLE IF NOT EXISTS variants (
   caption_hash TEXT,
   render_status TEXT,
   render_path TEXT,
-  created_at TIMESTAMPTZ,
-  updated_at TIMESTAMPTZ
+  created_at TEXT,
+  updated_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS approvals (
@@ -123,17 +139,17 @@ CREATE TABLE IF NOT EXISTS approvals (
   reviewer TEXT NOT NULL,
   note TEXT,
   caption_hash TEXT,
-  at TIMESTAMPTZ
+  at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS schedules (
   schedule_id TEXT PRIMARY KEY,
   variant_id TEXT NOT NULL,
   account_id TEXT NOT NULL,
-  slot_at TIMESTAMPTZ NOT NULL,
+  slot_at TEXT NOT NULL,
   state TEXT NOT NULL,
   reason TEXT,
-  created_at TIMESTAMPTZ
+  created_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS publish_jobs (
@@ -144,21 +160,21 @@ CREATE TABLE IF NOT EXISTS publish_jobs (
   state TEXT NOT NULL,
   mode TEXT NOT NULL,
   attempts INTEGER NOT NULL DEFAULT 0,
-  next_attempt_at TIMESTAMPTZ,
-  locked_at TIMESTAMPTZ,
+  next_attempt_at TEXT,
+  locked_at TEXT,
   last_error TEXT,
   platform_post_id TEXT,
   permalink TEXT,
   receipt JSONB,
   remote_status TEXT,
-  created_at TIMESTAMPTZ,
-  updated_at TIMESTAMPTZ
+  created_at TEXT,
+  updated_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS publish_attempts (
   id BIGSERIAL PRIMARY KEY,
   job_id TEXT NOT NULL,
-  at TIMESTAMPTZ,
+  at TEXT,
   outcome TEXT,
   error_kind TEXT,
   error TEXT,
@@ -178,7 +194,7 @@ CREATE TABLE IF NOT EXISTS metrics (
   period_start TEXT,
   period_end TEXT,
   source TEXT NOT NULL,
-  captured_at TIMESTAMPTZ
+  captured_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS feedback (
@@ -187,12 +203,12 @@ CREATE TABLE IF NOT EXISTS feedback (
   kind TEXT,
   text TEXT,
   author TEXT,
-  at TIMESTAMPTZ
+  at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS audit_log (
   id BIGSERIAL PRIMARY KEY,
-  at TIMESTAMPTZ,
+  at TEXT,
   actor TEXT,
   action TEXT NOT NULL,
   entity TEXT,
@@ -203,7 +219,7 @@ CREATE TABLE IF NOT EXISTS audit_log (
 CREATE TABLE IF NOT EXISTS settings_kv (
   key TEXT PRIMARY KEY,
   value TEXT,
-  updated_at TIMESTAMPTZ,
+  updated_at TEXT,
   updated_by TEXT
 );
 
@@ -216,7 +232,7 @@ CREATE TABLE IF NOT EXISTS migration_decisions (
   rationale TEXT,
   evidence JSONB,
   decided_by TEXT,
-  decided_at TIMESTAMPTZ
+  decided_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS profile_change_proposals (
@@ -227,7 +243,7 @@ CREATE TABLE IF NOT EXISTS profile_change_proposals (
   proposed_value TEXT,
   status TEXT NOT NULL,
   note TEXT,
-  created_at TIMESTAMPTZ,
+  created_at TEXT,
   reviewed_by TEXT
 );
 

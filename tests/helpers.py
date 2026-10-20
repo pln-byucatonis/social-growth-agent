@@ -19,11 +19,26 @@ WPL = "wpl-archive-003"
 SLAP = "slapfight-sample-004"
 
 
+def test_db_url() -> str:
+    """SQLite in-memory by default; set PLN_TEST_DATABASE_URL=postgresql://... to run the
+    suite against Postgres (each call gets its own throwaway schema)."""
+    base = os.environ.get("PLN_TEST_DATABASE_URL")
+    if not base:
+        return ":memory:"
+    import uuid
+    import psycopg
+    schema = f"t_{uuid.uuid4().hex[:10]}"
+    with psycopg.connect(base, autocommit=True) as c:
+        c.execute(f"CREATE SCHEMA {schema}")
+    sep = "&" if "?" in base else "?"
+    return f"{base}{sep}options=-csearch_path%3D{schema}"
+
+
 def make(packs=True, **overrides):
     tmp = Path(tempfile.mkdtemp(prefix="pln-test-"))
     s = replace(load_settings(), dry_run=True, publishing_enabled=False, database_url="sqlite:///:memory:",
                 render_dir=tmp / "renders", media_inbox=ROOT / "sample_media" / "inbox", **overrides)
-    db = DB(":memory:")
+    db = DB(test_db_url())
     acc_mod.load_accounts(db, actor="test")
     mig.sync_decisions(db)
     scan_inbox(db, s.media_inbox)

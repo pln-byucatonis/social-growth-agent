@@ -9,6 +9,8 @@ BANNED_PATTERNS = [
     r"you won'?t believe", r"\binsane\b", r"gone wrong", r"\bdestroy(?:ed|s)\b", r"\bbrutal\b", r"\bKO'?d\b",
     r"\bshocking\b", r"\bexposed\b", r"\bdrama\b", r"\bbet (?:now|on)\b", r"\bodds\b", r"\bguaranteed\b",
     r"\bviral\b", r"\bbreak(?:ing)? the internet\b", r"\bfight (?:broke out|erupts)\b",
+    # sensationalized injury language (machine-written clip captions often use it)
+    r"\bdevastating\b", r"\bout cold\b", r"\bknocked (?:him |her )?out\b", r"\blights out\b", r"\bcarnage\b",
 ]
 WATERMARK_WORDS = ["watermark", "instagram logo", "tiktok logo", "capcut", "reels logo"]
 

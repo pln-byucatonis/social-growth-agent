@@ -12,6 +12,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
+
+class _J:
+    """A JSON-encoded bind value (so each backend can bind it as jsonb)."""
+
+    __slots__ = ("v",)
+
+    def __init__(self, v: str):
+        self.v = v
+
 # column spec: (name, logical_type, constraints). logical types: text, int, real, bool, json, ts
 TABLES: dict[str, list[tuple[str, str, str]]] = {
     "brands": [
@@ -44,7 +53,8 @@ TABLES: dict[str, list[tuple[str, str, str]]] = {
         ("redirect_to_account_id", "text", ""),
         ("campaign", "text", ""),
         ("notes", "text", ""),
-        ("source", "text", "NOT NULL"),  # user_csv | system_placeholder
+        ("source", "text", "NOT NULL"),  # user_csv | system_placeholder | ops_registry
+        ("ops_account_id", "int", ""),  # ops portal social_account.id when matched
         ("csv_row", "int", ""),
         ("created_at", "ts", ""),
         ("updated_at", "ts", ""),
@@ -85,6 +95,22 @@ TABLES: dict[str, list[tuple[str, str, str]]] = {
         ("transcript", "json", ""),
         ("is_sample", "bool", "NOT NULL DEFAULT 0"),
         ("ingested_at", "ts", ""),
+    ],
+    # Human-entered rights/identity record per asset. Survives re-imports of the asset
+    # from the ops clip library (which carries no rights metadata at all).
+    "asset_rights": [
+        ("asset_id", "text", "PRIMARY KEY"),
+        ("license", "text", ""),
+        ("owner", "text", ""),
+        ("territory", "json", ""),
+        ("rights_expires_at", "text", ""),
+        ("rights_verified", "bool", "NOT NULL DEFAULT 0"),
+        ("people_verified", "bool", "NOT NULL DEFAULT 0"),
+        ("music_cleared", "bool", "NOT NULL DEFAULT 0"),
+        ("sponsor_approved", "bool", "NOT NULL DEFAULT 0"),
+        ("note", "text", ""),
+        ("updated_by", "text", ""),
+        ("updated_at", "ts", ""),
     ],
     "editorial_packs": [
         ("pack_id", "text", "PRIMARY KEY"),
@@ -255,11 +281,13 @@ INDEXES = [
     "CREATE INDEX IF NOT EXISTS ix_sched_slot ON schedules(slot_at)",
 ]
 
+# Timestamps are stored as ISO-8601 TEXT on every backend: the engine compares and
+# parses them as strings, and the Aurora Data API has no clean timestamptz binding.
 _TYPES = {
     "sqlite": {"text": "TEXT", "int": "INTEGER", "real": "REAL", "bool": "INTEGER", "json": "TEXT",
                "ts": "TEXT", "pk": "INTEGER PRIMARY KEY AUTOINCREMENT"},
     "postgres": {"text": "TEXT", "int": "INTEGER", "real": "DOUBLE PRECISION", "bool": "BOOLEAN",
-                 "json": "JSONB", "ts": "TIMESTAMPTZ", "pk": "BIGSERIAL PRIMARY KEY"},
+                 "json": "JSONB", "ts": "TEXT", "pk": "BIGSERIAL PRIMARY KEY"},
 }
 
 JSON_COLS = {t: {c for c, ty, _ in cols if ty == "json"} for t, cols in TABLES.items()}
@@ -267,6 +295,7 @@ BOOL_COLS = {t: {c for c, ty, _ in cols if ty == "bool"} for t, cols in TABLES.i
 
 
 def render_ddl(dialect: str = "sqlite") -> str:
+    dialect = "postgres" if dialect == "rdsdata" else dialect
     out = []
     for table, cols in TABLES.items():
         parts = []
@@ -284,10 +313,57 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
 
-class DB:
-    """Tiny DB wrapper; SQL is written with `?` placeholders and translated for Postgres."""
+class _RdsData:
+    """Aurora Data API connection (same access pattern as the ops portal's src/lib/aws/db.ts).
+
+    URL form: rdsdata://<database>?cluster=<cluster-arn>&secret=<secret-arn>[&region=us-east-1]
+    """
 
     def __init__(self, url: str):
+        import boto3  # optional dependency
+        from urllib.parse import parse_qs, urlparse
+        u = urlparse(url)
+        q = {k: v[0] for k, v in parse_qs(u.query).items()}
+        self.database = u.netloc or u.path.lstrip("/") or "growth"
+        self.cluster, self.secret = q["cluster"], q["secret"]
+        self.client = boto3.client("rds-data", region_name=q.get("region", "us-east-1"))
+
+    @staticmethod
+    def _param(name: str, v: Any, json_hint: bool) -> dict:
+        if v is None:
+            return {"name": name, "value": {"isNull": True}}
+        if isinstance(v, bool):
+            return {"name": name, "value": {"booleanValue": v}}
+        if isinstance(v, int):
+            return {"name": name, "value": {"longValue": v}}
+        if isinstance(v, float):
+            return {"name": name, "value": {"doubleValue": v}}
+        p = {"name": name, "value": {"stringValue": str(v)}}
+        if json_hint:
+            p["typeHint"] = "JSON"
+        return p
+
+    def run(self, sql: str, params: Iterable[Any] = (), json_params: set[int] | None = None) -> list[dict]:
+        params = list(params)
+        parts = sql.split("?")
+        if len(parts) - 1 != len(params):
+            raise ValueError("placeholder/param count mismatch")
+        named = parts[0] + "".join(f":p{i}" + parts[i + 1] for i in range(len(params)))
+        out = self.client.execute_statement(
+            resourceArn=self.cluster, secretArn=self.secret, database=self.database, sql=named,
+            parameters=[self._param(f"p{i}", v, i in (json_params or set())) for i, v in enumerate(params)],
+            formatRecordsAs="JSON")
+        return json.loads(out["formattedRecords"]) if out.get("formattedRecords") else []
+
+
+class DB:
+    """Tiny DB wrapper; SQL is written with `?` placeholders and translated per backend.
+
+    Backends: sqlite:///path (local/tests), postgresql://... (psycopg), and
+    rdsdata://<db>?cluster=..&secret=.. (Aurora Data API, used when running beside the ops portal).
+    """
+
+    def __init__(self, url: str, init: bool = True):
         self.url = url
         if url.startswith("sqlite:///") or url == ":memory:":
             self.dialect = "sqlite"
@@ -307,13 +383,18 @@ class DB:
             from psycopg.rows import dict_row
             self.dialect = "postgres"
             self.conn = psycopg.connect(url, row_factory=dict_row, autocommit=True)
+        elif url.startswith("rdsdata://"):
+            self.dialect = "rdsdata"
+            self.conn = _RdsData(url)
         else:
             raise ValueError(f"unsupported database url {url!r}")
-        self.init_schema()
+        if init:  # init=False: read-only handle onto someone else's database (e.g. the ops portal's)
+            self.init_schema()
 
     def close(self) -> None:
         try:
-            self.conn.close()
+            if self.dialect != "rdsdata":
+                self.conn.close()
         except Exception:
             pass
 
@@ -325,30 +406,63 @@ class DB:
         if self.dialect == "sqlite":
             self.conn.executescript(ddl)
             self.conn.commit()
-        else:
+        elif self.dialect == "postgres":
             with self.conn.cursor() as cur:
                 cur.execute(ddl)
+        else:  # Data API: one statement per call
+            for stmt in [x.strip() for x in ddl.split(";\n") if x.strip()]:
+                self.conn.run(stmt)
+        self._add_missing_columns()
+
+    def _add_missing_columns(self) -> None:
+        """Additive migrations: CREATE TABLE IF NOT EXISTS never adds new columns to an
+        existing table, so add any column the code defines but the table lacks."""
+        types = _TYPES["sqlite" if self.dialect == "sqlite" else "postgres"]
+        for table, cols in TABLES.items():
+            if self.dialect == "sqlite":
+                have = {r["name"] for r in self.query(f"PRAGMA table_info({table})")}
+            else:
+                have = {r["column_name"] for r in self.query(
+                    "SELECT column_name FROM information_schema.columns WHERE table_name = ? "
+                    "AND table_schema = current_schema()", [table])}
+            for name, ty, cons in cols:
+                if name in have or ty == "pk" or "PRIMARY KEY" in cons:
+                    continue
+                default = " DEFAULT 0" if "DEFAULT 0" in cons and self.dialect == "sqlite" else (
+                    " DEFAULT FALSE" if "DEFAULT 0" in cons else "")
+                self.execute(f"ALTER TABLE {table} ADD COLUMN {name} {types[ty]}{default}")
 
     def _sql(self, sql: str) -> str:
         return sql.replace("?", "%s") if self.dialect == "postgres" else sql
 
+    def _adapt(self, params: Iterable[Any]) -> list:
+        params = list(params)
+        if self.dialect == "postgres":
+            from psycopg.types.json import Jsonb
+            return [Jsonb(json.loads(p.v)) if isinstance(p, _J) else p for p in params]
+        return [p.v if isinstance(p, _J) else p for p in params]
+
     def execute(self, sql: str, params: Iterable[Any] = ()) -> Any:
+        params = list(params)
         if self.dialect == "sqlite":
-            cur = self.conn.execute(sql, tuple(params))
+            cur = self.conn.execute(sql, tuple(self._adapt(params)))
             self.conn.commit()
             return cur
+        if self.dialect == "rdsdata":
+            return self.conn.run(sql, self._adapt(params), {i for i, p in enumerate(params) if isinstance(p, _J)})
         with self.conn.cursor() as cur:
-            cur.execute(self._sql(sql), tuple(params))
+            cur.execute(self._sql(sql), tuple(self._adapt(params)))
             return cur
 
     def query(self, sql: str, params: Iterable[Any] = ()) -> list[dict]:
+        params = list(params)
         if self.dialect == "sqlite":
-            rows = [dict(r) for r in self.conn.execute(sql, tuple(params)).fetchall()]
-        else:
-            with self.conn.cursor() as cur:
-                cur.execute(self._sql(sql), tuple(params))
-                rows = list(cur.fetchall())
-        return rows
+            return [dict(r) for r in self.conn.execute(sql, tuple(self._adapt(params))).fetchall()]
+        if self.dialect == "rdsdata":
+            return self.conn.run(sql, self._adapt(params), {i for i, p in enumerate(params) if isinstance(p, _J)})
+        with self.conn.cursor() as cur:
+            cur.execute(self._sql(sql), tuple(self._adapt(params)))
+            return list(cur.fetchall()) if cur.description else []
 
     def one(self, sql: str, params: Iterable[Any] = ()) -> dict | None:
         rows = self.query(sql, params)
@@ -358,10 +472,10 @@ class DB:
     def _encode(self, table: str, row: dict) -> dict:
         enc = {}
         for k, v in row.items():
-            if k in JSON_COLS[table] and v is not None and not isinstance(v, str):
-                v = json.dumps(v, sort_keys=True)
+            if k in JSON_COLS[table] and v is not None:
+                v = _J(v if isinstance(v, str) else json.dumps(v, sort_keys=True))
             elif k in BOOL_COLS[table] and v is not None:
-                v = bool(v) if self.dialect == "postgres" else int(bool(v))
+                v = int(bool(v)) if self.dialect == "sqlite" else bool(v)
             enc[k] = v
         return enc
 

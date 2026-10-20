@@ -245,9 +245,49 @@ def cmd_demo(args):
     run_demo(Path(args.out) if args.out else ROOT / "data" / "demo_output")
 
 
+def cmd_ops(args):
+    from .ops_sources import import_ops_accounts, import_ops_clips
+    s = load_settings()
+    if not s.ops_database_url:
+        print("Set PLN_OPS_DATABASE_URL (e.g. rdsdata://plnops?cluster=<arn>&secret=<arn>)")
+        sys.exit(2)
+    db, ops = _db(args), DB(s.ops_database_url, init=False)
+    if args.action in ("accounts", "all"):
+        _p(import_ops_accounts(db, ops, args.actor))
+    if args.action in ("clips", "all"):
+        r = import_ops_clips(db, ops, s.ops_assets_bucket, limit=args.limit, min_score=args.min_score,
+                             properties=args.property or None, actor=args.actor)
+        print(f"imported {r['imported']} clips; skipped {len(r['skipped'])}")
+        for x in r["skipped"][:20]:
+            print("   ", x)
+
+
+def cmd_rights(args):
+    from .ops_sources import set_asset_rights
+    db = _db(args)
+    ids = [a["asset_id"] for a in db.all("assets", "brand_id=?", [args.brand])] if args.brand else [args.asset_id]
+    fields = {"license": args.license, "owner": args.owner or "", "territory": [t.strip().upper() for t in args.territory.split(",")],
+              "rights_expires_at": args.expires, "rights_verified": True, "music_cleared": args.music_cleared,
+              "note": args.note or ""}
+    if args.asset_id and args.people_verified:
+        fields["people_verified"] = True  # never in bulk: identities are confirmed clip by clip
+    for aid in ids:
+        set_asset_rights(db, aid, args.actor, **fields)
+    print(f"rights recorded for {len(ids)} asset(s) by {args.actor}")
+
+
+def cmd_worker(args):
+    from . import worker
+    s = load_settings()
+    worker.run(_db(args), s, interval_s=args.interval, ops_every_s=args.ops_every)
+
+
 def cmd_serve(args):
+    import os
     import uvicorn
-    uvicorn.run("pln_agent.web.app:app", host=args.host, port=args.port, reload=False)
+    port = int(os.environ.get("PORT", args.port))
+    uvicorn.run("pln_agent.web.app:app", host=args.host, port=port, reload=False,
+                proxy_headers=True, forwarded_allow_ips="*")
 
 
 def main(argv=None):
@@ -322,6 +362,20 @@ def main(argv=None):
     d = sp.add_parser("demo")
     d.add_argument("--out")
     d.set_defaults(fn=cmd_demo)
+    o = sp.add_parser("ops", help="read-only import from the ops portal (accounts registry + clip library)")
+    o.add_argument("action", choices=["accounts", "clips", "all"])
+    o.add_argument("--limit", type=int, default=100), o.add_argument("--min-score", dest="min_score", type=int, default=60)
+    o.add_argument("--property", action="append", help="clips.property value, e.g. CarJitsu (repeatable)")
+    o.set_defaults(fn=cmd_ops)
+    rg = sp.add_parser("rights", help="record a human rights confirmation for one asset or a whole brand")
+    rg.add_argument("asset_id", nargs="?"), rg.add_argument("--brand")
+    rg.add_argument("--license", required=True), rg.add_argument("--owner"), rg.add_argument("--territory", required=True)
+    rg.add_argument("--expires"), rg.add_argument("--music-cleared", dest="music_cleared", action="store_true")
+    rg.add_argument("--people-verified", dest="people_verified", action="store_true"), rg.add_argument("--note")
+    rg.set_defaults(fn=cmd_rights)
+    w = sp.add_parser("worker", help="publisher loop + periodic ops refresh")
+    w.add_argument("--interval", type=int, default=60), w.add_argument("--ops-every", dest="ops_every", type=int, default=6 * 3600)
+    w.set_defaults(fn=cmd_worker)
     sv = sp.add_parser("serve")
     sv.add_argument("--host", default="127.0.0.1"), sv.add_argument("--port", type=int, default=8000)
     sv.set_defaults(fn=cmd_serve)

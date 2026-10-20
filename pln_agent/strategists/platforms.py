@@ -35,6 +35,21 @@ LEX = {
                         "tags": ["#Carrom"], "debate": "Could you make that shot?",
                         "b2b": ("Precision sports have their own kind of drama.", "Small surface, huge skill ceiling.")},
 }
+LEX.update({
+    "ultimate_tire_wrestling": {"noun": "Ultimate Tire Wrestling", "arena": "in the tire ring", "what": "wrestling with tires",
+                                "tags": ["#UltimateTireWrestling"], "debate": "Who had the better grip?",
+                                "b2b": ("Absurd premises earn the first look; real competition earns the second.",
+                                        "The format is instantly readable and nobody has seen it before.")},
+    "bronco_off_course": {"noun": "Bronco Off Course", "arena": "off course", "what": "off-road driving",
+                          "tags": ["#BroncoOffCourse"], "debate": "Would you take that line?",
+                          "b2b": ("Product and sport can be the same frame.", "Driving skill is the show.")},
+    "coffin_wars": {"noun": "Coffin Wars", "arena": "in Coffin Wars", "what": "coffin-based competition",
+                    "tags": ["#CoffinWars"], "debate": "Who takes the rematch?",
+                    "b2b": ("A strange premise is a distribution hook.", "Viewers stop because they can't place it.")},
+    "pro_mini_golf_tour": {"noun": "Pro Mini Golf Tour", "arena": "on the course", "what": "pro mini golf",
+                           "tags": ["#MiniGolf"], "debate": "Make or miss?",
+                           "b2b": ("Familiar games, pro stakes.", "Everyone has played it, so everyone gets it.")},
+})
 LEX["world_putting_league"] = LEX["putt_tour"]
 
 

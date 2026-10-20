@@ -18,9 +18,9 @@ button{font:inherit;padding:6px 12px;border-radius:6px;border:1px solid var(--li
 pre{white-space:pre-wrap;word-break:break-word;background:var(--bg);padding:8px;border-radius:6px;font-size:12px}.flash{padding:8px 12px;border-radius:6px;margin-bottom:12px}.flash.ok{background:color-mix(in srgb,var(--ok) 18%,transparent)}.flash.err{background:color-mix(in srgb,var(--bad) 22%,transparent)}
 form.inline{display:inline}video{max-width:100%;max-height:520px;border-radius:8px;background:#000}
 </style></head><body>
-<header><b>PLN Growth Desk</b><nav><a href="/">Overview</a><a href="/queue">Approval queue</a><a href="/calendar">Calendar</a><a href="/accounts">Accounts</a><a href="/migration">WPL → Putt Tour</a><a href="/audit">Audit</a></nav>
+<header><b>PLN Growth Desk</b><nav><a href="{{ base }}/">Overview</a><a href="{{ base }}/queue">Approval queue</a><a href="{{ base }}/assets">Assets &amp; rights</a><a href="{{ base }}/calendar">Calendar</a><a href="{{ base }}/accounts">Accounts</a><a href="{{ base }}/migration">WPL → Putt Tour</a><a href="{{ base }}/audit">Audit</a></nav>
 <div class="mode">{% if dry_run %}<span class="pill ok">DRY-RUN</span>{% else %}<span class="pill warn">LIVE MODE</span>{% endif %}
 <span class="pill {{ 'warn' if publishing_enabled else 'ok' }}">publishing {{ 'ENABLED' if publishing_enabled else 'off' }}</span>
-{% if kill %}<span class="pill bad">EMERGENCY STOP ON</span>{% endif %}</div></header>
+{% if kill %}<span class="pill bad">EMERGENCY STOP ON</span>{% endif %}{% if user %}<span class="pill">{{ user }}</span>{% endif %}</div></header>
 <main>{% if msg %}<div class="flash ok">{{ msg }}</div>{% endif %}{% if err %}<div class="flash err">{{ err }}</div>{% endif %}
 {% block body %}{% endblock %}</main></body></html>

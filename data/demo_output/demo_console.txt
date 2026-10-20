@@ -251,23 +251,23 @@ Mon 2026-10-26
     x          needs_fix  2
     youtube    in_review  4
     youtube    needs_fix  3
-  SCHEDULE carjitsu-sample-001:carjitsu.tiktok.carjitsuchampionship           → job job-3f643e76ba key=374579bde8f3…
-  SCHEDULE putt-sample-002:putt_tour.instagram.putttour                       → job job-08f3d384b9 key=b468730c4019…
-  SCHEDULE carjitsu-sample-001:pln.linkedin.pending                           → job job-819d427664 key=d86d96767784…
+  SCHEDULE carjitsu-sample-001:carjitsu.tiktok.carjitsuchampionship           → job job-c3a2d12563 key=374579bde8f3…
+  SCHEDULE putt-sample-002:putt_tour.instagram.putttour                       → job job-d04c33a817 key=b468730c4019…
+  SCHEDULE carjitsu-sample-001:pln.linkedin.pending                           → job job-115e6bc4c4 key=d86d96767784…
   SCHEDULE carjitsu-sample-001:carjitsu.instagram.carjitsu_championship       → REFUSED: only approved variants can be scheduled (state=in_review)
   SCHEDULE (double-submit of same post)                            → REFUSED: duplicate: an identical post for this account already has a publish job
   EMERGENCY STOP ON → publisher: [{'skipped': 'emergency stop is ON'}]
-  PUBLISH (dry-run) job-3f643e76ba → simulated; not live because: ['global dry-run is ON (PLN_DRY_RUN)', 'global publishing disabled (PLN_PUBLISHING_ENABLED)', 'account is unverified, not oauth_connected', 'no credential reference configured', 'publishing not authorized for this account']
-  PUBLISH (dry-run) job-08f3d384b9 → simulated; not live because: ['global dry-run is ON (PLN_DRY_RUN)', 'global publishing disabled (PLN_PUBLISHING_ENABLED)', 'account is unverified, not oauth_connected', 'no credential reference configured', 'publishing not authorized for this account']
-  PUBLISH (dry-run) job-819d427664 → simulated; not live because: ['global dry-run is ON (PLN_DRY_RUN)', 'global publishing disabled (PLN_PUBLISHING_ENABLED)', 'hard block: No LinkedIn company Page ID supplied: connect via OAuth with Page admin role first', 'account is unverified, not oauth_connected', 'no credential reference configured', 'publishing not authorized for this account']
+  PUBLISH (dry-run) job-c3a2d12563 → simulated; not live because: ['global dry-run is ON (PLN_DRY_RUN)', 'global publishing disabled (PLN_PUBLISHING_ENABLED)', 'account is unverified, not oauth_connected', 'no credential reference configured', 'publishing not authorized for this account']
+  PUBLISH (dry-run) job-d04c33a817 → simulated; not live because: ['global dry-run is ON (PLN_DRY_RUN)', 'global publishing disabled (PLN_PUBLISHING_ENABLED)', 'account is unverified, not oauth_connected', 'no credential reference configured', 'publishing not authorized for this account']
+  PUBLISH (dry-run) job-115e6bc4c4 → simulated; not live because: ['global dry-run is ON (PLN_DRY_RUN)', 'global publishing disabled (PLN_PUBLISHING_ENABLED)', 'hard block: No LinkedIn company Page ID supplied: connect via OAuth with Page admin role first', 'account is unverified, not oauth_connected', 'no credential reference configured', 'publishing not authorized for this account']
   → simulated receipts incl. exact (token-redacted) API requests: simulated_receipts.json
 
 ====================================================================================================
 8) LIVE-PATH REHEARSAL WITH A MOCK TRANSPORT (no network; proves retry/backoff/idempotency/error handling)
 ====================================================================================================
-  2026-10-21T16:00:00+00:00 → [{'job_id': 'job-06fe30b3e1', 'state': 'retry_scheduled', 'next_attempt_at': '2026-10-21T16:01:00+00:00', 'error': 'x create post: HTTP 503 {"title": "Service Unavailable"}'}]
-  2026-10-21T16:01:01+00:00 → [{'job_id': 'job-06fe30b3e1', 'state': 'retry_scheduled', 'next_attempt_at': '2026-10-21T16:03:01+00:00', 'error': 'x create post: HTTP 429 {"title": "Too Many Requests"}'}]
-  2026-10-21T16:03:02+00:00 → [{'job_id': 'job-06fe30b3e1', 'state': 'published', 'permalink': 'https://x.com/carjitsuusa/status/1850000000000000001'}]
+  2026-10-21T16:00:00+00:00 → [{'job_id': 'job-c5f0402d5c', 'state': 'retry_scheduled', 'next_attempt_at': '2026-10-21T16:01:00+00:00', 'error': 'x create post: HTTP 503 {"title": "Service Unavailable"}'}]
+  2026-10-21T16:01:01+00:00 → [{'job_id': 'job-c5f0402d5c', 'state': 'retry_scheduled', 'next_attempt_at': '2026-10-21T16:03:01+00:00', 'error': 'x create post: HTTP 429 {"title": "Too Many Requests"}'}]
+  2026-10-21T16:03:02+00:00 → [{'job_id': 'job-c5f0402d5c', 'state': 'published', 'permalink': 'https://x.com/carjitsuusa/status/1850000000000000001'}]
   final job: {'state': 'published', 'attempts': 3, 'permalink': 'https://x.com/carjitsuusa/status/1850000000000000001'} · HTTP calls made: 3 (Authorization header redacted in logs)
   re-run publisher after success → nothing due (no duplicate post; calls still 3)
   401 Unauthorized → failed (kind=auth); no retry storm; rollback guidance stored

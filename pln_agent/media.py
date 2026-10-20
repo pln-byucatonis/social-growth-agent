@@ -5,6 +5,7 @@ placeholder preview — never a fake video. No platform logos or third-party wat
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -16,6 +17,30 @@ from .db import DB, now_iso
 FONT_CANDIDATES = ["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
                    "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
                    "/System/Library/Fonts/Supplemental/Arial Bold.ttf"]
+
+
+def resolve_media(path: str) -> str:
+    """Local path as-is; s3://bucket/key → short-lived presigned HTTPS URL ffmpeg can range-read.
+    Uses the runtime's ambient AWS credentials (App Runner instance role)."""
+    if not path.startswith("s3://"):
+        return path
+    import boto3
+    bucket, _, key = path[5:].partition("/")
+    return boto3.client("s3").generate_presigned_url("get_object", Params={"Bucket": bucket, "Key": key},
+                                                     ExpiresIn=3600)
+
+
+def upload_render(outdir: Path, variant_id: str, bucket: str) -> str:
+    """Persist a finished render to S3 (container disks are ephemeral). Returns the s3:// path of the video."""
+    import boto3
+    s3 = boto3.client("s3")
+    prefix = f"social-agent/renders/{_safe(variant_id)}"
+    for name, ctype in (("video.mp4", "video/mp4"), ("thumbnail.jpg", "image/jpeg"), ("edl.json", "application/json"),
+                        ("captions.srt", "application/x-subrip")):
+        f = outdir / name
+        if f.exists():
+            s3.upload_file(str(f), bucket, f"{prefix}/{name}", ExtraArgs={"ContentType": ctype})
+    return f"s3://{bucket}/{prefix}/video.mp4"
 
 
 def _font() -> str | None:
@@ -86,12 +111,16 @@ def render_variant(db: DB, variant_id: str, settings: Settings, actor: str = "re
         status, path, detail = "edl_only", str(preview), "source media missing: EDL + placeholder preview only"
     else:
         has_audio = bool(asset.get("has_audio"))
-        parts, labels = [], []
+        src = resolve_media(asset["media_path"])
+        # One input per segment with input-side seeking: ffmpeg range-reads just those seconds,
+        # so a multi-GB master on S3 is never downloaded or decoded from the start.
+        inputs, parts, labels = [], [], []
         for i, s in enumerate(segs):
-            parts.append(f"[0:v]trim=start={s['source_in']}:end={s['source_out']},setpts=PTS-STARTPTS[v{i}]")
+            inputs += ["-ss", f"{s['source_in']:.3f}", "-t", f"{s['source_out'] - s['source_in']:.3f}", "-i", src]
+            parts.append(f"[{i}:v]setpts=PTS-STARTPTS[v{i}]")
             labels.append(f"[v{i}]")
             if has_audio:
-                parts.append(f"[0:a]atrim=start={s['source_in']}:end={s['source_out']},asetpts=PTS-STARTPTS[a{i}]")
+                parts.append(f"[{i}:a]asetpts=PTS-STARTPTS[a{i}]")
                 labels.append(f"[a{i}]")
         parts.append("".join(labels) + f"concat=n={len(segs)}:v=1:a={1 if has_audio else 0}" + ("[cv][ca]" if has_audio else "[cv]"))
         chain = _reframe(out, asset.get("width") or out["w"], asset.get("height") or out["h"])
@@ -114,7 +143,7 @@ def render_variant(db: DB, variant_id: str, settings: Settings, actor: str = "re
                              f"bordercolor=black:x=(w-text_w)/2:y=h*0.78:enable='between(t,{c['start']:.2f},{c['end']:.2f})'")
         parts.append(f"[cv]{chain}{(',' + ','.join(draws)) if draws else ''}[ov]")
         video = outdir / "video.mp4"
-        cmd = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", asset["media_path"],
+        cmd = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", *inputs,
                "-filter_complex", ";".join(parts), "-map", "[ov]"]
         if has_audio:
             cmd += ["-map", "[ca]", "-c:a", "aac", "-b:a", "128k"]
@@ -130,9 +159,11 @@ def render_variant(db: DB, variant_id: str, settings: Settings, actor: str = "re
                     f"{i + 1}\n{_srt_time(c['start'])} --> {_srt_time(c['end'])}\n{c['text']}\n" for i, c in enumerate(cues)))
             t = v["thumbnail"].get("source_time", 0)
             thumb = outdir / "thumbnail.jpg"
-            subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-ss", str(t), "-i", asset["media_path"],
+            subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-ss", str(t), "-i", src,
                             "-frames:v", "1", "-vf", _reframe(out, asset["width"], asset["height"]), str(thumb)],
                            capture_output=True, timeout=120)
+    if status == "rendered" and os.environ.get("PLN_RENDER_BUCKET"):
+        path = upload_render(outdir, variant_id, os.environ["PLN_RENDER_BUCKET"])
     db.update("variants", "variant_id", variant_id, {"render_status": status, "render_path": path, "updated_at": now_iso()})
     db.audit(actor, "variant_rendered", "variants", variant_id, {"status": status, "detail": detail[:300]})
     return {"variant_id": variant_id, "status": status, "path": path, "detail": detail, "dir": str(outdir)}

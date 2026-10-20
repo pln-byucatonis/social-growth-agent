@@ -47,6 +47,11 @@ class Settings:
     llm_provider: str = "template"  # template | anthropic (optional, needs ANTHROPIC_API_KEY)
     meta_graph_version: str = "v26.0"
     linkedin_version: str = "202601"
+    # ops portal integration (read-only): rdsdata://plnops?cluster=<arn>&secret=<arn>
+    ops_database_url: str = ""
+    ops_assets_bucket: str = "plnfaststack-assetsbucket5cb76180-4dbgjaidfcbv"
+    # set by the ops proxy; when present the dashboard requires it and trusts X-PLN-User-Email
+    agent_api_key: str = ""
     max_publish_attempts: int = 5
     backoff_base_seconds: int = 60
     extra: dict = field(default_factory=dict)
@@ -73,6 +78,9 @@ def load_settings(env_file: Path | None = None) -> Settings:
     s.llm_provider = os.environ.get("PLN_LLM_PROVIDER", s.llm_provider)
     s.meta_graph_version = os.environ.get("META_GRAPH_VERSION", s.meta_graph_version)
     s.linkedin_version = os.environ.get("LINKEDIN_VERSION", s.linkedin_version)
+    s.ops_database_url = os.environ.get("PLN_OPS_DATABASE_URL", s.ops_database_url)
+    s.ops_assets_bucket = os.environ.get("PLN_OPS_ASSETS_BUCKET", s.ops_assets_bucket)
+    s.agent_api_key = os.environ.get("PLN_AGENT_API_KEY", s.agent_api_key)
     return s
 
 

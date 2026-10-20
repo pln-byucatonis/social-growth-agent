@@ -1,0 +1,35 @@
+{% extends "base.html" %}{% block body %}
+<div class="grid">
+<div class="card"><h3>Import from ops</h3>
+{% if ops_connected %}
+<p class="muted">Pulls the ops account registry and the top-scoring clips from the clip library. Read-only; nothing in ops changes. Imported clips start <b>rights-blocked</b>: the library has no licence data.</p>
+<form method="post" action="{{ base }}/ops/import"><div class="grid">
+<label>Max clips<input name="limit" type="number" value="100" min="1" max="1000"></label>
+<label>Min highlight score<input name="min_score" type="number" value="60" min="0" max="100"></label>
+<label>Property (optional)<input name="property" placeholder="CarJitsu, PuttTour, SlapFIGHT…"></label></div><br>
+<button class="primary">Import</button></form>
+{% else %}<p class="muted">Not connected to ops (set PLN_OPS_DATABASE_URL). Sample/inbox assets only.</p>{% endif %}
+</div>
+<div class="card"><h3>Bulk rights by brand</h3>
+<p class="muted">For footage PLN owns outright (e.g. its own league productions). People/athlete identities are <b>not</b> bulk-verifiable; confirm them per clip.</p>
+<form method="post" action="{{ base }}/assets/rights-bulk">
+<select name="brand" required>{% for b in brands %}<option {{ 'selected' if b==brand }}>{{ b }}</option>{% endfor %}</select>
+<input name="license" placeholder="Licence / ownership, e.g. PLN-owned production" required>
+<input name="owner" placeholder="Owner (e.g. Pro League Network)">
+<input name="territory" placeholder="Territory, e.g. WORLDWIDE or US,CA" required>
+<input name="expires" placeholder="Rights expire (YYYY-MM-DD, blank = perpetual)">
+<label><input type="checkbox" name="rights_verified" style="width:auto"> I confirm these media rights</label>
+<label><input type="checkbox" name="music_cleared" style="width:auto"> Audio / music cleared</label>
+<input name="note" placeholder="Evidence (contract, policy link)">
+{% if not user %}<input name="actor" placeholder="your name" required>{% endif %}<br><br>
+<button>Apply to all {{ brand or 'selected brand' }} assets</button></form></div>
+</div>
+<div class="card"><form method="get" class="grid"><select name="brand"><option value="">all brands</option>{% for b in brands %}<option {{ 'selected' if b==brand }}>{{ b }}</option>{% endfor %}</select>
+<select name="rights"><option value="">any rights state</option><option value="blocked" {{ 'selected' if rights=='blocked' }}>blocked</option><option value="clear" {{ 'selected' if rights=='clear' }}>clear</option></select><button>Filter</button></form>
+<form method="post" action="{{ base }}/assets/plan" style="margin-top:8px"><input type="hidden" name="brand" value="{{ brand }}"><button class="primary">Generate posts for rights-clear assets{{ ' (' + brand + ')' if brand }}</button></form></div>
+<div class="card tablewrap"><h3>{{ total }} assets</h3><table><tr><th>asset</th><th>brand</th><th>source</th><th>moments</th><th>rights</th><th>flags</th><th>posts</th></tr>
+{% for a in assets %}<tr><td><a href="{{ base }}/asset/{{ a.asset_id }}">{{ a.title }}</a><br><span class="muted">{{ a.asset_id }}{% if a.is_sample %} · SAMPLE{% endif %}</span></td>
+<td>{{ a.brand_id }}</td><td class="muted">{{ a.provenance }}</td><td>{{ a.moments|length }}</td>
+<td>{% if a.rights_eval.ok %}<span class="badge ok">clear</span>{% else %}{% for b in a.rights_eval.blockers %}<span class="badge bad">{{ b }}</span>{% endfor %}{% endif %}</td>
+<td>{% for f in a.rights_eval.review_flags %}<span class="badge warn">{{ f }}</span>{% endfor %}</td><td>{{ a.variants }}</td></tr>{% endfor %}</table></div>
+{% endblock %}
