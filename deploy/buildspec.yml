@@ -6,6 +6,7 @@ env:
 phases:
   pre_build:
     commands:
+      - AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
       - REPO=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/pln-social-agent
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
       - TAG=$(date -u +%Y%m%d%H%M%S)
