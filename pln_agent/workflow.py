@@ -274,6 +274,9 @@ def run_publisher(db: DB, settings: Settings, now: datetime | None = None, trans
             res = adapter.publish(v, acc, job["idempotency_key"])
             _attempt(db, job["job_id"], "ok", None, res.raw)
             _finish(db, job, v, "published", res.raw, "", res)
+            if res.platform_post_id:  # Creative Intelligence DB: the agent's decisions + where it went
+                from .creative_db import upsert_agent_post
+                upsert_agent_post(db, v, res.platform_post_id, res.permalink, now.isoformat(), settings.timezone)
             results.append({"job_id": job["job_id"], "state": "published", "permalink": res.permalink})
         except AdapterError as e:
             _attempt(db, job["job_id"], "error", e, e.response)

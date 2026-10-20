@@ -58,6 +58,9 @@ def plan_week(db: DB, settings: Settings, start: date, days: int = 7, states=("i
                 lst.append(datetime.combine(day, time(h, m), tz))
         free[acc] = lst
 
+    from .cadence import weekly_target
+    week_cap = {acc: weekly_target(db, acc) for acc in free}  # measured/recommended cadence; None = no record yet
+    per_week: dict[str, int] = {}
     placed: list[dict] = []
     per_day: dict[tuple[str, date], int] = {}
     series_week: dict[tuple[str, str], int] = {}
@@ -68,6 +71,9 @@ def plan_week(db: DB, settings: Settings, start: date, days: int = 7, states=("i
         acc, plat = v["account_id"], v["platform"]
         if not slots.get(plat):
             unplaced.append({"variant_id": v["variant_id"], "reason": f"{plat}: no recurring slots (live/schedule-only)"})
+            continue
+        if week_cap.get(acc) is not None and per_week.get(acc, 0) >= week_cap[acc] and days <= 7:
+            unplaced.append({"variant_id": v["variant_id"], "reason": f"weekly cadence target reached ({week_cap[acc]}/week)"})
             continue
         prior = asset_times.get(v["asset_id"], [])
         canon_times = [t for t, _, _, r in prior if r in ("canonical", "legacy_inplace")]
@@ -97,6 +103,7 @@ def plan_week(db: DB, settings: Settings, start: date, days: int = 7, states=("i
             unplaced.append({"variant_id": v["variant_id"], "reason": "no slot satisfies spacing/caps this week"})
             continue
         free[acc].remove(chosen)
+        per_week[acc] = per_week.get(acc, 0) + 1
         per_day[(acc, chosen.date())] = per_day.get((acc, chosen.date()), 0) + 1
         if v["series"]:
             series_week[(acc, v["series"])] = series_week.get((acc, v["series"]), 0) + 1

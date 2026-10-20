@@ -50,7 +50,29 @@ def _tick(db: DB, settings: Settings, do_ops: bool) -> dict:
         ops = DB(settings.ops_database_url, init=False)
         out["ops_accounts"] = import_ops_accounts(db, ops, "worker")
         out["ops_clips"] = import_ops_clips(db, ops, settings.ops_assets_bucket, limit=200, min_score=60, actor="worker")
+        out["intelligence"] = refresh_intelligence(db, settings, ops)
     out["planned"] = plan_new_clear_assets(db, settings)
+    return out
+
+
+def refresh_intelligence(db: DB, settings: Settings, ops: DB | None) -> dict:
+    """Phase 1 loop: real performance in → creative evidence → cadence → knowledge review.
+    Each step is isolated so one failure (e.g. a platform page timing out) doesn't stop the rest."""
+    from . import audience, cadence, knowledge
+    steps = [("knowledge_seed", lambda: knowledge.seed(db, "worker")),
+             ("social", lambda: audience.import_ops_social(db, ops, settings.timezone, "worker") if ops else None),
+             ("pln_evidence", lambda: len(knowledge.derive_pln_evidence(db)["written"])),
+             ("cadence", lambda: len(cadence.recommend_all(db))),
+             ("knowledge_review", lambda: {k: v for k, v in knowledge.review_sources(db).items() if k != "ok"})]
+    out = {}
+    for name, fn in steps:
+        try:
+            r = fn()
+            out[name] = {k: v for k, v in r.items() if k in ("accounts", "posts", "account_rows", "post_rows")} \
+                if name == "social" and isinstance(r, dict) else r
+        except Exception as e:  # noqa: BLE001 — logged and reported, loop continues
+            log.exception("intelligence step %s failed", name)
+            out[name] = {"error": str(e)[:300]}
     return out
 
 

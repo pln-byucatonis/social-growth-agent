@@ -1,0 +1,17 @@
+{
+  "_note": "STARTING cadences (posts per week) — test schedules from the PLN Social Growth Engine 2.0 brief (2026-10-20), not permanent rules. The cadence engine recommends changes per account from measured incremental followers, engagement and production capacity. Edit freely.",
+  "source": "PLN Social Growth Engine 2.0 brief, section 6 (2026-10-20)",
+  "brands": {
+    "pln": {"instagram": [7, 14], "tiktok": [14, 14], "facebook": [7, 14], "youtube": [5, 7], "linkedin": [3, 5], "x": [7, 21], "twitch": [0, 0]},
+    "carjitsu": {"tiktok": [14, 21], "instagram": [7, 14], "youtube": [7, 7], "youtube_long": [1, 2], "x": [3, 5], "facebook": [2, 4]},
+    "putt_tour": {"instagram": [7, 14], "tiktok": [7, 14], "youtube": [5, 7], "youtube_long": [1, 1], "x": [3, 5], "facebook": [2, 4]},
+    "world_putting_league": {"*": [2, 4]}
+  },
+  "default": [2, 4],
+  "rules": {
+    "min_weeks_for_recommendation": 4,
+    "max_step_per_week": 2,
+    "ceiling_multiplier_of_start_max": 1.5,
+    "engagement_dilution_threshold": 0.2
+  }
+}

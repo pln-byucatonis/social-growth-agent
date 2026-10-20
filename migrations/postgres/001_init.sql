@@ -195,7 +195,8 @@ CREATE TABLE IF NOT EXISTS metrics (
   period_start TEXT,
   period_end TEXT,
   source TEXT NOT NULL,
-  captured_at TEXT
+  captured_at TEXT,
+  metric_key TEXT
 );
 
 CREATE TABLE IF NOT EXISTS feedback (
@@ -262,11 +263,87 @@ CREATE TABLE IF NOT EXISTS experiments (
   result JSONB
 );
 
+CREATE TABLE IF NOT EXISTS posts (
+  post_id TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL,
+  brand_id TEXT,
+  platform TEXT NOT NULL,
+  platform_post_id TEXT NOT NULL,
+  published_at TEXT,
+  permalink TEXT,
+  post_type TEXT,
+  origin TEXT,
+  variant_id TEXT,
+  asset_id TEXT,
+  caption TEXT,
+  duration_s DOUBLE PRECISION,
+  creative JSONB,
+  provenance JSONB,
+  source_footage JSONB,
+  first_seen_at TEXT,
+  updated_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS knowledge (
+  entry_id TEXT PRIMARY KEY,
+  level TEXT NOT NULL,
+  platform TEXT,
+  brand_id TEXT,
+  account_id TEXT,
+  topic TEXT,
+  statement TEXT NOT NULL,
+  quote TEXT,
+  source_url TEXT,
+  source_title TEXT,
+  publisher TEXT,
+  source_date TEXT,
+  retrieved_at TEXT,
+  reviewed_at TEXT,
+  reviewed_by TEXT,
+  status TEXT NOT NULL,
+  applicability TEXT,
+  evidence JSONB,
+  supersedes TEXT,
+  created_by TEXT,
+  created_at TEXT,
+  updated_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS knowledge_sources (
+  url TEXT PRIMARY KEY,
+  title TEXT,
+  last_checked_at TEXT,
+  http_status INTEGER,
+  content_hash TEXT,
+  changed_at TEXT,
+  status TEXT,
+  note TEXT
+);
+
+CREATE TABLE IF NOT EXISTS cadence (
+  account_id TEXT PRIMARY KEY,
+  start_min DOUBLE PRECISION,
+  start_max DOUBLE PRECISION,
+  start_source TEXT,
+  recommended_per_week DOUBLE PRECISION,
+  action TEXT,
+  confidence TEXT,
+  rationale TEXT,
+  evidence JSONB,
+  updated_at TEXT
+);
+
 CREATE INDEX IF NOT EXISTS ix_variants_state ON variants(state);
 
 CREATE INDEX IF NOT EXISTS ix_variants_account ON variants(account_id);
 
 CREATE INDEX IF NOT EXISTS ix_metrics_account ON metrics(account_id, metric);
+
+CREATE UNIQUE INDEX IF NOT EXISTS ux_metrics_key ON metrics(metric_key);
+
+CREATE INDEX IF NOT EXISTS ix_metrics_post ON metrics(platform_post_id);
+
+CREATE INDEX IF NOT EXISTS ix_posts_account ON posts(account_id, published_at);
 
 CREATE INDEX IF NOT EXISTS ix_jobs_state ON publish_jobs(state, next_attempt_at);
 

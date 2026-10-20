@@ -1,0 +1,10 @@
+{% extends "base.html" %}{% block body %}
+<div class="card"><h3>Adaptive cadence</h3>
+<p class="muted">Each account starts from a configurable <b>starting</b> cadence (config/cadence.json — a test schedule, not a rule). Once ≥4 weeks are measured, the recommendation follows incremental followers per extra post, engagement dilution in busier weeks and the drafts we can actually supply. The calendar planner caps each account at its recommended weekly number.</p>
+<form method="post" action="{{ base }}/cadence/recompute"><button>Recompute now</button></form></div>
+<div class="card tablewrap"><table><tr><th>account</th><th>starting /week</th><th>recommended /week</th><th>action</th><th>confidence</th><th>why</th><th>weeks</th></tr>
+{% for r in rows %}<tr><td>{{ r.acc.username_original or r.account_id }}<br><span class="muted">{{ r.acc.platform }} · {{ r.acc.brand_id }}</span></td>
+<td>{{ '%g'|format(r.start_min) }}–{{ '%g'|format(r.start_max) }}</td><td><b>{{ '%g'|format(r.recommended_per_week) if r.recommended_per_week is not none else '—' }}</b></td>
+<td><span class="badge {{ 'ok' if r.action == 'increase' else 'warn' if r.action in ('decrease','production_limited') else '' }}">{{ r.action }}</span></td><td>{{ r.confidence }}</td>
+<td>{{ r.rationale }}</td><td>{{ (r.evidence or {}).get('weeks', 0) }}</td></tr>{% else %}<tr><td class="muted">No cadence computed yet — press Recompute.</td></tr>{% endfor %}</table></div>
+{% endblock %}

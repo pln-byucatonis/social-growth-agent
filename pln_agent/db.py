@@ -211,8 +211,9 @@ TABLES: dict[str, list[tuple[str, str, str]]] = {
         ("checkpoint", "text", ""),  # 2h | 24h | 72h | 7d | snapshot
         ("period_start", "text", ""),
         ("period_end", "text", ""),
-        ("source", "text", "NOT NULL"),  # manual_csv | api
+        ("source", "text", "NOT NULL"),  # manual_csv | api | ops_social | platform_api
         ("captured_at", "ts", ""),
+        ("metric_key", "text", ""),  # stable id for idempotent re-imports (unique when set)
     ],
     "feedback": [
         ("id", "pk", ""),
@@ -272,12 +273,86 @@ TABLES: dict[str, list[tuple[str, str, str]]] = {
         ("status", "text", ""),
         ("result", "json", ""),
     ],
+    # Creative Intelligence Database: one row per real post (historical or agent-published) with the
+    # creative variables, where each value came from, the source footage and publishing details.
+    # Performance lives in `metrics` (post-level rows share platform_post_id).
+    "posts": [
+        ("post_id", "text", "PRIMARY KEY"),  # <platform>:<platform_post_id>
+        ("account_id", "text", "NOT NULL"),
+        ("brand_id", "text", ""),
+        ("platform", "text", "NOT NULL"),
+        ("platform_post_id", "text", "NOT NULL"),
+        ("published_at", "ts", ""),
+        ("permalink", "text", ""),
+        ("post_type", "text", ""),  # reels | feed | carousel | short | video | story ...
+        ("origin", "text", ""),  # ops_ingested | agent_published
+        ("variant_id", "text", ""),
+        ("asset_id", "text", ""),
+        ("caption", "text", ""),
+        ("duration_s", "real", ""),
+        ("creative", "json", ""),  # variable -> value
+        ("provenance", "json", ""),  # variable -> agent_decision | inferred_from_caption | inferred_from_metadata | unknown
+        ("source_footage", "json", ""),
+        ("first_seen_at", "ts", ""),
+        ("updated_at", "ts", ""),
+    ],
+    # Knowledge Engine: every piece of guidance is attributed, dated and classified.
+    "knowledge": [
+        ("entry_id", "text", "PRIMARY KEY"),
+        ("level", "text", "NOT NULL"),  # platform_rule | platform_guidance | external_research | hypothesis | pln_evidence
+        ("platform", "text", ""),  # '' = cross-platform
+        ("brand_id", "text", ""),  # '' = all brands
+        ("account_id", "text", ""),
+        ("topic", "text", ""),  # cadence | duration | hook | originality | analytics | publishing_limits ...
+        ("statement", "text", "NOT NULL"),
+        ("quote", "text", ""),  # verbatim excerpt from the source, checked on every review
+        ("source_url", "text", ""),
+        ("source_title", "text", ""),
+        ("publisher", "text", ""),
+        ("source_date", "text", ""),  # publication date, or 'undated' + what the page shows
+        ("retrieved_at", "ts", ""),
+        ("reviewed_at", "ts", ""),
+        ("reviewed_by", "text", ""),
+        ("status", "text", "NOT NULL"),  # current | needs_review | superseded | retired
+        ("applicability", "text", ""),
+        ("evidence", "json", ""),
+        ("supersedes", "text", ""),
+        ("created_by", "text", ""),
+        ("created_at", "ts", ""),
+        ("updated_at", "ts", ""),
+    ],
+    "knowledge_sources": [
+        ("url", "text", "PRIMARY KEY"),
+        ("title", "text", ""),
+        ("last_checked_at", "ts", ""),
+        ("http_status", "int", ""),
+        ("content_hash", "text", ""),
+        ("changed_at", "ts", ""),
+        ("status", "text", ""),  # baseline | unchanged | changed | quote_missing | unreachable
+        ("note", "text", ""),
+    ],
+    # Publishing Strategist: configurable starting cadence + the current measured recommendation.
+    "cadence": [
+        ("account_id", "text", "PRIMARY KEY"),
+        ("start_min", "real", ""),
+        ("start_max", "real", ""),
+        ("start_source", "text", ""),
+        ("recommended_per_week", "real", ""),
+        ("action", "text", ""),  # hold | increase | decrease | production_limited | collect_baseline
+        ("confidence", "text", ""),
+        ("rationale", "text", ""),
+        ("evidence", "json", ""),
+        ("updated_at", "ts", ""),
+    ],
 }
 
 INDEXES = [
     "CREATE INDEX IF NOT EXISTS ix_variants_state ON variants(state)",
     "CREATE INDEX IF NOT EXISTS ix_variants_account ON variants(account_id)",
     "CREATE INDEX IF NOT EXISTS ix_metrics_account ON metrics(account_id, metric)",
+    "CREATE UNIQUE INDEX IF NOT EXISTS ux_metrics_key ON metrics(metric_key)",
+    "CREATE INDEX IF NOT EXISTS ix_metrics_post ON metrics(platform_post_id)",
+    "CREATE INDEX IF NOT EXISTS ix_posts_account ON posts(account_id, published_at)",
     "CREATE INDEX IF NOT EXISTS ix_jobs_state ON publish_jobs(state, next_attempt_at)",
     "CREATE INDEX IF NOT EXISTS ix_sched_slot ON schedules(slot_at)",
 ]
@@ -295,7 +370,7 @@ JSON_COLS = {t: {c for c, ty, _ in cols if ty == "json"} for t, cols in TABLES.i
 BOOL_COLS = {t: {c for c, ty, _ in cols if ty == "bool"} for t, cols in TABLES.items()}
 
 
-def render_ddl(dialect: str = "sqlite") -> str:
+def render_ddl(dialect: str = "sqlite", indexes: bool = True) -> str:
     dialect = "postgres" if dialect == "rdsdata" else dialect
     out = []
     for table, cols in TABLES.items():
@@ -306,7 +381,8 @@ def render_ddl(dialect: str = "sqlite") -> str:
                 c = c.replace("DEFAULT 0", "DEFAULT FALSE").replace("DEFAULT 1", "DEFAULT TRUE")
             parts.append(f"  {name} {_TYPES[dialect][ty]} {c}".rstrip())
         out.append(f"CREATE TABLE IF NOT EXISTS {table} (\n" + ",\n".join(parts) + "\n);")
-    out.extend(i + ";" for i in INDEXES)
+    if indexes:
+        out.extend(i + ";" for i in INDEXES)
     return "\n\n".join(out) + "\n"
 
 
@@ -429,7 +505,12 @@ class DB:
         self.close()
 
     def init_schema(self) -> None:
-        ddl = render_ddl(self.dialect)
+        # tables → additive columns → indexes (an index may cover a column an older table lacks)
+        self._run_ddl(render_ddl(self.dialect, indexes=False))
+        self._add_missing_columns()
+        self._run_ddl("\n\n".join(i + ";" for i in INDEXES) + "\n")
+
+    def _run_ddl(self, ddl: str) -> None:
         if self.dialect == "sqlite":
             self.conn.executescript(ddl)
             self.conn.commit()
@@ -439,7 +520,6 @@ class DB:
         else:  # Data API: one statement per call
             for stmt in [x.strip() for x in ddl.split(";\n") if x.strip()]:
                 self.conn.run(stmt)
-        self._add_missing_columns()
 
     def _add_missing_columns(self) -> None:
         """Additive migrations: CREATE TABLE IF NOT EXISTS never adds new columns to an
@@ -530,6 +610,22 @@ class DB:
             updates = ", ".join(f"{c}=excluded.{c}" for c in row if c != upsert_key)
             sql += f" ON CONFLICT({upsert_key}) DO UPDATE SET {updates}"
         self.execute(sql, row.values())
+
+    def insert_many(self, table: str, rows: list[dict], upsert_key: str | None = None, chunk_params: int = 900) -> int:
+        """Multi-row INSERT (one round trip per chunk — matters on the Data API). All rows must share keys."""
+        if not rows:
+            return 0
+        cols = list(rows[0])
+        per = max(1, chunk_params // len(cols))
+        for i in range(0, len(rows), per):
+            part = [self._encode(table, r) for r in rows[i:i + per]]
+            values = ", ".join("(" + ", ".join("?" for _ in cols) + ")" for _ in part)
+            sql = f"INSERT INTO {table} ({', '.join(cols)}) VALUES {values}"
+            if upsert_key:
+                updates = ", ".join(f"{c}=excluded.{c}" for c in cols if c != upsert_key)
+                sql += f" ON CONFLICT({upsert_key}) DO UPDATE SET {updates}"
+            self.execute(sql, [r[c] for r in part for c in cols])
+        return len(rows)
 
     def update(self, table: str, key: str, key_value: Any, changes: dict) -> None:
         changes = self._encode(table, changes)

@@ -1,0 +1,21 @@
+{% extends "base.html" %}{% block body %}
+{% macro basis(k) %}{% if k.basis == 'measured' %}<span class="badge ok">measured</span>{% elif k.basis == 'derived' %}<span class="badge warn">derived</span>{% else %}<span class="badge">unavailable</span>{% endif %}{% endmacro %}
+{% macro fmt(v) %}{% if v is none %}—{% elif v >= 1000 %}{{ '{:,.0f}'.format(v) }}{% else %}{{ '%.2f'|format(v) }}{% endif %}{% endmacro %}
+<div class="card"><h3>Audience intelligence — last {{ days }} days of data per account</h3>
+<p class="muted">Views are not the goal. Each number says how it was obtained: <b>measured</b> (reported by the platform), <b>derived</b> (computed from measured numbers with a stated attribution assumption) or <b>unavailable</b> (no current integration exposes it — never estimated). Source: platform APIs via the ops portal ingest. <a href="?days=7">7d</a> · <a href="?days=28">28d</a> · <a href="?days=90">90d</a></p>
+{% if not rows %}<p><b>No performance data yet.</b> It arrives from the ops portal's platform ingest on the next refresh, and from accounts connected under Accounts.</p>{% endif %}
+</div>
+<div class="grid">{% for r in rows %}<div class="card"><h3>{{ r.handle or r.account_id }} <span class="muted">{{ r.platform }} · {{ r.brand_id }}</span></h3>
+<p>{% if r.followers_end %}<b>{{ '{:,.0f}'.format(r.followers_end) }}</b> followers{% if r.net_follower_change is not none %} ({{ '{:+,.0f}'.format(r.net_follower_change) }} in window){% endif %}{% else %}<span class="muted">no follower snapshots</span>{% endif %} · {{ r.posts }} posts ({{ r.posts_measured }} measured) · window {{ r.window[0] }} → {{ r.window[1] }}</p>
+{% set t = trends[r.account_id] %}{% if t|length > 1 %}{% set lo = t|map(attribute=1)|min %}{% set hi = t|map(attribute=1)|max %}
+<svg viewBox="0 0 300 40" width="100%" height="40" role="img" aria-label="follower trend"><polyline fill="none" stroke="currentColor" stroke-width="1.5" points="{% for d, v in t %}{{ (loop.index0 / (t|length - 1) * 300)|round(1) }},{{ (38 - ((v - lo) / ((hi - lo) or 1)) * 36)|round(1) }} {% endfor %}"/></svg>{% endif %}
+<table>{% for key, label in labels.items() %}{% set k = r.kpis.get(key) %}{% if k %}<tr><td>{{ label }}</td><td><b>{{ fmt(k.value) }}</b></td><td>{{ basis(k) }}</td><td class="muted">{{ k.how }}</td></tr>{% endif %}{% endfor %}</table></div>{% endfor %}</div>
+<div class="grid">
+{% for title, rows2 in (("By brand", by_brand), ("By content type (inferred from captions)", by_type), ("By format", by_format)) %}
+<div class="card tablewrap"><h3>{{ title }}</h3><table><tr><th></th><th>posts</th><th>median views</th><th>shares/1k</th><th>saves/1k</th><th>engagements/1k</th></tr>
+{% for g in rows2 %}<tr><td>{{ g.group }}</td><td>{{ g.posts }}</td><td>{{ fmt(g.median_views) }}</td><td>{{ fmt(g.median_shares_per_1k_views) }}</td><td>{{ fmt(g.median_saves_per_1k_views) }}</td><td>{{ fmt(g.median_engagements_per_1k_views) }}</td></tr>{% else %}<tr><td class="muted">no measured posts ≥72h old</td></tr>{% endfor %}</table></div>{% endfor %}
+</div>
+<div class="card"><h3>Audience overlap — what we can and can't know</h3><table>{% for q in overlap %}<tr><td><b>{{ q.question }}</b><br><span class="muted">{{ q.why }}</span></td><td>{{ 'partly' if q.measurable == 'partly' else 'not measurable' }}</td><td><ul>{% for p in q.proxies %}<li>{{ p }}</li>{% endfor %}</ul></td></tr>{% endfor %}</table></div>
+<div class="card tablewrap"><h3>Measurability matrix (official APIs)</h3><table><tr><th>platform</th>{% for key in ['non_follower_reach','follows_per_1k_views','avg_watch_time_s','shares_per_1k_views','returning_viewers','profile_visits_per_1k_views','outbound_clicks_per_1k_views'] %}<th>{{ labels[key] }}</th>{% endfor %}</tr>
+{% for p, m in matrix.items() %}<tr><td>{{ p }}</td>{% for key in ['non_follower_reach','follows_per_1k_views','avg_watch_time_s','shares_per_1k_views','returning_viewers','profile_visits_per_1k_views','outbound_clicks_per_1k_views'] %}<td class="muted">{{ m.get(key) }}</td>{% endfor %}</tr>{% endfor %}</table></div>
+{% endblock %}

@@ -537,6 +537,108 @@ def confirm_ownership(request: Request, account_id: str = Form("")):
     return back(request, "/accounts", f"Ownership confirmed for {len(ids)} account(s)")
 
 
+# --- Phase 1: audience intelligence, creative DB, knowledge, cadence -----------------------------
+
+@app.get("/intelligence", response_class=HTMLResponse)
+def intelligence(request: Request, days: int = 28):
+    from .. import audience
+    d = db()
+    days = max(7, min(days, 120))
+    rows = audience.portfolio(d, days)
+    trends = {r["account_id"]: audience.follower_trend(d, r["account_id"])[-60:] for r in rows}
+    return page(request, "intelligence.html", rows=rows, labels=audience.KPI_LABELS, days=days, trends=trends,
+                by_brand=audience.breakdown(d, "brand_id"), by_type=audience.breakdown(d, "content_type"),
+                by_format=audience.breakdown(d, "post_type"), overlap=audience.OVERLAP_QUESTIONS,
+                matrix=audience.MEASURABILITY)
+
+
+@app.get("/creative", response_class=HTMLResponse)
+def creative(request: Request, brand: str = "", platform: str = "", outcome: str = "shares_per_1k_views", fmt: str = ""):
+    from ..audience import post_outcomes
+    from ..creative_db import EVIDENCE_RULE, OUTCOMES, what_works
+    d = db()
+    res = what_works(d, brand, platform, outcome if outcome in OUTCOMES else "shares_per_1k_views", fmt) \
+        if (brand or platform) else None
+    accs = [a["account_id"] for a in d.all("accounts") if (not brand or a["brand_id"] == brand)
+            and (not platform or a["platform"] == platform)]
+    recent = sorted(post_outcomes(d, accs), key=lambda p: str(p["published_at"] or ""), reverse=True)[:60]
+    brands = [r["brand_id"] for r in d.query("SELECT DISTINCT brand_id FROM posts ORDER BY brand_id")]
+    platforms = [r["platform"] for r in d.query("SELECT DISTINCT platform FROM posts ORDER BY platform")]
+    total = d.one("SELECT COUNT(*) AS n FROM posts")["n"]
+    return page(request, "creative.html", res=res, recent=recent, brands=brands, platforms=platforms, brand=brand,
+                platform=platform, outcome=outcome, fmt=fmt, outcomes=OUTCOMES, rule=EVIDENCE_RULE, total=total)
+
+
+@app.get("/knowledge", response_class=HTMLResponse)
+def knowledge_page(request: Request, level: str = "", platform: str = ""):
+    from .. import knowledge as ke
+    d = db()
+    if not d.one("SELECT entry_id FROM knowledge LIMIT 1"):
+        ke.seed(d)
+    rows = [e for e in d.all("knowledge", order="level, platform, entry_id")
+            if (not level or e["level"] == level) and (not platform or e["platform"] in ("", platform))]
+    rows.sort(key=lambda e: (ke.LEVELS.index(e["level"]) if e["level"] in ke.LEVELS else 9, e["status"] != "needs_review"))
+    return page(request, "knowledge.html", rows=rows, levels=ke.LEVELS, labels=ke.LEVEL_LABELS, level=level,
+                platform=platform, sources=d.all("knowledge_sources", order="last_checked_at DESC"))
+
+
+@app.post("/knowledge/add")
+def knowledge_add(request: Request, level: str = Form(...), statement: str = Form(...), platform: str = Form(""),
+                  topic: str = Form(""), source_url: str = Form(""), source_title: str = Form(""),
+                  publisher: str = Form(""), source_date: str = Form(""), quote: str = Form(""),
+                  applicability: str = Form("")):
+    from .. import knowledge as ke
+    _admin(request)
+    try:
+        ke.add_entry(db(), {"level": level, "statement": statement, "platform": platform, "topic": topic,
+                            "source_url": source_url.strip(), "source_title": source_title, "publisher": publisher,
+                            "source_date": source_date, "quote": quote, "applicability": applicability},
+                     request.state.user or "dashboard")
+    except ValueError as e:
+        return back(request, "/knowledge", err=str(e))
+    return back(request, "/knowledge", "Added")
+
+
+@app.post("/knowledge/{eid}/status")
+def knowledge_status(request: Request, eid: str, status: str = Form(...), note: str = Form("")):
+    from .. import knowledge as ke
+    _admin(request)
+    try:
+        ke.set_status(db(), eid, status, request.state.user or "dashboard", note)
+    except ValueError as e:
+        return back(request, "/knowledge", err=str(e))
+    return back(request, "/knowledge", f"{eid}: {status}")
+
+
+@app.post("/knowledge/review")
+def knowledge_review(request: Request):
+    """Re-check every cited source now (runs in the background; the worker also does this weekly)."""
+    import threading
+    from .. import knowledge as ke
+    _admin(request)
+    threading.Thread(target=lambda: ke.review_sources(DB(settings.database_url, init=False), force=True),
+                     daemon=True).start()
+    return back(request, "/knowledge", "Source review started — refresh in a minute.")
+
+
+@app.get("/cadence", response_class=HTMLResponse)
+def cadence_page(request: Request):
+    d = db()
+    accs = {a["account_id"]: a for a in d.all("accounts")}
+    rows = [{**r, "acc": accs.get(r["account_id"], {})} for r in d.all("cadence", order="account_id")]
+    order = {"increase": 0, "decrease": 1, "production_limited": 2, "hold": 3, "collect_baseline": 4}
+    rows.sort(key=lambda r: (order.get(r["action"], 9), r["account_id"]))
+    return page(request, "cadence.html", rows=rows)
+
+
+@app.post("/cadence/recompute")
+def cadence_recompute(request: Request):
+    from ..cadence import recommend_all
+    _admin(request)
+    n = len(recommend_all(db()))
+    return back(request, "/cadence", f"Recomputed {n} accounts")
+
+
 @app.get("/migration", response_class=HTMLResponse)
 def migration(request: Request):
     d = db()
