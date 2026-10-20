@@ -144,7 +144,7 @@ def import_ops_clips(db: DB, ops: DB, assets_bucket: str, limit: int = 100, min_
     clips = ops.query(
         "SELECT c.id, c.property, c.start_sec, c.end_sec, c.peak_offset_sec, c.moment_offset_sec, "
         "c.highlight_score, c.caption, c.transcript, c.source_bucket, c.source_key, c.vertical_key, "
-        "c.vertical_mode, s.title AS source_title, s.aired_date::text AS aired_date, s.duration_sec AS source_duration "
+        "c.vertical_mode, c.thumb_key, s.title AS source_title, s.aired_date::text AS aired_date, s.duration_sec AS source_duration "
         "FROM clips c JOIN clip_sources s ON s.id = c.source_id WHERE " + " AND ".join(where) +
         " ORDER BY c.highlight_score DESC NULLS LAST, c.id LIMIT ?", params)
     if not clips:
@@ -202,7 +202,8 @@ def import_ops_clips(db: DB, ops: DB, assets_bucket: str, limit: int = 100, min_
             "duration_s": (end - start) if rel else (float(c["source_duration"]) if c["source_duration"] else None),
             "width": 1080 if rel else None, "height": 1920 if rel else None, "has_audio": True,
             "probe": {"ops_clip": {"tags": ctags, "highlight_score": c["highlight_score"],
-                                   "machine_caption": c["caption"], "raw_talent": raw_people,  # for reviewers only; never used in copy unless verified
+                                   "machine_caption": c["caption"], "raw_talent": raw_people,
+                                   "thumb": f"s3://{assets_bucket}/{c['thumb_key']}" if c.get("thumb_key") else None,  # for reviewers only; never used in copy unless verified
                                    "transcript": c["transcript"], "source_title": c["source_title"],
                                    "vertical_mode": c["vertical_mode"], "start_sec": start, "end_sec": end}},
             # Transcripts are burned in as captions; commentary names athletes, so only when verified.

@@ -19,15 +19,40 @@ FONT_CANDIDATES = ["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
                    "/System/Library/Fonts/Supplemental/Arial Bold.ttf"]
 
 
-def resolve_media(path: str) -> str:
-    """Local path as-is; s3://bucket/key → short-lived presigned HTTPS URL ffmpeg can range-read.
-    Uses the runtime's ambient AWS credentials (App Runner instance role)."""
+_s3 = None
+
+
+def resolve_media(path: str, content_type: str | None = None, expires: int = 3600) -> str:
+    """Local path as-is; s3://bucket/key → short-lived presigned HTTPS URL (ffmpeg range-reads it; browsers
+    play/preview it). Signing is local — no network call. Uses the runtime's ambient AWS credentials."""
     if not path.startswith("s3://"):
         return path
-    import boto3
+    global _s3
+    if _s3 is None:
+        import boto3
+        from botocore.config import Config
+        _s3 = boto3.client("s3", config=Config(signature_version="s3v4", region_name="us-east-1"))
     bucket, _, key = path[5:].partition("/")
-    return boto3.client("s3").generate_presigned_url("get_object", Params={"Bucket": bucket, "Key": key},
-                                                     ExpiresIn=3600)
+    params = {"Bucket": bucket, "Key": key}
+    if content_type:
+        params["ResponseContentType"] = content_type
+    return _s3.generate_presigned_url("get_object", Params=params, ExpiresIn=expires)
+
+
+def asset_thumb_url(asset: dict) -> str:
+    thumb = ((asset.get("probe") or {}).get("ops_clip") or {}).get("thumb")
+    return resolve_media(thumb, "image/jpeg") if thumb else ""
+
+
+def asset_preview(asset: dict, segments: list[dict] | None = None) -> dict:
+    """Browser-playable source clip for reviewers, cued to the post's cut (#t=start,end)."""
+    path = asset.get("media_path") or ""
+    if not (asset.get("media_present") and path.startswith("s3://")):
+        return {}
+    frag = ""
+    if segments:
+        frag = f"#t={segments[0]['source_in']:.2f},{segments[-1]['source_out']:.2f}"
+    return {"src": resolve_media(path, "video/mp4") + frag, "poster": asset_thumb_url(asset)}
 
 
 def upload_render(outdir: Path, variant_id: str, bucket: str) -> str:

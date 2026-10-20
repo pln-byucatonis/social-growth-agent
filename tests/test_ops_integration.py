@@ -117,7 +117,8 @@ CREATE TABLE social_account (id serial PRIMARY KEY, brand text, platform text, p
 CREATE TABLE clip_sources (id text PRIMARY KEY, bucket text, property text, title text, aired_date date, duration_sec numeric);
 CREATE TABLE clips (id text PRIMARY KEY, source_id text, property text, start_sec numeric, end_sec numeric,
   peak_offset_sec numeric, moment_offset_sec numeric, highlight_score integer, caption text, transcript text,
-  source_bucket text, source_key text, vertical_key text, vertical_mode text, status text, superseded_by text);
+  source_bucket text, source_key text, vertical_key text, vertical_mode text, status text, superseded_by text,
+  thumb_key text);
 CREATE TABLE clip_tags (clip_id text, tag text, source text);
 CREATE TABLE people (id bigint PRIMARY KEY, name text);
 CREATE TABLE clip_talent (clip_id text, name_raw text, person_id bigint, source text);
@@ -269,6 +270,25 @@ class ProxiedDashboardTests(unittest.TestCase):
         self.assertTrue(r.headers["location"].startswith("/api/social-agent/variant/"))
         appr = self.db.all("approvals", "variant_id=?", [vid])
         self.assertEqual(appr[-1]["reviewer"], "editor@proleaguenetwork.com")
+
+    def test_embedded_in_portal_hides_own_nav_and_queue_has_preview_column(self):
+        framed = self.c.get("/queue", headers={**self.h, "Sec-Fetch-Dest": "iframe"}).text
+        self.assertNotIn('href="/api/social-agent/audit">Audit</a>', framed)
+        self.assertIn('href="/api/social-agent/audit">Audit</a>', self.c.get("/queue", headers=self.h).text)
+        self.assertIn("no preview", framed)  # sample assets have no S3 thumbnail
+
+    def test_thumbnail_and_preview_urls_are_presigned_and_cued(self):
+        from pln_agent.media import asset_preview, asset_thumb_url
+        import os
+        os.environ.setdefault("AWS_ACCESS_KEY_ID", "AKIDEXAMPLE")
+        os.environ.setdefault("AWS_SECRET_ACCESS_KEY", "example")
+        a = {"media_present": True, "media_path": "s3://bkt/verticals/x_9x16.mp4",
+             "probe": {"ops_clip": {"thumb": "s3://assets/frames/x_0.jpg"}}}
+        self.assertIn("response-content-type=image%2Fjpeg", asset_thumb_url(a))
+        p = asset_preview(a, [{"source_in": 1.5, "source_out": 3.0}, {"source_in": 4.0, "source_out": 9.25}])
+        self.assertTrue(p["src"].startswith("https://bkt.s3"))
+        self.assertTrue(p["src"].endswith("#t=1.50,9.25"))
+        self.assertEqual(asset_preview({"media_present": False, "media_path": "s3://b/k"}), {})
 
     def test_bad_prefix_is_ignored(self):
         r = self.c.get("/queue", headers={**self.h, "X-Forwarded-Prefix": 'x"><script>'})

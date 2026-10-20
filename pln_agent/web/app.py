@@ -127,6 +127,8 @@ def ctx(request: Request, **kw) -> dict:
     return {"request": request, "dry_run": settings.dry_run, "publishing_enabled": settings.publishing_enabled,
             "kill": kill_switch_on(db()), "base": base(request), "user": request.state.user,
             "ops_connected": bool(settings.ops_database_url),
+            # framed inside the ops portal: the portal sidebar is the nav, so hide ours
+            "embedded": request.headers.get("sec-fetch-dest") == "iframe",
             "msg": request.query_params.get("msg"), "err": request.query_params.get("err"), **kw}
 
 
@@ -167,12 +169,20 @@ def queue(request: Request, platform: str = "", state: str = ""):
     cond = " AND ".join(where)
     total = d.one(f"SELECT COUNT(*) AS n FROM variants WHERE {cond}", params)["n"]
     vs = [d.decode("variants", r) for r in d.query(
-        "SELECT variant_id, account_id, platform, state, hook, score, risk_flags, validation FROM variants "
+        "SELECT variant_id, asset_id, account_id, platform, state, hook, score, risk_flags, validation FROM variants "
         f"WHERE {cond} ORDER BY platform, state, score DESC LIMIT {QUEUE_LIMIT}", params)]
     accs = {a["account_id"]: a for a in d.all("accounts")}
     perm = {k: publish_eligibility(a, settings, kill_switch_on(d)) for k, a in accs.items()}
     platforms = [r["platform"] for r in d.query("SELECT DISTINCT platform FROM variants ORDER BY platform")]
-    return page(request, "queue.html", variants=vs, accs=accs, perm=perm, platform=platform, state=state,
+    ids = sorted({v["asset_id"] for v in vs})
+    thumbs = {}
+    if ids:
+        from ..media import asset_thumb_url
+        marks = ",".join("?" for _ in ids)
+        for a in d.query(f"SELECT asset_id, probe FROM assets WHERE asset_id IN ({marks})", ids):
+            a = d.decode("assets", a)
+            thumbs[a["asset_id"]] = asset_thumb_url(a)
+    return page(request, "queue.html", variants=vs, accs=accs, perm=perm, platform=platform, state=state, thumbs=thumbs,
                 platforms=platforms, total=total, limit=QUEUE_LIMIT)
 
 
@@ -199,7 +209,10 @@ def variant(request: Request, vid: str):
         except ValueError:
             render_url = ""
     preview = get_adapter(acc["platform"], settings=settings).simulate(v, acc, "preview")
+    from ..media import asset_preview
+    source = asset_preview(asset, (v.get("edl") or {}).get("segments"))
     return page(request, "variant.html", v=v, acc=acc, asset=asset, live_ok=ok, reasons=reasons, approvals=approvals,
+                source=source,
                 audit=audit, jobs=jobs, planned=planned, render_url=render_url,
                 would_send=preview.raw["would_send"], north=NORTH_STAR.get(v["platform"], {}))
 
@@ -252,8 +265,27 @@ def do_cancel(request: Request, vid: str, actor: str = Form(""), reason: str = F
 
 @app.post("/variant/{vid:path}/render")
 def do_render(request: Request, vid: str):
-    r = render_variant(db(), vid, settings, actor=request.state.user or "dashboard")
-    return back(request, f"/variant/{vid}", f"Render: {r['status']}")
+    """Renders take longer than the portal proxy's 25s window, so run them in the background."""
+    import threading
+    d = db()
+    v = d.get("variants", "variant_id", vid)
+    if not v:
+        raise HTTPException(404)
+    if v.get("render_status") == "rendering":
+        return back(request, f"/variant/{vid}", "Already rendering — refresh in a minute.")
+    d.update("variants", "variant_id", vid, {"render_status": "rendering"})
+    actor = request.state.user or "dashboard"
+
+    def work():
+        own = DB(settings.database_url, init=False)  # separate connection for the worker thread
+        try:
+            render_variant(own, vid, settings, actor=actor)
+        except Exception as e:  # never leave a variant stuck in "rendering"
+            own.update("variants", "variant_id", vid, {"render_status": "render_failed"})
+            own.audit(actor, "variant_render_failed", "variants", vid, {"error": str(e)[:300]})
+
+    threading.Thread(target=work, daemon=True, name=f"render-{vid[:20]}").start()
+    return back(request, f"/variant/{vid}", "Rendering started — this takes about a minute. Refresh to see it.")
 
 
 @app.post("/publish/run")
