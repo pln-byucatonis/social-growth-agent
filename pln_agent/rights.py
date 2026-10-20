@@ -10,7 +10,15 @@ from datetime import datetime, timezone
 
 SENSITIVE = {"gambling", "paid_partnership", "combat", "injury", "minors", "ai_generated_person", "likeness_unreleased"}
 
+def identity_policy() -> str:
+    """block (default): unverified identities block the asset.
+    withhold_names: the asset may post, but no athlete is named until identities are verified."""
+    import os
+    return os.environ.get("PLN_IDENTITY_POLICY", "block")
+
+
 LABEL_REQUIREMENTS = {
+    "names_withheld": "Athlete identities are unverified: do not name or tag anyone in copy, captions or on-screen text.",
     "paid_partnership": "Turn on the platform's branded-content / paid-partnership disclosure and name the partner.",
     "ai_generated_person": "Apply the platform's AI-generated content label (TikTok AIGC toggle, Meta 'AI info', YouTube altered/synthetic disclosure).",
     "gambling": "No wagering call-to-action; check geo/age restrictions and each platform's gambling policy.",
@@ -65,7 +73,11 @@ def evaluate(asset: dict, at: datetime | None = None, territory: str = "US", req
     if asset.get("has_audio") and not asset.get("music_cleared"):
         r.blockers.append("audio present but music/sound not cleared")
     if not asset.get("people_verified"):
-        r.blockers.append("people/athlete identities not verified")
+        if identity_policy() == "withhold_names":
+            # Post without naming anyone; copy validation rejects any unverified name that slips in.
+            r.review_flags.append("names_withheld")
+        else:
+            r.blockers.append("people/athlete identities not verified")
     if require_media and not asset.get("media_present"):
         r.blockers.append("source media file missing")
 

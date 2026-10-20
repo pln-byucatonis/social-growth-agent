@@ -131,6 +131,31 @@ class OpsImportTests(unittest.TestCase):
         self.assertNotIn("audio present but music/sound not cleared", ev.blockers)
         self.assertIn("people/athlete identities not verified", ev.blockers)
 
+    def test_withhold_names_policy_lets_unverified_clips_post_without_names(self):
+        import os
+        from pln_agent.ops_sources import set_rights_default
+        set_rights_default(self.db, "by@pln", license="PLN-owned production", territory=["WORLDWIDE"],
+                           rights_verified=True, music_cleared=True)
+        import_ops_clips(self.db, self.ops, "b", min_score=50)
+        a = self.db.get("assets", "asset_id", clip_asset_id("CJ.mp4:10-24"))
+        # machine caption/transcript/event title are kept for reviewers but not used for copy
+        self.assertEqual(a["description"], "A submission ends it.")
+        self.assertEqual(a["transcript"], [])
+        self.assertEqual(a["probe"]["ops_clip"]["machine_caption"], "Back-seat reversal into a submission.")
+        self.assertIn("people/athlete identities not verified", evaluate(a).blockers)  # default policy blocks
+        os.environ["PLN_IDENTITY_POLICY"] = "withhold_names"
+        try:
+            ev = evaluate(a)
+            self.assertTrue(ev.ok, ev.blockers)
+            self.assertIn("names_withheld", ev.review_flags)
+            from pln_agent.editorial import generate_pack
+            p = generate_pack(self.db, a["asset_id"], self.s)
+            self.assertTrue(p["variants"])
+            for v in p["variants"]:
+                self.assertNotIn("Athlete Seven", v["caption"] + v["hook"])
+        finally:
+            os.environ.pop("PLN_IDENTITY_POLICY")
+
     def test_rights_overlay_survives_reimport(self):
         import_ops_clips(self.db, self.ops, "b", min_score=50)
         aid = clip_asset_id("CJ.mp4:10-24")

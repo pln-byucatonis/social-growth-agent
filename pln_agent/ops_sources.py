@@ -82,6 +82,22 @@ def _label(tags: list[str]) -> str:
 
 
 INJURY_TAGS = {"knockout", "ko", "tko", "injury", "blood", "down_hard"}
+# Neutral, name-free descriptions of the action, used instead of the machine caption when the clip's
+# athletes are unverified (machine captions routinely contain fighter names and nicknames).
+TAG_SENTENCES = {
+    "submission": "A submission ends it.", "flush_slap": "A flush slap lands.", "knockout": "The exchange ends the match.",
+    "reversal": "A reversal flips the position.", "tap": "The tap comes.", "three_pointer": "The shot drops from deep.",
+    "putt": "The putt drops.", "hole_in_one": "It drops for a hole-in-one.", "dunk": "The dunk lands.",
+}
+
+
+def neutral_description(tags: list[str]) -> str:
+    for t in tags:
+        if t in TAG_SENTENCES:
+            return TAG_SENTENCES[t]
+    return "The decisive moment."
+
+
 FINISH_TAGS = {"submission", "flush_slap", "knockout", "ko", "tap", "pin", "win", "hole_in_one"}
 
 
@@ -148,31 +164,37 @@ def import_ops_clips(db: DB, ops: DB, assets_bucket: str, limit: int = 100, min_
         aid = clip_asset_id(c["id"])
         rights = db.get("asset_rights", "asset_id", aid) or rights_default(db, brand["brand_id"])
         people = talent.get(c["id"], [])
+        identities_ok = bool(rights.get("people_verified")) or (bool(people) and all(p["verified"] for p in people))
+        # Copy is built from the description: never feed it machine text that may name unverified athletes.
+        safe_caption = (c["caption"] or "").strip() if identities_ok else neutral_description(ctags)
         row = {
             "asset_id": aid, "brand_id": canonical_brand_id(brand), "source_brand_name": brand["name"],
             "title": f"{_label(ctags)} — {c['source_title'] or c['property']}",
-            "description": (c["caption"] or "").strip(),
+            "description": safe_caption,
             "media_path": f"s3://{assets_bucket}/{c['vertical_key']}" if rel else f"s3://{c['source_bucket']}/{c['source_key']}",
             "media_present": True, "sha256": "", "content_id": c["id"], "parent_asset_id": "",
             "provenance": "ops clip library (pln-fast-aws tagger)" + (" — vertical rendition" if rel else " — master"),
             "owner": rights.get("owner", ""), "license": rights.get("license", ""),
             "territory": rights.get("territory") or [], "rights_expires_at": rights.get("rights_expires_at"),
             "rights_verified": bool(rights.get("rights_verified")),
-            "people_verified": bool(rights.get("people_verified")) or (bool(people) and all(p["verified"] for p in people)),
+            "people_verified": identities_ok,
             "music_cleared": bool(rights.get("music_cleared")), "sponsors": [],
             "sponsor_approved": bool(rights.get("sponsor_approved")), "people": people, "facts": [],
             "moments": clip_moments(start, end, float(offset) if offset is not None else None, ctags, score,
-                                    c["caption"] or "", rel),
+                                    safe_caption, rel),
             # knockouts / drops are injury-adjacent: always manual review, never the hook
             "flags": {**brand_flags.get(brand["brand_id"], {}),
                       **({"injury": True} if set(ctags) & INJURY_TAGS else {})}, "series": "",
-            "event_name": c["source_title"] or "", "event_date": c["aired_date"],
+            "event_name": "", "event_date": c["aired_date"],  # source titles are raw master filenames
             "duration_s": (end - start) if rel else (float(c["source_duration"]) if c["source_duration"] else None),
             "width": 1080 if rel else None, "height": 1920 if rel else None, "has_audio": True,
             "probe": {"ops_clip": {"tags": ctags, "highlight_score": c["highlight_score"],
+                                   "machine_caption": c["caption"],  # for reviewers only; never used in copy unless verified
+                                   "transcript": c["transcript"], "source_title": c["source_title"],
                                    "vertical_mode": c["vertical_mode"], "start_sec": start, "end_sec": end}},
+            # Transcripts are burned in as captions; commentary names athletes, so only when verified.
             "transcript": [{"start": 0.0 if rel else start, "end": (end - start) if rel else end, "text": c["transcript"]}]
-            if c["transcript"] else [],
+            if c["transcript"] and identities_ok else [],
             "is_sample": False, "ingested_at": now_iso(),
         }
         db.insert("assets", row, upsert_key="asset_id")
