@@ -161,16 +161,21 @@ MIN_N, CONCLUSIVE_N = 5, 8
 
 
 def permutation_p(a: list[float], b: list[float], iters: int = 2000, seed: int = 7) -> float:
-    """Two-sided p-value for the difference in medians (seeded → reproducible)."""
+    """Two-sided p-value for the difference in medians (seeded → reproducible). Sequential: a quick first
+    pass stops early when the difference is clearly not significant, so only close calls pay full cost."""
     obs = abs(statistics.median(a) - statistics.median(b))
     pool, na = a + b, len(a)
     rng = random.Random(seed)
-    hits = 0
-    for _ in range(iters):
-        rng.shuffle(pool)
-        if abs(statistics.median(pool[:na]) - statistics.median(pool[na:])) >= obs - 1e-12:
-            hits += 1
-    return (hits + 1) / (iters + 1)
+    hits, done = 0, 0
+    for stage in (200, iters):
+        while done < stage:
+            rng.shuffle(pool)
+            if abs(statistics.median(pool[:na]) - statistics.median(pool[na:])) >= obs - 1e-12:
+                hits += 1
+            done += 1
+        if (hits + 1) / (done + 1) > 0.3:
+            break
+    return (hits + 1) / (done + 1)
 
 
 def evidence_class(n_a: int, n_b: int, p: float | None) -> str:

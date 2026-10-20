@@ -189,7 +189,10 @@ def derive_pln_evidence(db: DB, slices: list[dict] | None = None, actor: str = "
     from .creative_db import EVIDENCE_RULE, what_works
     if slices is None:
         slices = []
-        for r in db.query("SELECT DISTINCT brand_id, platform FROM posts"):
+        from .creative_db import MIN_N
+        for r in db.query("SELECT brand_id, platform, COUNT(*) AS n FROM posts GROUP BY brand_id, platform"):
+            if r["n"] < 2 * MIN_N:
+                continue
             for out in ("shares_per_1k_views", "engagements_per_1k_views", "views"):
                 slices.append({"brand_id": r["brand_id"], "platform": r["platform"], "outcome": out})
     written, superseded = [], []

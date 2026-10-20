@@ -50,9 +50,29 @@ def _tick(db: DB, settings: Settings, do_ops: bool) -> dict:
         ops = DB(settings.ops_database_url, init=False)
         out["ops_accounts"] = import_ops_accounts(db, ops, "worker")
         out["ops_clips"] = import_ops_clips(db, ops, settings.ops_assets_bucket, limit=200, min_score=60, actor="worker")
-        out["intelligence"] = refresh_intelligence(db, settings, ops)
+        out["intelligence"] = start_intelligence(settings)
     out["planned"] = plan_new_clear_assets(db, settings)
     return out
+
+
+_intel_lock = threading.Lock()
+
+
+def start_intelligence(settings: Settings) -> str:
+    """Run the intelligence refresh in its own thread + connections: it's minutes of work (and CPU-bound
+    statistics) that must not hold the scheduler's request open or block the publisher tick."""
+    if _intel_lock.locked():
+        return "already running"
+
+    def work():
+        with _intel_lock:
+            own = DB(settings.database_url, init=False)
+            ops = DB(settings.ops_database_url, init=False) if settings.ops_database_url else None
+            res = refresh_intelligence(own, settings, ops)
+            log.info("intelligence refresh: %s", res)
+
+    threading.Thread(target=work, daemon=True, name="pln-intelligence").start()
+    return "started"
 
 
 def refresh_intelligence(db: DB, settings: Settings, ops: DB | None) -> dict:
