@@ -1,0 +1,7 @@
+{
+  "_note": "OPT-IN ONLY. When enabled, in_review variants whose series AND account are allowlisted are auto-approved by 'policy:evergreen' — never if the content carries any review flag, validation error or rights blocker. Publishing still requires every live gate (dry-run off, publishing enabled, account authorized, kill switch off).",
+  "enabled": false,
+  "series_allowlist": [],
+  "account_allowlist": [],
+  "max_per_account_per_week": 2
+}

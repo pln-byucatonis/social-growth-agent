@@ -1,0 +1,179 @@
+[
+  {
+    "job_id": "job-3f643e76ba",
+    "variant_id": "carjitsu-sample-001:carjitsu.tiktok.carjitsuchampionship",
+    "state": "simulated",
+    "mode": "dry_run",
+    "permalink": "dryrun://tiktok/374579bde8f3",
+    "would_send": [
+      {
+        "headers": {
+          "Authorization": "***REDACTED***",
+          "Content-Type": "application/json; charset=UTF-8"
+        },
+        "json": {},
+        "method": "POST",
+        "purpose": "creator info",
+        "url": "https://open.tiktokapis.com/v2/post/publish/creator_info/query/"
+      },
+      {
+        "headers": {
+          "Authorization": "***REDACTED***",
+          "Content-Type": "application/json; charset=UTF-8"
+        },
+        "json": {
+          "post_info": {
+            "brand_content_toggle": false,
+            "brand_organic_toggle": false,
+            "disable_comment": false,
+            "disable_duet": false,
+            "disable_stitch": false,
+            "is_aigc": false,
+            "privacy_level": "SELF_ONLY",
+            "title": "Pinned on the bottom with nowhere to go. Then this. The competitor on the bottom flips position and takes control of the seat. Tap or keep fighting?\n\n#CarJitsu #Grappling",
+            "video_cover_timestamp_ms": 5500
+          },
+          "source_info": {
+            "source": "PULL_FROM_URL",
+            "video_url": "https://media.example.invalid/374579bde8f3fec48466240e5b9ca1e3.mp4"
+          }
+        },
+        "method": "POST",
+        "purpose": "init direct post",
+        "url": "https://open.tiktokapis.com/v2/post/publish/video/init/"
+      },
+      {
+        "headers": {
+          "Authorization": "***REDACTED***",
+          "Content-Type": "application/json; charset=UTF-8"
+        },
+        "json": {
+          "publish_id": "{PUBLISH_ID}"
+        },
+        "method": "POST",
+        "purpose": "status",
+        "url": "https://open.tiktokapis.com/v2/post/publish/status/fetch/"
+      }
+    ]
+  },
+  {
+    "job_id": "job-08f3d384b9",
+    "variant_id": "putt-sample-002:putt_tour.instagram.putttour",
+    "state": "simulated",
+    "mode": "dry_run",
+    "permalink": "dryrun://instagram/b468730c4019",
+    "would_send": [
+      {
+        "headers": {},
+        "json": {
+          "access_token": "***REDACTED***",
+          "caption": "Putt Tour: Putt drops\n\nThe long putt curls in and drops.\n\nSend this to the friend who needs to see it, and save it for the rematch.\n\n#PuttTour #Putting",
+          "media_type": "REELS",
+          "share_to_feed": true,
+          "video_url": "https://media.example.invalid/b468730c40194814b4cebca8b0ff0777.mp4"
+        },
+        "method": "POST",
+        "purpose": "create reel container",
+        "url": "https://graph.facebook.com/v26.0/{IG_USER_ID}/media"
+      },
+      {
+        "headers": {},
+        "json": {},
+        "method": "GET",
+        "purpose": "poll container",
+        "url": "https://graph.facebook.com/v26.0/{CONTAINER_ID}?fields=status_code"
+      },
+      {
+        "headers": {},
+        "json": {
+          "access_token": "***REDACTED***",
+          "creation_id": "{CONTAINER_ID}"
+        },
+        "method": "POST",
+        "purpose": "publish container",
+        "url": "https://graph.facebook.com/v26.0/{IG_USER_ID}/media_publish"
+      }
+    ]
+  },
+  {
+    "job_id": "job-819d427664",
+    "variant_id": "carjitsu-sample-001:pln.linkedin.pending",
+    "state": "simulated",
+    "mode": "dry_run",
+    "permalink": "dryrun://linkedin/d86d96767784",
+    "would_send": [
+      {
+        "headers": {
+          "Authorization": "***REDACTED***",
+          "Linkedin-Version": "202601",
+          "X-Restli-Protocol-Version": "2.0.0"
+        },
+        "json": {
+          "initializeUploadRequest": {
+            "fileSizeBytes": "{FILE_SIZE}",
+            "owner": "urn:li:organization:{ORG_ID}",
+            "uploadCaptions": false,
+            "uploadThumbnail": false
+          }
+        },
+        "method": "POST",
+        "purpose": "initialize video upload",
+        "url": "https://api.linkedin.com/rest/videos?action=initializeUpload"
+      },
+      {
+        "headers": {},
+        "json": {},
+        "method": "PUT",
+        "purpose": "upload video parts (binary)",
+        "url": "{uploadInstructions[].uploadUrl}"
+      },
+      {
+        "headers": {
+          "Authorization": "***REDACTED***",
+          "Linkedin-Version": "202601",
+          "X-Restli-Protocol-Version": "2.0.0"
+        },
+        "json": {
+          "finalizeUploadRequest": {
+            "uploadToken": "",
+            "uploadedPartIds": [
+              "{ETAGS}"
+            ],
+            "video": "{VIDEO_URN}"
+          }
+        },
+        "method": "POST",
+        "purpose": "finalize video upload",
+        "url": "https://api.linkedin.com/rest/videos?action=finalizeUpload"
+      },
+      {
+        "headers": {
+          "Authorization": "***REDACTED***",
+          "Linkedin-Version": "202601",
+          "X-Restli-Protocol-Version": "2.0.0"
+        },
+        "json": {
+          "author": "urn:li:organization:{ORG_ID}",
+          "commentary": "Constraint is a format strategy.\n\nIn this clip: The competitor on the bottom flips position and takes control of the seat.\n\nPut a grappling match inside a car and the rules explain themselves: tight space, visible stakes, and a single decisive moment a new viewer understands without commentary.\n\nVerified detail: CarJitsu matches take place inside a car.\n\nFor partners, that legibility is the asset: a moment a fan can explain to a friend in one sentence is a moment a brand can stand next to.\n\nWhat would you measure first: completion, shares, or the follow that comes after?\n\nIf you're building fan-first formats or looking for distinctive sports inventory, PLN is open to the conversation.\n\n#SportsBusiness",
+          "content": {
+            "media": {
+              "id": "{VIDEO_URN}",
+              "title": "Constraint is a format strategy."
+            }
+          },
+          "distribution": {
+            "feedDistribution": "MAIN_FEED",
+            "targetEntities": [],
+            "thirdPartyDistributionChannels": []
+          },
+          "isReshareDisabledByAuthor": false,
+          "lifecycleState": "PUBLISHED",
+          "visibility": "PUBLIC"
+        },
+        "method": "POST",
+        "purpose": "create post",
+        "url": "https://api.linkedin.com/rest/posts"
+      }
+    ]
+  }
+]

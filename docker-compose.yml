@@ -1,0 +1,27 @@
+# Local stack: dashboard + publisher worker + Postgres. Dry-run by default.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: pln
+      POSTGRES_PASSWORD: pln_local_only
+      POSTGRES_DB: pln
+    volumes: ["pgdata:/var/lib/postgresql/data", "./migrations/postgres:/docker-entrypoint-initdb.d:ro"]
+  web:
+    build: .
+    env_file: [.env]
+    environment:
+      PLN_DATABASE_URL: postgresql://pln:pln_local_only@db:5432/pln
+    ports: ["127.0.0.1:8000:8000"]
+    volumes: ["./sample_media:/app/sample_media", "./data:/app/data"]
+    depends_on: [db]
+  worker:
+    build: .
+    env_file: [.env]
+    environment:
+      PLN_DATABASE_URL: postgresql://pln:pln_local_only@db:5432/pln
+    command: ["sh", "-c", "while true; do python -m pln_agent publish; sleep 60; done"]
+    volumes: ["./data:/app/data"]
+    depends_on: [db]
+volumes:
+  pgdata: {}

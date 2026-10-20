@@ -1,0 +1,19 @@
+{
+  "_note": "World Putting League -> Putt Tour migration. EDITABLE canonical-account selection per platform. 'status' must be set to 'approved' by a human (CLI: migration approve) before profile proposals can be acted on. Nothing here renames, deletes, or edits any profile: proposals are executed manually by an account admin in the native app.",
+  "legacy_brand_id": "world_putting_league",
+  "target_brand_id": "putt_tour",
+  "campaign": "wpl_to_putttour_2026",
+  "planning_start_date": "2026-10-21",
+  "link_hub_url": "",
+  "legacy_bridge_max_posts_per_week": 2,
+  "platforms": {
+    "instagram": {"option": "bridge_to_canonical", "canonical_account_id": "putt_tour.instagram.putttour",
+                  "legacy_account_id": "world_putting_league.instagram.worldputtingleague", "status": "proposed"},
+    "tiktok": {"option": "keep_legacy_temporarily", "canonical_account_id": "world_putting_league.tiktok.worldputtingleague",
+               "legacy_account_id": "world_putting_league.tiktok.worldputtingleague", "status": "proposed"},
+    "youtube": {"option": "keep_legacy_temporarily", "canonical_account_id": "world_putting_league.youtube.worldputtingleague",
+                "legacy_account_id": "world_putting_league.youtube.worldputtingleague", "status": "proposed"},
+    "x": {"option": "keep_legacy_temporarily", "canonical_account_id": "world_putting_league.x.worldputtleague",
+          "legacy_account_id": "world_putting_league.x.worldputtleague", "status": "proposed"}
+  }
+}

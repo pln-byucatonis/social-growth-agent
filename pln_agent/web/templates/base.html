@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PLN Growth Desk</title>
+<style>
+:root{--bg:#f6f6f3;--panel:#fff;--ink:#16181d;--muted:#5d6370;--line:#dedfe3;--accent:#d7262f;--ok:#1f7a4a;--warn:#a86400;--bad:#b3261e;--chip:#eef0f3}
+@media (prefers-color-scheme:dark){:root{--bg:#121316;--panel:#1b1d22;--ink:#eceef2;--muted:#9aa1ad;--line:#2c2f36;--accent:#ff5a5f;--ok:#4cc38a;--warn:#f0a83a;--bad:#ff6b63;--chip:#262930}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:2}
+header b{font-size:15px;letter-spacing:.3px}nav a{color:var(--ink);text-decoration:none;margin-right:12px;font-weight:500}nav a:hover{color:var(--accent)}
+.mode{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}.pill{padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600;background:var(--chip)}
+.pill.ok{color:var(--ok)}.pill.warn{color:var(--warn)}.pill.bad{color:#fff;background:var(--bad)}
+main{padding:16px;max-width:1280px;margin:0 auto}.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}th{color:var(--muted);font-weight:600}
+.tablewrap{overflow-x:auto}a{color:var(--accent)}.muted{color:var(--muted)}.badge{display:inline-block;padding:1px 6px;margin:1px;border-radius:5px;font-size:11px;background:var(--chip)}
+.badge.bad{background:var(--bad);color:#fff}.badge.warn{background:var(--warn);color:#111}.badge.ok{background:var(--ok);color:#fff}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}textarea,input,select{width:100%;font:inherit;padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
+button{font:inherit;padding:6px 12px;border-radius:6px;border:1px solid var(--line);background:var(--chip);color:var(--ink);cursor:pointer}button.primary{background:var(--ok);color:#fff;border:0}button.danger{background:var(--bad);color:#fff;border:0}
+pre{white-space:pre-wrap;word-break:break-word;background:var(--bg);padding:8px;border-radius:6px;font-size:12px}.flash{padding:8px 12px;border-radius:6px;margin-bottom:12px}.flash.ok{background:color-mix(in srgb,var(--ok) 18%,transparent)}.flash.err{background:color-mix(in srgb,var(--bad) 22%,transparent)}
+form.inline{display:inline}video{max-width:100%;max-height:520px;border-radius:8px;background:#000}
+</style></head><body>
+<header><b>PLN Growth Desk</b><nav><a href="/">Overview</a><a href="/queue">Approval queue</a><a href="/calendar">Calendar</a><a href="/accounts">Accounts</a><a href="/migration">WPL → Putt Tour</a><a href="/audit">Audit</a></nav>
+<div class="mode">{% if dry_run %}<span class="pill ok">DRY-RUN</span>{% else %}<span class="pill warn">LIVE MODE</span>{% endif %}
+<span class="pill {{ 'warn' if publishing_enabled else 'ok' }}">publishing {{ 'ENABLED' if publishing_enabled else 'off' }}</span>
+{% if kill %}<span class="pill bad">EMERGENCY STOP ON</span>{% endif %}</div></header>
+<main>{% if msg %}<div class="flash ok">{{ msg }}</div>{% endif %}{% if err %}<div class="flash err">{{ err }}</div>{% endif %}
+{% block body %}{% endblock %}</main></body></html>

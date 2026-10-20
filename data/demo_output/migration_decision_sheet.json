@@ -1,0 +1,194 @@
+[
+  {
+    "platform": "instagram",
+    "legacy_account": "world_putting_league.instagram.worldputtingleague",
+    "legacy_handle": "@worldputtingleague",
+    "putt_tour_account": "putt_tour.instagram.putttour",
+    "putt_tour_handle": "@putttour",
+    "configured_option": "bridge_to_canonical",
+    "status": "proposed",
+    "recommended_option": "bridge_to_canonical",
+    "confidence": "provisional \u2014 audit required",
+    "rationale": "Evidence missing (@worldputtingleague follower count, @putttour follower count, @worldputtingleague reach/post). Lowest-risk reversible default: keep @putttour as canonical and use WPL as a 60\u201390-day bridge. Re-evaluate once analytics are imported.",
+    "missing_evidence": [
+      "@worldputtingleague follower count",
+      "@putttour follower count",
+      "@worldputtingleague reach/post"
+    ],
+    "pre_decision_checks": [
+      "admin/ownership confirmed for every account",
+      "handle availability checked (target handle free or owned)",
+      "archive + backlinks + partner obligations catalogued",
+      "platform's current rename/merge policy re-read (no follower merge assumed)"
+    ],
+    "evidence": {
+      "legacy": {
+        "account_id": "world_putting_league.instagram.worldputtingleague",
+        "platform": "instagram",
+        "followers": null,
+        "posts_per_week": null,
+        "posts_observed": 0,
+        "median_reach_per_post": null,
+        "median_watch_time_s": null,
+        "median_completion_rate": null,
+        "median_shares_per_post": null,
+        "median_saves_per_post": null,
+        "profile_to_follow_conversion": null,
+        "data_source": [
+          "none \u2014 no analytics imported yet"
+        ]
+      },
+      "putt_tour": {
+        "account_id": "putt_tour.instagram.putttour",
+        "platform": "instagram",
+        "followers": null,
+        "posts_per_week": null,
+        "posts_observed": 0,
+        "median_reach_per_post": null,
+        "median_watch_time_s": null,
+        "median_completion_rate": null,
+        "median_shares_per_post": null,
+        "median_saves_per_post": null,
+        "profile_to_follow_conversion": null,
+        "data_source": [
+          "none \u2014 no analytics imported yet"
+        ]
+      }
+    },
+    "follower_transfer_assumed": false,
+    "auto_rename": false,
+    "auto_delete": false
+  },
+  {
+    "platform": "tiktok",
+    "legacy_account": "world_putting_league.tiktok.worldputtingleague",
+    "legacy_handle": "@worldputtingleague",
+    "putt_tour_account": null,
+    "putt_tour_handle": "(none supplied \u2014 not presumed)",
+    "configured_option": "keep_legacy_temporarily",
+    "status": "proposed",
+    "recommended_option": "keep_legacy_temporarily",
+    "confidence": "provisional \u2014 audit required",
+    "rationale": "No Putt Tour account exists on this platform and no analytics are imported. Keep the WPL identity, post Putt Tour content with transitional copy, and evaluate an in-place rebrand rather than starting a competing fresh account.",
+    "missing_evidence": [
+      "@worldputtingleague follower count",
+      "@worldputtingleague reach/post"
+    ],
+    "pre_decision_checks": [
+      "admin/ownership confirmed for every account",
+      "handle availability checked (target handle free or owned)",
+      "archive + backlinks + partner obligations catalogued",
+      "platform's current rename/merge policy re-read (no follower merge assumed)"
+    ],
+    "evidence": {
+      "legacy": {
+        "account_id": "world_putting_league.tiktok.worldputtingleague",
+        "platform": "tiktok",
+        "followers": null,
+        "posts_per_week": null,
+        "posts_observed": 0,
+        "median_reach_per_post": null,
+        "median_watch_time_s": null,
+        "median_completion_rate": null,
+        "median_shares_per_post": null,
+        "median_saves_per_post": null,
+        "profile_to_follow_conversion": null,
+        "data_source": [
+          "none \u2014 no analytics imported yet"
+        ]
+      },
+      "putt_tour": null
+    },
+    "follower_transfer_assumed": false,
+    "auto_rename": false,
+    "auto_delete": false
+  },
+  {
+    "platform": "youtube",
+    "legacy_account": "world_putting_league.youtube.worldputtingleague",
+    "legacy_handle": "@worldputtingleague",
+    "putt_tour_account": null,
+    "putt_tour_handle": "(none supplied \u2014 not presumed)",
+    "configured_option": "keep_legacy_temporarily",
+    "status": "proposed",
+    "recommended_option": "keep_legacy_temporarily",
+    "confidence": "provisional \u2014 audit required",
+    "rationale": "No Putt Tour account exists on this platform and no analytics are imported. Keep the WPL identity, post Putt Tour content with transitional copy, and evaluate an in-place rebrand rather than starting a competing fresh account.",
+    "missing_evidence": [
+      "@worldputtingleague follower count",
+      "@worldputtingleague reach/post"
+    ],
+    "pre_decision_checks": [
+      "admin/ownership confirmed for every account",
+      "handle availability checked (target handle free or owned)",
+      "archive + backlinks + partner obligations catalogued",
+      "platform's current rename/merge policy re-read (no follower merge assumed)"
+    ],
+    "evidence": {
+      "legacy": {
+        "account_id": "world_putting_league.youtube.worldputtingleague",
+        "platform": "youtube",
+        "followers": null,
+        "posts_per_week": null,
+        "posts_observed": 0,
+        "median_reach_per_post": null,
+        "median_watch_time_s": null,
+        "median_completion_rate": null,
+        "median_shares_per_post": null,
+        "median_saves_per_post": null,
+        "profile_to_follow_conversion": null,
+        "data_source": [
+          "none \u2014 no analytics imported yet"
+        ]
+      },
+      "putt_tour": null
+    },
+    "follower_transfer_assumed": false,
+    "auto_rename": false,
+    "auto_delete": false
+  },
+  {
+    "platform": "x",
+    "legacy_account": "world_putting_league.x.worldputtleague",
+    "legacy_handle": "@worldputtleague",
+    "putt_tour_account": null,
+    "putt_tour_handle": "(none supplied \u2014 not presumed)",
+    "configured_option": "keep_legacy_temporarily",
+    "status": "proposed",
+    "recommended_option": "keep_legacy_temporarily",
+    "confidence": "provisional \u2014 audit required",
+    "rationale": "No Putt Tour account exists on this platform and no analytics are imported. Keep the WPL identity, post Putt Tour content with transitional copy, and evaluate an in-place rebrand rather than starting a competing fresh account.",
+    "missing_evidence": [
+      "@worldputtleague follower count",
+      "@worldputtleague reach/post"
+    ],
+    "pre_decision_checks": [
+      "admin/ownership confirmed for every account",
+      "handle availability checked (target handle free or owned)",
+      "archive + backlinks + partner obligations catalogued",
+      "platform's current rename/merge policy re-read (no follower merge assumed)"
+    ],
+    "evidence": {
+      "legacy": {
+        "account_id": "world_putting_league.x.worldputtleague",
+        "platform": "x",
+        "followers": null,
+        "posts_per_week": null,
+        "posts_observed": 0,
+        "median_reach_per_post": null,
+        "median_watch_time_s": null,
+        "median_completion_rate": null,
+        "median_shares_per_post": null,
+        "median_saves_per_post": null,
+        "profile_to_follow_conversion": null,
+        "data_source": [
+          "none \u2014 no analytics imported yet"
+        ]
+      },
+      "putt_tour": null
+    },
+    "follower_transfer_assumed": false,
+    "auto_rename": false,
+    "auto_delete": false
+  }
+]

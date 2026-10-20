@@ -1,0 +1,235 @@
+{
+  "source": "User-supplied inventory Oct 20 2026; not independently confirmed",
+  "accounts": [
+    {
+      "brand": "Pro League Network",
+      "platform": "Instagram",
+      "username": "@proleaguenetwork",
+      "priority": "P0",
+      "status": "unverified_user_supplied",
+      "canonical_brand": "Pro League Network"
+    },
+    {
+      "brand": "Pro League Network",
+      "platform": "Facebook",
+      "username": "@Pro League Network",
+      "priority": "P0",
+      "status": "unverified_user_supplied",
+      "canonical_brand": "Pro League Network"
+    },
+    {
+      "brand": "Pro League Network",
+      "platform": "X",
+      "username": "@ProLeagueNet",
+      "priority": "P0",
+      "status": "unverified_user_supplied",
+      "canonical_brand": "Pro League Network"
+    },
+    {
+      "brand": "Pro League Network",
+      "platform": "TikTok",
+      "username": "@proleaguenetwork",
+      "priority": "P0",
+      "status": "unverified_user_supplied",
+      "canonical_brand": "Pro League Network"
+    },
+    {
+      "brand": "Pro League Network",
+      "platform": "YouTube",
+      "username": "@proleaguenetwork",
+      "priority": "P0",
+      "status": "unverified_user_supplied",
+      "canonical_brand": "Pro League Network"
+    },
+    {
+      "brand": "Pro League Network",
+      "platform": "Twitch",
+      "username": "@proleaguenetwork",
+      "priority": "P0",
+      "status": "unverified_user_supplied",
+      "canonical_brand": "Pro League Network"
+    },
+    {
+      "brand": "Pro League Network",
+      "platform": "TikTok",
+      "username": "@pro.league.networ",
+      "priority": "P0",
+      "status": "unverified_user_supplied",
+      "canonical_brand": "Pro League Network"
+    },
+    {
+      "brand": "CarJitsu Championship",
+      "platform": "Instagram",
+      "username": "@carjitsu_championship",
+      "priority": "P0",
+      "status": "unverified_user_supplied",
+      "canonical_brand": "CarJitsu Championship"
+    },
+    {
+      "brand": "CarJitsu Championship",
+      "platform": "X",
+      "username": "@CarJitsuUSA",
+      "priority": "P0",
+      "status": "unverified_user_supplied",
+      "canonical_brand": "CarJitsu Championship"
+    },
+    {
+      "brand": "CarJitsu Championship",
+      "platform": "TikTok",
+      "username": "@carjitsuchampionship",
+      "priority": "P0",
+      "status": "unverified_user_supplied",
+      "canonical_brand": "CarJitsu Championship"
+    },
+    {
+      "brand": "CarJitsu Championship",
+      "platform": "YouTube",
+      "username": "@carjitsuchampionship6540",
+      "priority": "P0",
+      "status": "unverified_user_supplied",
+      "canonical_brand": "CarJitsu Championship"
+    },
+    {
+      "brand": "Putt Tour",
+      "platform": "Instagram",
+      "username": "@putttour",
+      "priority": "P0",
+      "status": "unverified_user_supplied",
+      "canonical_brand": "Putt Tour"
+    },
+    {
+      "brand": "World Putting League",
+      "platform": "Instagram",
+      "username": "@worldputtingleague",
+      "priority": "P0 migration",
+      "status": "unverified_user_supplied",
+      "canonical_brand": "Putt Tour"
+    },
+    {
+      "brand": "World Putting League",
+      "platform": "X",
+      "username": "@worldputtleague",
+      "priority": "P0 migration",
+      "status": "unverified_user_supplied",
+      "canonical_brand": "Putt Tour"
+    },
+    {
+      "brand": "World Putting League",
+      "platform": "TikTok",
+      "username": "@worldputtingleague",
+      "priority": "P0 migration",
+      "status": "unverified_user_supplied",
+      "canonical_brand": "Putt Tour"
+    },
+    {
+      "brand": "World Putting League",
+      "platform": "YouTube",
+      "username": "@worldputtingleague",
+      "priority": "P0 migration",
+      "status": "unverified_user_supplied",
+      "canonical_brand": "Putt Tour"
+    },
+    {
+      "brand": "SlapFIGHT Championship",
+      "platform": "Instagram",
+      "username": "@_slapfight_",
+      "priority": "P2",
+      "status": "unverified_user_supplied",
+      "canonical_brand": "SlapFIGHT Championship"
+    },
+    {
+      "brand": "SlapFIGHT Championship",
+      "platform": "X",
+      "username": "@SlapFIGHTUSA",
+      "priority": "P2",
+      "status": "unverified_user_supplied",
+      "canonical_brand": "SlapFIGHT Championship"
+    },
+    {
+      "brand": "SlapFIGHT Championship",
+      "platform": "TikTok",
+      "username": "@slapfightchampionshipusa",
+      "priority": "P2",
+      "status": "unverified_user_supplied",
+      "canonical_brand": "SlapFIGHT Championship"
+    },
+    {
+      "brand": "SlapFIGHT Championship",
+      "platform": "YouTube",
+      "username": "@slapfightchampionship",
+      "priority": "P2",
+      "status": "unverified_user_supplied",
+      "canonical_brand": "SlapFIGHT Championship"
+    },
+    {
+      "brand": "STR33T",
+      "platform": "Instagram",
+      "username": "@str33tofficial",
+      "priority": "P2",
+      "status": "unverified_user_supplied",
+      "canonical_brand": "STR33T"
+    },
+    {
+      "brand": "STR33T",
+      "platform": "X",
+      "username": "@str33tofficial",
+      "priority": "P2",
+      "status": "unverified_user_supplied",
+      "canonical_brand": "STR33T"
+    },
+    {
+      "brand": "STR33T",
+      "platform": "TikTok",
+      "username": "@str33tofficial_",
+      "priority": "P2",
+      "status": "unverified_user_supplied",
+      "canonical_brand": "STR33T"
+    },
+    {
+      "brand": "STR33T",
+      "platform": "YouTube",
+      "username": "@str33tofficial_",
+      "priority": "P2",
+      "status": "unverified_user_supplied",
+      "canonical_brand": "STR33T"
+    },
+    {
+      "brand": "Pro Carrom Tour",
+      "platform": "Instagram",
+      "username": "@procarromtour",
+      "priority": "P2",
+      "status": "unverified_user_supplied",
+      "canonical_brand": "Pro Carrom Tour"
+    },
+    {
+      "brand": "Pro Carrom Tour",
+      "platform": "TikTok",
+      "username": "@procarromtour",
+      "priority": "P2",
+      "status": "unverified_user_supplied",
+      "canonical_brand": "Pro Carrom Tour"
+    },
+    {
+      "brand": "Pro Carrom Tour",
+      "platform": "YouTube",
+      "username": "@ProCarromTour",
+      "priority": "P2",
+      "status": "unverified_user_supplied",
+      "canonical_brand": "Pro Carrom Tour"
+    },
+    {
+      "brand": "World FootGolf Tour",
+      "platform": "TikTok",
+      "username": "@ezz.abde",
+      "priority": "P3 verification",
+      "status": "unverified_user_supplied",
+      "canonical_brand": "World FootGolf Tour"
+    }
+  ],
+  "missing_not_errors": [
+    "LinkedIn company page URL / admin",
+    "Putt Tour native TikTok and YouTube if any",
+    "Facebook pages for individual IP if any",
+    "Audience analytics, ownership, permissions and follower counts"
+  ]
+}

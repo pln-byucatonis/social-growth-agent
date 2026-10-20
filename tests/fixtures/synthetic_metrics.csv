@@ -1,0 +1,15 @@
+account_id,metric,value,platform_post_id,checkpoint,period_start,period_end
+world_putting_league.instagram.worldputtingleague,followers_count,12000,,snapshot,,
+putt_tour.instagram.putttour,followers_count,1500,,snapshot,,
+world_putting_league.instagram.worldputtingleague,posts_published,12,,snapshot,2026-09-01,2026-09-29
+world_putting_league.instagram.worldputtingleague,reach,4000,p1,7d,,
+world_putting_league.instagram.worldputtingleague,shares,80,p1,7d,,
+world_putting_league.instagram.worldputtingleague,reach,6000,p2,7d,,
+world_putting_league.instagram.worldputtingleague,reach,100,p2,2h,,
+world_putting_league.instagram.worldputtingleague,shares,90,p2,7d,,
+world_putting_league.instagram.worldputtingleague,profile_visits,500,,snapshot,,
+world_putting_league.instagram.worldputtingleague,follows,50,,snapshot,,
+putt_tour.instagram.putttour,reach,900,q1,7d,,
+putt_tour.instagram.putttour,shares,10,q1,7d,,
+putt_tour.instagram.putttour,saved,,q1,7d,,
+,metric_without_account,5,,,,

@@ -1,0 +1,4 @@
+{
+  "_note": "Per-account verification/authorization overrides keyed by account_id. Only edit after a human has actually confirmed ownership or connected OAuth. credential_ref names an env var / vault key, never the secret itself. Empty by default: nothing is verified.",
+  "accounts": {}
+}

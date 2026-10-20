@@ -1,0 +1,4 @@
+[
+  {"id":"asset-001","ip":"CarJitsu","title":"A surprise submission during a car match","description":"A competitor changes position and forces an unexpected tap. Verify event and athlete identities before publishing.","media_path":"/replace/with/licensed/carjitsu001.mp4","rights_verified":false,"people_verified":false,"sponsor_approved":false,"event_date":null,"tags":["unexpected","finish","vertical"]},
+  {"id":"asset-002","ip":"Putt Tour","title":"A long putt changes the leaderboard","description":"One pressure putt flips the standing. Verify scoring and player names before publishing.","media_path":"/replace/with/licensed/putt001.mp4","rights_verified":false,"people_verified":false,"sponsor_approved":false,"event_date":null,"tags":["pressure","competition","vertical"]}
+]

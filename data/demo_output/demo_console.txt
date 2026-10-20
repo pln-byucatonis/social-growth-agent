@@ -1,0 +1,393 @@
+
+====================================================================================================
+1) ACCOUNT INVENTORY — user-supplied handles, loaded verbatim, NOTHING verified
+====================================================================================================
+CSV rows: 28 | loaded: 28 | dropped: 0 | system placeholder: pln.linkedin.pending (no handle fabricated)
+  carjitsu.instagram.carjitsu_championship             @carjitsu_championship      canonical             unverified  
+  carjitsu.tiktok.carjitsuchampionship                 @carjitsuchampionship       canonical             unverified  
+  carjitsu.x.carjitsuusa                               @CarJitsuUSA                canonical             unverified  
+  carjitsu.youtube.carjitsuchampionship6540            @carjitsuchampionship6540   canonical             unverified  
+  pln.facebook.pro_league_network                      @Pro League Network         canonical             unverified  
+  pln.instagram.proleaguenetwork                       @proleaguenetwork           canonical             unverified  
+  pln.linkedin.pending                                 (not supplied)              pending_placeholder   unverified  ⛔ No LinkedIn company Page ID supplied: connect via OAuth
+  pln.tiktok.pro_league_networ                         @pro.league.networ          secondary_unverified  unverified  ⛔ Ambiguous secondary PLN TikTok: confirm owner, purpose 
+  pln.tiktok.proleaguenetwork                          @proleaguenetwork           canonical             unverified  
+  pln.twitch.proleaguenetwork                          @proleaguenetwork           canonical             unverified  
+  pln.x.proleaguenet                                   @ProLeagueNet               canonical             unverified  
+  pln.youtube.proleaguenetwork                         @proleaguenetwork           canonical             unverified  
+  pro_carrom_tour.instagram.procarromtour              @procarromtour              canonical             unverified  
+  pro_carrom_tour.tiktok.procarromtour                 @procarromtour              canonical             unverified  
+  pro_carrom_tour.youtube.procarromtour                @ProCarromTour              canonical             unverified  
+  putt_tour.instagram.putttour                         @putttour                   canonical             unverified  
+  world_putting_league.instagram.worldputtingleague    @worldputtingleague         legacy_bridge         unverified  
+  world_putting_league.tiktok.worldputtingleague       @worldputtingleague         legacy_bridge         unverified  
+  world_putting_league.x.worldputtleague               @worldputtleague            legacy_bridge         unverified  
+  world_putting_league.youtube.worldputtingleague      @worldputtingleague         legacy_bridge         unverified  
+  slapfight.instagram.slapfight                        @_slapfight_                canonical             unverified  
+  slapfight.tiktok.slapfightchampionshipusa            @slapfightchampionshipusa   canonical             unverified  
+  slapfight.x.slapfightusa                             @SlapFIGHTUSA               canonical             unverified  
+  slapfight.youtube.slapfightchampionship              @slapfightchampionship      canonical             unverified  
+  str33t.instagram.str33tofficial                      @str33tofficial             canonical             unverified  
+  str33t.tiktok.str33tofficial                         @str33tofficial_            canonical             unverified  
+  str33t.x.str33tofficial                              @str33tofficial             canonical             unverified  
+  str33t.youtube.str33tofficial                        @str33tofficial_            canonical             unverified  
+  world_footgolf_tour.tiktok.ezz_abde                  @ezz.abde                   creator_unverified    unverified  ⛔ Possibly a creator-owned account: confirm brand associa
+
+====================================================================================================
+2) INGESTION — licensed-asset inbox + sidecars + ffprobe (SAMPLE synthetic clips)
+====================================================================================================
+  carjitsu-sample-001    brand=carjitsu   source_identity='CarJitsu Championship'    media=yes dur=30.133333 1920x1080
+  putt-sample-002        brand=putt_tour  source_identity='Putt Tour'                media=yes dur=20.133333 1080x1920
+  slapfight-sample-004   brand=slapfight  source_identity='SlapFIGHT Championship'   media=MISSING dur=None NonexNone
+  wpl-archive-003        brand=putt_tour  source_identity='World Putting League'     media=yes dur=15.133333 1280x720
+
+====================================================================================================
+3) EDITORIAL PACKS — routing: canonical brand first, then selective PLN amplification / WPL bridge
+====================================================================================================
+
+  carjitsu-sample-001: 9 variants · rights_ok=True blockers=[] review_flags=[]
+    in_review carjitsu.instagram.carjitsu_championship           [canonical] score=0.891
+    in_review carjitsu.tiktok.carjitsuchampionship               [canonical] score=0.891
+    in_review carjitsu.x.carjitsuusa                             [canonical] score=0.957
+    in_review carjitsu.youtube.carjitsuchampionship6540          [canonical] score=0.891
+    in_review pln.facebook.pro_league_network                    [pln_amplification] score=0.891
+    in_review pln.instagram.proleaguenetwork                     [pln_amplification] score=0.891
+    in_review pln.linkedin.pending                               [pln_b2b] score=0.957
+    in_review pln.tiktok.proleaguenetwork                        [pln_amplification] score=0.891
+    in_review pln.youtube.proleaguenetwork                       [pln_amplification] score=0.891
+    note: pln.tiktok.pro_league_networ: excluded from routing (Ambiguous secondary PLN TikTok: confirm owner, purpose and correct spelling before any posting)
+
+  putt-sample-002: 10 variants · rights_ok=True blockers=[] review_flags=['paid_partnership']
+    in_review putt_tour.instagram.putttour                       [canonical] score=0.819
+    in_review world_putting_league.tiktok.worldputtingleague     [legacy_inplace] score=0.819
+    in_review world_putting_league.x.worldputtleague             [legacy_inplace] score=0.756
+    in_review world_putting_league.youtube.worldputtingleague    [legacy_inplace] score=0.819
+    in_review pln.facebook.pro_league_network                    [pln_amplification] score=0.819
+    in_review pln.instagram.proleaguenetwork                     [pln_amplification] score=0.819
+    in_review pln.linkedin.pending                               [pln_b2b] score=0.756
+    in_review pln.tiktok.proleaguenetwork                        [pln_amplification] score=0.819
+    in_review pln.youtube.proleaguenetwork                       [pln_amplification] score=0.819
+    in_review world_putting_league.instagram.worldputtingleague  [legacy_bridge] score=0.819
+    note: pln.tiktok.pro_league_networ: excluded from routing (Ambiguous secondary PLN TikTok: confirm owner, purpose and correct spelling before any posting)
+
+  slapfight-sample-004: 5 variants · rights_ok=False blockers=['media rights not verified', 'no license/ownership record', 'territory not specified', 'people/athlete identities not verified'] review_flags=['combat', 'likeness_unreleased']
+    needs_fix slapfight.instagram.slapfight                      [canonical] score=0.3458
+    needs_fix slapfight.tiktok.slapfightchampionshipusa          [canonical] score=0.3458
+    needs_fix slapfight.x.slapfightusa                           [canonical] score=0.3458
+    needs_fix slapfight.youtube.slapfightchampionship            [canonical] score=0.3458
+    needs_fix pln.linkedin.pending                               [pln_b2b] score=0.3458
+    note: pln.tiktok.pro_league_networ: excluded from routing (Ambiguous secondary PLN TikTok: confirm owner, purpose and correct spelling before any posting)
+    note: slapfight-sample-004:pln.facebook.pro_league_network: PLN amplification skipped (score 0.3458 < 0.55)
+    note: slapfight-sample-004:pln.instagram.proleaguenetwork: PLN amplification skipped (score 0.3458 < 0.55)
+    note: slapfight-sample-004:pln.tiktok.proleaguenetwork: PLN amplification skipped (score 0.3458 < 0.55)
+    note: slapfight-sample-004:pln.youtube.proleaguenetwork: PLN amplification skipped (score 0.3458 < 0.55)
+
+  wpl-archive-003: 10 variants · rights_ok=False blockers=['rights expired 2026-09-30'] review_flags=[]
+    needs_fix putt_tour.instagram.putttour                       [canonical] score=0.5985
+    needs_fix world_putting_league.tiktok.worldputtingleague     [legacy_inplace] score=0.5985
+    needs_fix world_putting_league.x.worldputtleague             [legacy_inplace] score=0.6615
+    needs_fix world_putting_league.youtube.worldputtingleague    [legacy_inplace] score=0.5985
+    needs_fix pln.facebook.pro_league_network                    [pln_amplification] score=0.5985
+    needs_fix pln.instagram.proleaguenetwork                     [pln_amplification] score=0.5985
+    needs_fix pln.linkedin.pending                               [pln_b2b] score=0.6615
+    needs_fix pln.tiktok.proleaguenetwork                        [pln_amplification] score=0.5985
+    needs_fix pln.youtube.proleaguenetwork                       [pln_amplification] score=0.5985
+    needs_fix world_putting_league.instagram.worldputtingleague  [legacy_bridge] score=0.5985
+    note: pln.tiktok.pro_league_networ: excluded from routing (Ambiguous secondary PLN TikTok: confirm owner, purpose and correct spelling before any posting)
+
+====================================================================================================
+4) ONE ASSET → FOUR GENUINELY DIFFERENT CORE-PLATFORM SCRIPTS (carjitsu-sample-001)
+====================================================================================================
+
+--- TIKTOK → carjitsu.tiktok.carjitsuchampionship [canonical] series='Wait For It' format=9:16 native vertical, captions burned, no end card
+HOOK: Pinned on the bottom with nowhere to go. Then this.
+CAPTION:
+  Pinned on the bottom with nowhere to go. Then this. The competitor on the bottom flips position and takes control of the seat. Tap or keep fighting?
+EDL: cut 6.50s–9.00s tension (trimmed) (annotated 00:03.00–00:09.00) | cut 9.70s–17.00s payoff+reaction (annotated 00:10.00–00:14.00)
+OUTPUT: {'h': 1920, 'reframe': 'subject_center_crop', 'w': 1080} · ON-SCREEN: ['Pinned on the bottom with nowhere to go. Then this.', 'CarJitsu matches take place inside a car']
+HASHTAGS: ['#CarJitsu', '#Grappling'] — #CarJitsu = owned brand tag: lets fans find the property's archive; #Grappling = sport/category discovery tag. No trend tags: we have no verified trend data.
+CTA: Follow for part 2 · ANGLE: discovery: immediate stakes, zero context required
+TEST: Cold-opening 00:06.50 (pre-payoff) vs chronological cut lifts avg watch time and follows/1k views for 'stakes' hook.
+ALT HOOKS: ['Wait for it… the reversal inside a car', 'POV: you thought you had this inside a car', 'How does this even work inside a car?']
+SCORE 0.891: empirical=0.5 (no data: fewer than 3 measured 'Wait For It' posts on this a); platform_fit=0.7 (source 1920x1080 must be reframed to 1080x1920 (crop risk: c); rights=1.0 (clear); source=0.9 (peak intensity 0.9 from annotated moments at 00:03.00–00:09.); timeliness=1.0 (event 2d ago; upcoming CarJitsu Fall Card (SAMPLE) on 2026-1)
+
+--- INSTAGRAM → carjitsu.instagram.carjitsu_championship [canonical] series='The Moment' format=Reel 9:16 + carousel alt (setup / payoff / reaction stills)
+HOOK: CarJitsu Championship: Reversal
+CAPTION:
+  CarJitsu Championship: Reversal
+  
+  The competitor on the bottom flips position and takes control of the seat.
+  CarJitsu matches take place inside a car.
+  
+  Send this to the friend who needs to see it, and save it for the rematch.
+EDL: cut 2.50s–9.00s setup (annotated 00:03.00–00:09.00) | cut 9.80s–17.50s payoff+reaction (annotated 00:10.00–00:14.00)
+OUTPUT: {'h': 1920, 'reframe': 'subject_center_crop', 'w': 1080} · ON-SCREEN: ['CarJitsu Championship: Reversal', 'CarJitsu Championship']
+HASHTAGS: ['#CarJitsu', '#Grappling'] — #CarJitsu = owned brand tag: lets fans find the property's archive; #Grappling = sport/category discovery tag. No trend tags: we have no verified trend data.
+CTA: Send this to the friend who needs to see it, and save it for the rematch. · ANGLE: brand fandom: identity + shareability
+TEST: 'title_card' cover text vs. no-text cover changes non-follower reach→follow rate.
+ALT HOOKS: ["Send this to someone who thinks grappling inside a car isn't a sport", 'Rules in 20 Seconds: CarJitsu']
+SCORE 0.891: empirical=0.5 (no data: fewer than 3 measured 'The Moment' posts on this ac); platform_fit=0.7 (source 1920x1080 must be reframed to 1080x1920 (crop risk: c); rights=1.0 (clear); source=0.9 (peak intensity 0.9 from annotated moments at 00:03.00–00:09.); timeliness=1.0 (event 2d ago; upcoming CarJitsu Fall Card (SAMPLE) on 2026-1)
+
+--- FACEBOOK → pln.facebook.pro_league_network [pln_amplification] series='Full Finish Friday' format=native video 4:5 (feed) with burned captions; full sequence
+HOOK: Did you catch this CarJitsu moment?
+CAPTION:
+  Did you catch this CarJitsu moment?
+  
+  A scramble in the back seat ends with the bottom competitor reversing position.
+  
+  CarJitsu matches take place inside a car.
+  
+  Drop your answer below: Tap or keep fighting?
+  
+  Next up: CarJitsu Fall Card (SAMPLE) (2026-10-24).
+EDL: cut 2.00s–27.00s full sequence (annotated 00:03.00–00:26.00)
+OUTPUT: {'h': 1350, 'reframe': 'pad_or_crop_4x5', 'w': 1080} · ON-SCREEN: ['Did you catch this CarJitsu moment?']
+HASHTAGS: ['#CarJitsu'] — #CarJitsu = owned brand tag: lets fans find the property's archive. No trend tags: we have no verified trend data.
+CTA: Comment your call and share with the fan who'd argue with you · ANGLE: community conversation + return viewing
+TEST: Specific debate question vs. generic 'thoughts?' raises meaningful comments per 1k reached.
+ALT HOOKS: ['Be honest: Tap or keep fighting?']
+SCORE 0.891: empirical=0.5 (no data: fewer than 3 measured 'Full Finish Friday' posts on); platform_fit=0.7 (source 1920x1080 must be reframed to 1080x1350 (crop risk: c); rights=1.0 (clear); source=0.9 (peak intensity 0.9 from annotated moments at 00:03.00–00:26.); timeliness=1.0 (event 2d ago; upcoming CarJitsu Fall Card (SAMPLE) on 2026-1)
+
+--- LINKEDIN → pln.linkedin.pending [pln_b2b] series='Why This Sport Works' format=native 1:1 clip with captions + text post (document-carousel alt)
+HOOK: Constraint is a format strategy.
+CAPTION:
+  Constraint is a format strategy.
+  
+  In this clip: The competitor on the bottom flips position and takes control of the seat.
+  
+  Put a grappling match inside a car and the rules explain themselves: tight space, visible stakes, and a single decisive moment a new viewer understands without commentary.
+  
+  Verified detail: CarJitsu matches take place inside a car.
+  
+  For partners, that legibility is the asset: a moment a fan can explain to a friend in one sentence is a moment a brand can stand next to.
+  
+  What would you measure first: completion, shares, or the follow that comes after?
+  
+  If you're building fan-first formats or looking for distinctive sports inventory, PLN is open to the conversation.
+EDL: cut 2.70s–9.30s setup (annotated 00:03.00–00:09.00) | cut 9.70s–17.30s reversal+reaction (annotated 00:10.00–00:14.00)
+OUTPUT: {'h': 1080, 'reframe': 'center_crop_1x1', 'w': 1080} · ON-SCREEN: ['Constraint is a format strategy.']
+HASHTAGS: ['#SportsBusiness'] — #SportsBusiness = single professional discovery tag; LinkedIn reach is driven by dwell + comments, not tags.
+CTA: Invite qualified partnership / distribution conversations · ANGLE: B2B: format legibility as commercial value
+TEST: Insight-led first line vs. clip-description first line increases right-person comments and inbound DMs.
+ALT HOOKS: ['What CarJitsu teaches about building sports audiences']
+SCORE 0.957: empirical=0.5 (no data: fewer than 3 measured 'Why This Sport Works' posts ); platform_fit=1.0 (source 1920x1080 matches target orientation); rights=1.0 (clear); source=0.9 (peak intensity 0.9 from annotated moments at 00:03.00–00:09.); timeliness=1.0 (event 2d ago; upcoming CarJitsu Fall Card (SAMPLE) on 2026-1)
+
+Caption similarity matrix (trigram Jaccard; gate rejects > 0.45):
+  tiktok    1.00 0.22 0.03 0.09
+  instagram 0.22 1.00 0.07 0.12
+  facebook  0.03 0.07 1.00 0.03
+  linkedin  0.09 0.12 0.03 1.00
+
+====================================================================================================
+5) NATIVE MEDIA PACKAGING (FFmpeg) — real renders from SAMPLE clips; EDL-only when media missing
+====================================================================================================
+  rendered       carjitsu-sample-001:carjitsu.tiktok.carjitsuchampionship               renders/carjitsu-sample-001_carjitsu.tiktok.carjitsuchampionship/video.mp4
+  rendered       carjitsu-sample-001:carjitsu.instagram.carjitsu_championship           renders/carjitsu-sample-001_carjitsu.instagram.carjitsu_championship/video.mp4
+  rendered       carjitsu-sample-001:pln.facebook.pro_league_network                    renders/carjitsu-sample-001_pln.facebook.pro_league_network/video.mp4
+  rendered       carjitsu-sample-001:pln.linkedin.pending                               renders/carjitsu-sample-001_pln.linkedin.pending/video.mp4
+  rendered       putt-sample-002:putt_tour.instagram.putttour                           renders/putt-sample-002_putt_tour.instagram.putttour/video.mp4
+  rendered       putt-sample-002:world_putting_league.instagram.worldputtingleague      renders/putt-sample-002_world_putting_league.instagram.worldputtingleague/video.mp4
+  edl_only       slapfight-sample-004:slapfight.tiktok.slapfightchampionshipusa         renders/slapfight-sample-004_slapfight.tiktok.slapfightchampionshipusa/PREVIEW_NOT_RENDERED.svg
+
+====================================================================================================
+6) SEVEN-DAY CALENDAR (coordinated across accounts; empty slots = supply gap, not filler)
+====================================================================================================
+7-DAY CALENDAR from 2026-10-21 (America/New_York) — slots are test hypotheses
+
+Wed 2026-10-21
+  11:30  instagram putt_tour.instagram.putttour                     [canonical] in_review “Putt Tour: Putt drops”
+  12:00  x         carjitsu.x.carjitsuusa                           [canonical] in_review “Pinned on the bottom with nowhere to go… then the reversal”
+  18:30  instagram carjitsu.instagram.carjitsu_championship         [canonical] in_review “CarJitsu Championship: Reversal”
+  19:30  tiktok    world_putting_league.tiktok.worldputtingleague   [legacy_inplace] in_review “One putt for the lead. Then this.”
+Thu 2026-10-22
+  08:30  linkedin  pln.linkedin.pending                             [pln_b2b] in_review “The most legible stakes in sports might be one ball and on”
+  12:15  tiktok    carjitsu.tiktok.carjitsuchampionship             [canonical] in_review “Pinned on the bottom with nowhere to go. Then this.”
+  16:00  youtube   world_putting_league.youtube.worldputtingleague  [legacy_inplace] in_review “Putt drops | Putt Tour (formerly World Putting League)”
+  18:30  instagram pln.instagram.proleaguenetwork                   [pln_amplification] in_review “Sports you didn't know you needed: CarJitsu”
+Fri 2026-10-23
+  08:30  linkedin  pln.linkedin.pending                             [pln_b2b] in_review “Constraint is a format strategy.”
+  12:00  x         world_putting_league.x.worldputtleague           [legacy_inplace] in_review “One putt for the lead… then the putt drops.”
+  16:00  youtube   carjitsu.youtube.carjitsuchampionship6540        [canonical] in_review “Reversal | CarJitsu Championship”
+  18:30  instagram pln.instagram.proleaguenetwork                   [pln_amplification] in_review “Sports you didn't know you needed: Putt Tour”
+Sat 2026-10-24
+  13:00  facebook  pln.facebook.pro_league_network                  [pln_amplification] in_review “Did you catch this CarJitsu moment?”
+  16:00  youtube   pln.youtube.proleaguenetwork                     [pln_amplification] in_review “Putt Tour in one moment | PLN Network Picks”
+  19:30  tiktok    pln.tiktok.proleaguenetwork                      [pln_amplification] in_review “How does this even work inside a car?”
+Sun 2026-10-25
+  13:00  facebook  pln.facebook.pro_league_network                  [pln_amplification] in_review “Did you catch this Putt Tour moment?”
+  16:00  youtube   pln.youtube.proleaguenetwork                     [pln_amplification] in_review “CarJitsu in one moment | PLN Network Picks”
+  19:30  tiktok    pln.tiktok.proleaguenetwork                      [pln_amplification] in_review “How does this even work on the green?”
+Mon 2026-10-26
+  11:30  instagram world_putting_league.instagram.worldputtingleague [legacy_bridge] in_review “World Putting League is now Putt Tour”
+
+140 hypothesis slots left open: not enough distinct licensed, approved-ready assets to fill them. Ingest more footage rather than reposting.
+
+====================================================================================================
+7) APPROVAL GATES, RIGHTS GATE, DUPLICATE PREVENTION, EMERGENCY STOP, SAFE PUBLISH GATE
+====================================================================================================
+  APPROVE expired-rights asset                         → REFUSED: cannot approve from state needs_fix (fix validation/rights first)
+  APPROVE unlicensed / unverified people               → REFUSED: cannot approve from state needs_fix (fix validation/rights first)
+  APPROVE clean asset                                  → state=approved approvers=['demo.editor'] needed=1
+  APPROVE paid partnership (1st reviewer)              → state=in_review approvers=['demo.editor'] needed=2
+  APPROVE same reviewer again (doesn't count twice)    → state=in_review approvers=['demo.editor'] needed=2
+  APPROVE paid partnership (2nd reviewer)              → state=approved approvers=['demo.brand_safety', 'demo.editor'] needed=2
+  APPROVE PLN LinkedIn (pending, unverified page)      → state=approved approvers=['demo.editor'] needed=1
+  APPROVE WPL→Putt Tour bridge teaser (1st)            → state=in_review approvers=['demo.editor'] needed=2
+  APPROVE WPL bridge (2nd reviewer)                    → state=approved approvers=['demo.brand_safety', 'demo.editor'] needed=2
+
+  Approval queue by platform:
+    facebook   in_review  2
+    facebook   needs_fix  1
+    instagram  approved   2
+    instagram  in_review  3
+    instagram  needs_fix  4
+    linkedin   approved   1
+    linkedin   in_review  1
+    linkedin   needs_fix  2
+    tiktok     approved   1
+    tiktok     in_review  3
+    tiktok     needs_fix  3
+    x          in_review  2
+    x          needs_fix  2
+    youtube    in_review  4
+    youtube    needs_fix  3
+  SCHEDULE carjitsu-sample-001:carjitsu.tiktok.carjitsuchampionship           → job job-3f643e76ba key=374579bde8f3…
+  SCHEDULE putt-sample-002:putt_tour.instagram.putttour                       → job job-08f3d384b9 key=b468730c4019…
+  SCHEDULE carjitsu-sample-001:pln.linkedin.pending                           → job job-819d427664 key=d86d96767784…
+  SCHEDULE carjitsu-sample-001:carjitsu.instagram.carjitsu_championship       → REFUSED: only approved variants can be scheduled (state=in_review)
+  SCHEDULE (double-submit of same post)                            → REFUSED: duplicate: an identical post for this account already has a publish job
+  EMERGENCY STOP ON → publisher: [{'skipped': 'emergency stop is ON'}]
+  PUBLISH (dry-run) job-3f643e76ba → simulated; not live because: ['global dry-run is ON (PLN_DRY_RUN)', 'global publishing disabled (PLN_PUBLISHING_ENABLED)', 'account is unverified, not oauth_connected', 'no credential reference configured', 'publishing not authorized for this account']
+  PUBLISH (dry-run) job-08f3d384b9 → simulated; not live because: ['global dry-run is ON (PLN_DRY_RUN)', 'global publishing disabled (PLN_PUBLISHING_ENABLED)', 'account is unverified, not oauth_connected', 'no credential reference configured', 'publishing not authorized for this account']
+  PUBLISH (dry-run) job-819d427664 → simulated; not live because: ['global dry-run is ON (PLN_DRY_RUN)', 'global publishing disabled (PLN_PUBLISHING_ENABLED)', 'hard block: No LinkedIn company Page ID supplied: connect via OAuth with Page admin role first', 'account is unverified, not oauth_connected', 'no credential reference configured', 'publishing not authorized for this account']
+  → simulated receipts incl. exact (token-redacted) API requests: simulated_receipts.json
+
+====================================================================================================
+8) LIVE-PATH REHEARSAL WITH A MOCK TRANSPORT (no network; proves retry/backoff/idempotency/error handling)
+====================================================================================================
+  2026-10-21T16:00:00+00:00 → [{'job_id': 'job-06fe30b3e1', 'state': 'retry_scheduled', 'next_attempt_at': '2026-10-21T16:01:00+00:00', 'error': 'x create post: HTTP 503 {"title": "Service Unavailable"}'}]
+  2026-10-21T16:01:01+00:00 → [{'job_id': 'job-06fe30b3e1', 'state': 'retry_scheduled', 'next_attempt_at': '2026-10-21T16:03:01+00:00', 'error': 'x create post: HTTP 429 {"title": "Too Many Requests"}'}]
+  2026-10-21T16:03:02+00:00 → [{'job_id': 'job-06fe30b3e1', 'state': 'published', 'permalink': 'https://x.com/carjitsuusa/status/1850000000000000001'}]
+  final job: {'state': 'published', 'attempts': 3, 'permalink': 'https://x.com/carjitsuusa/status/1850000000000000001'} · HTTP calls made: 3 (Authorization header redacted in logs)
+  re-run publisher after success → nothing due (no duplicate post; calls still 3)
+  401 Unauthorized → failed (kind=auth); no retry storm; rollback guidance stored
+
+====================================================================================================
+9) WORLD PUTTING LEAGUE → PUTT TOUR MIGRATION
+====================================================================================================
+  [instagram] legacy @worldputtingleague    putt tour @putttour                        configured=bridge_to_canonical      recommended=bridge_to_canonical (provisional — audit required)
+      Evidence missing (@worldputtingleague follower count, @putttour follower count, @worldputtingleague reach/post). Lowest-risk reversible default: keep @putttour as canonical and use WPL as a 60–90-day bridge. Re-evaluate once analytics are imported.
+  [tiktok   ] legacy @worldputtingleague    putt tour (none supplied — not presumed)   configured=keep_legacy_temporarily  recommended=keep_legacy_temporarily (provisional — audit required)
+      No Putt Tour account exists on this platform and no analytics are imported. Keep the WPL identity, post Putt Tour content with transitional copy, and evaluate an in-place rebrand rather than starting a competing fresh account.
+  [youtube  ] legacy @worldputtingleague    putt tour (none supplied — not presumed)   configured=keep_legacy_temporarily  recommended=keep_legacy_temporarily (provisional — audit required)
+      No Putt Tour account exists on this platform and no analytics are imported. Keep the WPL identity, post Putt Tour content with transitional copy, and evaluate an in-place rebrand rather than starting a competing fresh account.
+  [x        ] legacy @worldputtleague       putt tour (none supplied — not presumed)   configured=keep_legacy_temporarily  recommended=keep_legacy_temporarily (provisional — audit required)
+      No Putt Tour account exists on this platform and no analytics are imported. Keep the WPL identity, post Putt Tour content with transitional copy, and evaluate an in-place rebrand rather than starting a competing fresh account.
+
+  16 profile-change PROPOSALS created (status=proposed; never auto-applied). e.g.:
+    world_putting_league.instagram.worldputtingleague    display_name → World Putting League → now Putt Tour
+    world_putting_league.instagram.worldputtingleague    bio          → World Putting League is now Putt Tour → follow @putttour
+    world_putting_league.instagram.worldputtingleague    pinned_post  → 📌 World Putting League is now Putt Tour. Follow @putttour for everything new.
+    world_putting_league.instagram.worldputtingleague    link         → Tracked link hub: (set link_hub_url in config/migration.json) ?utm_source=instagram&utm_medium=social&utm_campaign=wpl_to_putttour_2026&utm_content=worldputtingleague_bio
+    world_putting_league.tiktok.worldputtingleague       display_name → Putt Tour (formerly World Putting League)
+  Approving a proposal before the platform decision is signed off → REFUSED: migration decision for instagram must be approved before profile changes
+
+  90-day plan (approval checkpoints marked):
+    D  0 2026-10-21 audit        Confirm admin/ownership of all 4 WPL accounts + @putttour Instagram  [ownership confirmed]
+    D  1 2026-10-22 audit        Export platform-native analytics (followers, 30/90d reach, top posts, geo, watch-through, link clicks) → import CSV
+    D  5 2026-10-26 audit        Check handle availability; catalogue archives, backlinks, badges, partner obligations
+    D 10 2026-10-31 audit        Run decision sheet with real baselines; choose canonical account per platform
+    D 14 2026-11-04 audit        SIGN-OFF: migration decisions per platform (CLI: migration approve <platform>)  [APPROVAL CHECKPOINT 1]
+    D 15 2026-11-05 communicate  Admin applies approved display name/bio/banner/pinned proposals manually  [APPROVAL CHECKPOINT 2 (each proposal)]
+    D 16 2026-11-06 communicate  Announcement A — founder/tour story (all WPL accounts + @putttour, native edits)  [post approval]
+    D 20 2026-11-10 communicate  Announcement B — athlete-led (releases required)  [post approval]
+    D 25 2026-11-15 communicate  Announcement C — fast rules + highlights  [post approval]
+    D 30 2026-11-20 communicate  Website/link-hub updated with UTM-tagged migration links
+    D 31 2026-11-21 funnel       WPL Instagram bridge stream ≤2/week teasers → @putttour; originals first on canonical
+    D 45 2026-12-05 funnel       Mid-point review: hook variants, legacy response, reply to genuine questions  [APPROVAL CHECKPOINT 3]
+    D 60 2026-12-20 funnel       Evaluate in-place rebrand for WPL-only platforms (TikTok/YouTube/X)
+    D 75 2027-01-04 consolidate  Baseline vs outcome comparison per platform (migration proxies)
+    D 90 2027-01-19 consolidate  Decide signpost vs in-place for each legacy account; NO deletion without backup + rights review + explicit authorization  [APPROVAL CHECKPOINT 4]
+
+  Announcement variants (per platform, native edits):
+    Founder / tour story       “World Putting League is now Putt Tour. Same players, same pressure, a name that says exactly what we do. Everything you followed WPL for is here, and there's a lot more coming.”  edit: Talking head (founder/commissioner, approved) intercut with archive WPL moments; 20–40s.
+    Athlete-led announcement   “We asked the players to tell you themselves: World Putting League is now Putt Tour.”  edit: 2–4 verified athletes (signed releases) each deliver one line to camera; 15–25s.
+    Fast rules + highlights    “New name, same rules: one putt, real pressure. World Putting League is now Putt Tour.”  edit: Rules in 20 Seconds format over the strongest licensed highlight; 15–20s.
+
+  UTM example: ?utm_source=instagram&utm_medium=social&utm_campaign=wpl_to_putttour_2026&utm_content=worldputtingleague_announcement_founder
+  Weekly migration report (proxies; unknown until analytics imported):
+    instagram legacy_followers=None canonical_followers=None link_clicks=None
+    tiktok    legacy_followers=None canonical_followers=None link_clicks=None
+    youtube   legacy_followers=None canonical_followers=None link_clicks=None
+    x         legacy_followers=None canonical_followers=None link_clicks=None
+
+====================================================================================================
+10) WEEKLY EXPERIMENTS + EXPLAINABLE RECOMMENDATIONS
+====================================================================================================
+  facebook  hook_style control='recall: Did you catch this CarJitsu moment?' vs treatment='debate: Be honest: Tap or keep fighting?'
+  instagram hook_style control='title_card: CarJitsu Championship: Reversal' vs treatment='share_prompt: Send this to someone who thinks'
+  instagram time_slot  control='11:30' vs treatment='18:30'
+  linkedin  not run: insufficient supply (1 ready variants) for a controlled test
+  tiktok    hook_style control='question: How does this even work inside a ca' vs treatment='stakes: Pinned on the bottom with nowhere to '
+  tiktok    time_slot  control='12:15' vs treatment='19:30'
+  x         time_slot  control='12:00' vs treatment='20:15'
+  youtube   hook_style control='searchable: Reversal | CarJitsu Championship' vs treatment='explainer: What is CarJitsu? Grappling inside'
+  [P0] baseline             No analytics imported. Export 30–90 days of native analytics for PLN, CarJitsu, Putt Tour and the 4 WPL accounts and run `pln metrics import <csv>` be
+  [P1] missed_post          Planned slot 2026-10-21T12:00:00-04:00 for carjitsu-sample-001:carjitsu.x.carjitsuusa passed without approval/scheduling.
+  [P1] missed_post          Planned slot 2026-10-21T18:30:00-04:00 for carjitsu-sample-001:carjitsu.instagram.carjitsu_championship passed without approval/scheduling.
+  [P1] missed_post          Planned slot 2026-10-21T19:30:00-04:00 for putt-sample-002:world_putting_league.tiktok.worldputtingleague passed without approval/scheduling.
+  [P0] partnership_approval putt-sample-002: 8 pending variants carry a paid partnership — two-person signoff + platform disclosure toggle required.
+  [P0] rights_blocker       slapfight-sample-004 (5 variants blocked): media rights not verified; no license/ownership record; territory not specified; people/athlete identities 
+  [P0] rights_blocker       wpl-archive-003 (10 variants blocked): rights expired 2026-09-30
+  [P0] supply               pln: only 0 licensed assets with media on hand. Native short-video growth needs a steady clip supply: request ≥10 annotated moments/week from producti
+  [P0] supply               carjitsu: only 1 licensed assets with media on hand. Native short-video growth needs a steady clip supply: request ≥10 annotated moments/week from pro
+  [P0] supply               putt_tour: only 2 licensed assets with media on hand. Native short-video growth needs a steady clip supply: request ≥10 annotated moments/week from pr
+
+====================================================================================================
+11) PLATFORM REPORT
+====================================================================================================
+PLATFORM REPORT  dry_run=True publishing_enabled=False emergency_stop=off
+
+== LINKEDIN — north star: Qualified inbound conversations (not comparable across platforms)
+  (pending — not supplied)   pln                    pending_placeholder  followers=unknown  review=1 fix=2 appr=0 sched=0 sim=1 pub=0 live=no
+
+== FACEBOOK — north star: Returning engaged viewers (not comparable across platforms)
+  @Pro League Network        pln                    canonical            followers=unknown  review=2 fix=1 appr=0 sched=0 sim=0 pub=0 live=no
+
+== INSTAGRAM — north star: Non-follower reach → follows (not comparable across platforms)
+  @carjitsu_championship     carjitsu               canonical            followers=unknown  review=1 fix=0 appr=0 sched=0 sim=0 pub=0 live=no
+  @proleaguenetwork          pln                    canonical            followers=unknown  review=2 fix=1 appr=0 sched=0 sim=0 pub=0 live=no
+  @procarromtour             pro_carrom_tour        canonical            followers=unknown  review=0 fix=0 appr=0 sched=0 sim=0 pub=0 live=no
+  @putttour                  putt_tour              canonical            followers=unknown  review=0 fix=1 appr=0 sched=0 sim=1 pub=0 live=no
+  @worldputtingleague        world_putting_league   legacy_bridge        followers=unknown  review=0 fix=1 appr=1 sched=0 sim=0 pub=0 live=no
+  @_slapfight_               slapfight              canonical            followers=unknown  review=0 fix=1 appr=0 sched=0 sim=0 pub=0 live=no
+  @str33tofficial            str33t                 canonical            followers=unknown  review=0 fix=0 appr=0 sched=0 sim=0 pub=0 live=no
+
+== TIKTOK — north star: Watch time + follows per 1k views (not comparable across platforms)
+  @carjitsuchampionship      carjitsu               canonical            followers=unknown  review=0 fix=0 appr=0 sched=0 sim=1 pub=0 live=no
+  @proleaguenetwork          pln                    canonical            followers=unknown  review=2 fix=1 appr=0 sched=0 sim=0 pub=0 live=no
+  @pro.league.networ         pln                    secondary_unverified followers=unknown  review=0 fix=0 appr=0 sched=0 sim=0 pub=0 live=no
+  @procarromtour             pro_carrom_tour        canonical            followers=unknown  review=0 fix=0 appr=0 sched=0 sim=0 pub=0 live=no
+  @worldputtingleague        world_putting_league   legacy_bridge        followers=unknown  review=1 fix=1 appr=0 sched=0 sim=0 pub=0 live=no
+  @slapfightchampionshipusa  slapfight              canonical            followers=unknown  review=0 fix=1 appr=0 sched=0 sim=0 pub=0 live=no
+  @str33tofficial_           str33t                 canonical            followers=unknown  review=0 fix=0 appr=0 sched=0 sim=0 pub=0 live=no
+  @ezz.abde                  world_footgolf_tour    creator_unverified   followers=unknown  review=0 fix=0 appr=0 sched=0 sim=0 pub=0 live=no
+
+== YOUTUBE — north star: Watch time / subs gained (not comparable across platforms)
+  @carjitsuchampionship6540  carjitsu               canonical            followers=unknown  review=1 fix=0 appr=0 sched=0 sim=0 pub=0 live=no
+  @proleaguenetwork          pln                    canonical            followers=unknown  review=2 fix=1 appr=0 sched=0 sim=0 pub=0 live=no
+  @ProCarromTour             pro_carrom_tour        canonical            followers=unknown  review=0 fix=0 appr=0 sched=0 sim=0 pub=0 live=no
+  @worldputtingleague        world_putting_league   legacy_bridge        followers=unknown  review=1 fix=1 appr=0 sched=0 sim=0 pub=0 live=no
+  @slapfightchampionship     slapfight              canonical            followers=unknown  review=0 fix=1 appr=0 sched=0 sim=0 pub=0 live=no
+  @str33tofficial_           str33t                 canonical            followers=unknown  review=0 fix=0 appr=0 sched=0 sim=0 pub=0 live=no
+
+== X — north star: Clicks + replies during live windows (not comparable across platforms)
+  @CarJitsuUSA               carjitsu               canonical            followers=unknown  review=1 fix=0 appr=0 sched=0 sim=0 pub=0 live=no
+  @ProLeagueNet              pln                    canonical            followers=unknown  review=0 fix=0 appr=0 sched=0 sim=0 pub=0 live=no
+  @worldputtleague           world_putting_league   legacy_bridge        followers=unknown  review=1 fix=1 appr=0 sched=0 sim=0 pub=0 live=no
+  @SlapFIGHTUSA              slapfight              canonical            followers=unknown  review=0 fix=1 appr=0 sched=0 sim=0 pub=0 live=no
+  @str33tofficial            str33t                 canonical            followers=unknown  review=0 fix=0 appr=0 sched=0 sim=0 pub=0 live=no
+
+== TWITCH — north star: Average concurrent viewers (not comparable across platforms)
+  @proleaguenetwork          pln                    canonical            followers=unknown  review=0 fix=0 appr=0 sched=0 sim=0 pub=0 live=no
+

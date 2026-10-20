@@ -1,0 +1,12 @@
+{% extends "base.html" %}{% block body %}
+<div class="grid">
+<div class="card"><h3>Pipeline</h3><table>{% for s in ['needs_fix','in_review','approved','scheduled','simulated','published','failed','rejected'] %}<tr><td>{{ s }}</td><td><a href="/queue?state={{ s }}">{{ counts.get(s,0) }}</a></td></tr>{% endfor %}</table></div>
+<div class="card"><h3>Emergency stop</h3><p class="muted">Halts the publisher immediately and pauses all queued jobs. Audited.</p>
+<form method="post" action="/kill"><input name="actor" placeholder="your name" required><input name="reason" placeholder="reason"><br><br>
+{% if kill %}<input type="hidden" name="state" value="off"><button>Release emergency stop</button>{% else %}<input type="hidden" name="state" value="on"><button class="danger">EMERGENCY STOP</button>{% endif %}</form>
+<br><form method="post" action="/publish/run"><button>Run publisher now (respects all gates)</button></form></div>
+</div>
+<div class="card"><h3>Recommendations (evidence-cited)</h3><table>{% for r in recs %}<tr><td><span class="badge {{ 'bad' if r.priority=='P0' else 'warn' }}">{{ r.priority }}</span></td><td>{{ r.type }}</td><td>{{ r.text }}<br><span class="muted">{{ r.evidence }}</span></td></tr>{% endfor %}</table></div>
+<div class="card"><h3>Recent publish jobs</h3><div class="tablewrap"><table><tr><th>job</th><th>variant</th><th>state</th><th>mode</th><th>attempts</th><th>permalink / error</th></tr>
+{% for j in jobs %}<tr><td>{{ j.job_id }}</td><td><a href="/variant/{{ j.variant_id }}">{{ j.variant_id }}</a></td><td>{{ j.state }}</td><td>{{ j.mode }}</td><td>{{ j.attempts }}</td><td>{{ j.permalink or '' }} <span class="muted">{{ j.last_error or '' }}</span></td></tr>{% endfor %}</table></div></div>
+{% endblock %}

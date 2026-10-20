@@ -1,0 +1,12 @@
+{
+  "_note": "Posting-time HYPOTHESES in local time (PLN_TIMEZONE). Replace with times learned from each account's own analytics; the experiment planner proposes slot tests.",
+  "slots": {
+    "tiktok": ["12:15", "19:30"],
+    "instagram": ["11:30", "18:30"],
+    "facebook": ["13:00"],
+    "linkedin": ["08:30"],
+    "youtube": ["16:00"],
+    "x": ["12:00", "20:15"],
+    "twitch": []
+  }
+}

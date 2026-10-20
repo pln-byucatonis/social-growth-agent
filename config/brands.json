@@ -1,0 +1,29 @@
+{
+  "_note": "Editable brand registry. Voice notes are creative direction, not facts. Priorities mirror the v0.4 brief.",
+  "brands": [
+    {"brand_id": "pln", "name": "Pro League Network", "priority": "P0", "aliases": ["PLN", "Pro League Network"],
+     "voice": {"tone": "irreverent, high-energy curator of weird-but-real sports; confident B2B voice on LinkedIn",
+               "role": "master publisher: discovery, cross-property curation, B2B credibility"}},
+    {"brand_id": "carjitsu", "name": "CarJitsu Championship", "priority": "P0", "aliases": ["CarJitsu", "CarJitsu Championship"],
+     "voice": {"tone": "competitive tension + comedy; grappling inside a car is the joke AND the sport",
+               "role": "creator-first short-video growth"}},
+    {"brand_id": "putt_tour", "name": "Putt Tour", "priority": "P0", "aliases": ["Putt Tour", "PuttTour"],
+     "voice": {"tone": "pressure, mic'd reactions, simple scoreboard stakes, tour personalities",
+               "role": "target brand; absorbs World Putting League audience"}},
+    {"brand_id": "world_putting_league", "name": "World Putting League", "priority": "P0 migration", "is_legacy": true,
+     "legacy_of": "putt_tour", "aliases": ["World Putting League", "WPL"],
+     "voice": {"tone": "legacy signpost: 'World Putting League is now Putt Tour'", "role": "legacy distribution + migration funnel"}},
+    {"brand_id": "slapfight", "name": "SlapFIGHT Championship", "priority": "P2", "aliases": ["SlapFIGHT", "SlapFIGHT Championship"],
+     "voice": {"tone": "combat storytelling, no injury bait; heightened policy + advertiser review", "role": "evergreen cadence"}},
+    {"brand_id": "str33t", "name": "STR33T", "priority": "P2", "aliases": ["STR33T"],
+     "voice": {"tone": "athlete creators, team rivalries, local identity", "role": "evergreen cadence"}},
+    {"brand_id": "pro_carrom_tour", "name": "Pro Carrom Tour", "priority": "P2", "aliases": ["Pro Carrom Tour", "Carrom"],
+     "voice": {"tone": "explain the beautiful difficulty; accessible technical highlights", "role": "evergreen cadence"}},
+    {"brand_id": "world_footgolf_tour", "name": "World FootGolf Tour", "priority": "P3 verification", "aliases": ["World FootGolf Tour", "FootGolf"],
+     "voice": {"tone": "TBD after ownership confirmed", "role": "verification pending"}},
+    {"brand_id": "ultimate_tire_wrestling", "name": "Ultimate Tire Wrestling", "priority": "P2", "aliases": ["Ultimate Tire Wrestling", "UTW"],
+     "voice": {"tone": "absurdity balanced with sports legitimacy", "role": "no accounts supplied; PLN amplification only"}},
+    {"brand_id": "cartjitsu", "name": "CartJitsu", "priority": "P2", "aliases": ["CartJitsu"],
+     "voice": {"tone": "absurdity balanced with sports legitimacy", "role": "no accounts supplied; PLN amplification only"}}
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "asset_id": "carjitsu-sample-001",
+  "is_sample": true,
+  "brand": "CarJitsu Championship",
+  "title": "Bottom-position reversal (SAMPLE)",
+  "description": "A scramble in the back seat ends with the bottom competitor reversing position.",
+  "media_path": "carjitsu_sample_001.mp4",
+  "content_id": "SAMPLE-CJ-001",
+  "provenance": "SYNTHETIC test pattern generated locally with FFmpeg to exercise the pipeline. Not real footage.",
+  "owner": "Pro League Network (SAMPLE)",
+  "license": "SAMPLE: PLN-owned original production (replace with real license record)",
+  "territory": ["WORLDWIDE"],
+  "rights_expires_at": "2027-12-31",
+  "rights_verified": true,
+  "people_verified": true,
+  "people": [],
+  "music_cleared": true,
+  "sponsors": [],
+  "sponsor_approved": false,
+  "facts": [
+    {"text": "CarJitsu matches take place inside a car", "verified": true, "source": "brand description"}
+  ],
+  "moments": [
+    {"start": 3.0, "end": 9.0, "label": "Back-seat scramble", "kind": "setup", "intensity": 0.5,
+     "description": "Both competitors fight for position in the cramped back seat."},
+    {"start": 10.0, "end": 14.0, "label": "Reversal", "kind": "reversal", "intensity": 0.9,
+     "description": "The competitor on the bottom flips position and takes control of the seat.",
+     "stakes": "Pinned on the bottom with nowhere to go"},
+    {"start": 14.0, "end": 17.0, "label": "Corner reaction", "kind": "reaction", "intensity": 0.6,
+     "description": "The corner outside the car reacts to the reversal."},
+    {"start": 20.0, "end": 26.0, "label": "Rules recap", "kind": "explain", "intensity": 0.4,
+     "description": "Referee view showing how positions are scored inside the car."}
+  ],
+  "flags": {"combat": false, "injury": false, "gambling": false, "minors": false, "ai_generated_person": false},
+  "series": "",
+  "event_name": "CarJitsu Fall Card (SAMPLE)",
+  "event_date": "2026-10-18"
+}

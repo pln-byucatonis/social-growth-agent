@@ -1,0 +1,219 @@
+{
+  "start": "2026-10-21",
+  "days": 7,
+  "timezone": "America/New_York",
+  "placed": [
+    {
+      "variant_id": "carjitsu-sample-001:carjitsu.x.carjitsuusa",
+      "account_id": "carjitsu.x.carjitsuusa",
+      "platform": "x",
+      "slot": "2026-10-21 12:00:00-04:00",
+      "route_role": "canonical",
+      "asset_id": "carjitsu-sample-001",
+      "hook": "Pinned on the bottom with nowhere to go\u2026 then the reversal.",
+      "state": "in_review",
+      "score": 0.957
+    },
+    {
+      "variant_id": "carjitsu-sample-001:carjitsu.instagram.carjitsu_championship",
+      "account_id": "carjitsu.instagram.carjitsu_championship",
+      "platform": "instagram",
+      "slot": "2026-10-21 18:30:00-04:00",
+      "route_role": "canonical",
+      "asset_id": "carjitsu-sample-001",
+      "hook": "CarJitsu Championship: Reversal",
+      "state": "in_review",
+      "score": 0.891
+    },
+    {
+      "variant_id": "carjitsu-sample-001:carjitsu.tiktok.carjitsuchampionship",
+      "account_id": "carjitsu.tiktok.carjitsuchampionship",
+      "platform": "tiktok",
+      "slot": "2026-10-22 12:15:00-04:00",
+      "route_role": "canonical",
+      "asset_id": "carjitsu-sample-001",
+      "hook": "Pinned on the bottom with nowhere to go. Then this.",
+      "state": "in_review",
+      "score": 0.891
+    },
+    {
+      "variant_id": "carjitsu-sample-001:carjitsu.youtube.carjitsuchampionship6540",
+      "account_id": "carjitsu.youtube.carjitsuchampionship6540",
+      "platform": "youtube",
+      "slot": "2026-10-23 16:00:00-04:00",
+      "route_role": "canonical",
+      "asset_id": "carjitsu-sample-001",
+      "hook": "Reversal | CarJitsu Championship",
+      "state": "in_review",
+      "score": 0.891
+    },
+    {
+      "variant_id": "putt-sample-002:putt_tour.instagram.putttour",
+      "account_id": "putt_tour.instagram.putttour",
+      "platform": "instagram",
+      "slot": "2026-10-21 11:30:00-04:00",
+      "route_role": "canonical",
+      "asset_id": "putt-sample-002",
+      "hook": "Putt Tour: Putt drops",
+      "state": "in_review",
+      "score": 0.819
+    },
+    {
+      "variant_id": "putt-sample-002:world_putting_league.tiktok.worldputtingleague",
+      "account_id": "world_putting_league.tiktok.worldputtingleague",
+      "platform": "tiktok",
+      "slot": "2026-10-21 19:30:00-04:00",
+      "route_role": "legacy_inplace",
+      "asset_id": "putt-sample-002",
+      "hook": "One putt for the lead. Then this.",
+      "state": "in_review",
+      "score": 0.819
+    },
+    {
+      "variant_id": "putt-sample-002:world_putting_league.youtube.worldputtingleague",
+      "account_id": "world_putting_league.youtube.worldputtingleague",
+      "platform": "youtube",
+      "slot": "2026-10-22 16:00:00-04:00",
+      "route_role": "legacy_inplace",
+      "asset_id": "putt-sample-002",
+      "hook": "Putt drops | Putt Tour (formerly World Putting League)",
+      "state": "in_review",
+      "score": 0.819
+    },
+    {
+      "variant_id": "putt-sample-002:world_putting_league.x.worldputtleague",
+      "account_id": "world_putting_league.x.worldputtleague",
+      "platform": "x",
+      "slot": "2026-10-23 12:00:00-04:00",
+      "route_role": "legacy_inplace",
+      "asset_id": "putt-sample-002",
+      "hook": "One putt for the lead\u2026 then the putt drops.",
+      "state": "in_review",
+      "score": 0.756
+    },
+    {
+      "variant_id": "carjitsu-sample-001:pln.linkedin.pending",
+      "account_id": "pln.linkedin.pending",
+      "platform": "linkedin",
+      "slot": "2026-10-23 08:30:00-04:00",
+      "route_role": "pln_b2b",
+      "asset_id": "carjitsu-sample-001",
+      "hook": "Constraint is a format strategy.",
+      "state": "in_review",
+      "score": 0.957
+    },
+    {
+      "variant_id": "putt-sample-002:pln.linkedin.pending",
+      "account_id": "pln.linkedin.pending",
+      "platform": "linkedin",
+      "slot": "2026-10-22 08:30:00-04:00",
+      "route_role": "pln_b2b",
+      "asset_id": "putt-sample-002",
+      "hook": "The most legible stakes in sports might be one ball and one hole.",
+      "state": "in_review",
+      "score": 0.756
+    },
+    {
+      "variant_id": "carjitsu-sample-001:pln.facebook.pro_league_network",
+      "account_id": "pln.facebook.pro_league_network",
+      "platform": "facebook",
+      "slot": "2026-10-24 13:00:00-04:00",
+      "route_role": "pln_amplification",
+      "asset_id": "carjitsu-sample-001",
+      "hook": "Did you catch this CarJitsu moment?",
+      "state": "in_review",
+      "score": 0.891
+    },
+    {
+      "variant_id": "carjitsu-sample-001:pln.instagram.proleaguenetwork",
+      "account_id": "pln.instagram.proleaguenetwork",
+      "platform": "instagram",
+      "slot": "2026-10-22 18:30:00-04:00",
+      "route_role": "pln_amplification",
+      "asset_id": "carjitsu-sample-001",
+      "hook": "Sports you didn't know you needed: CarJitsu",
+      "state": "in_review",
+      "score": 0.891
+    },
+    {
+      "variant_id": "carjitsu-sample-001:pln.tiktok.proleaguenetwork",
+      "account_id": "pln.tiktok.proleaguenetwork",
+      "platform": "tiktok",
+      "slot": "2026-10-24 19:30:00-04:00",
+      "route_role": "pln_amplification",
+      "asset_id": "carjitsu-sample-001",
+      "hook": "How does this even work inside a car?",
+      "state": "in_review",
+      "score": 0.891
+    },
+    {
+      "variant_id": "carjitsu-sample-001:pln.youtube.proleaguenetwork",
+      "account_id": "pln.youtube.proleaguenetwork",
+      "platform": "youtube",
+      "slot": "2026-10-25 16:00:00-04:00",
+      "route_role": "pln_amplification",
+      "asset_id": "carjitsu-sample-001",
+      "hook": "CarJitsu in one moment | PLN Network Picks",
+      "state": "in_review",
+      "score": 0.891
+    },
+    {
+      "variant_id": "putt-sample-002:pln.facebook.pro_league_network",
+      "account_id": "pln.facebook.pro_league_network",
+      "platform": "facebook",
+      "slot": "2026-10-25 13:00:00-04:00",
+      "route_role": "pln_amplification",
+      "asset_id": "putt-sample-002",
+      "hook": "Did you catch this Putt Tour moment?",
+      "state": "in_review",
+      "score": 0.819
+    },
+    {
+      "variant_id": "putt-sample-002:pln.instagram.proleaguenetwork",
+      "account_id": "pln.instagram.proleaguenetwork",
+      "platform": "instagram",
+      "slot": "2026-10-23 18:30:00-04:00",
+      "route_role": "pln_amplification",
+      "asset_id": "putt-sample-002",
+      "hook": "Sports you didn't know you needed: Putt Tour",
+      "state": "in_review",
+      "score": 0.819
+    },
+    {
+      "variant_id": "putt-sample-002:pln.tiktok.proleaguenetwork",
+      "account_id": "pln.tiktok.proleaguenetwork",
+      "platform": "tiktok",
+      "slot": "2026-10-25 19:30:00-04:00",
+      "route_role": "pln_amplification",
+      "asset_id": "putt-sample-002",
+      "hook": "How does this even work on the green?",
+      "state": "in_review",
+      "score": 0.819
+    },
+    {
+      "variant_id": "putt-sample-002:pln.youtube.proleaguenetwork",
+      "account_id": "pln.youtube.proleaguenetwork",
+      "platform": "youtube",
+      "slot": "2026-10-24 16:00:00-04:00",
+      "route_role": "pln_amplification",
+      "asset_id": "putt-sample-002",
+      "hook": "Putt Tour in one moment | PLN Network Picks",
+      "state": "in_review",
+      "score": 0.819
+    },
+    {
+      "variant_id": "putt-sample-002:world_putting_league.instagram.worldputtingleague",
+      "account_id": "world_putting_league.instagram.worldputtingleague",
+      "platform": "instagram",
+      "slot": "2026-10-26 11:30:00-04:00",
+      "route_role": "legacy_bridge",
+      "asset_id": "putt-sample-002",
+      "hook": "World Putting League is now Putt Tour",
+      "state": "in_review",
+      "score": 0.819
+    }
+  ],
+  "unplaced": [],
+  "open_slots": 140,
+  "supply_note": "140 hypothesis slots left open: not enough distinct licensed, approved-ready assets to fill them. Ingest more footage rather than reposting."
+}

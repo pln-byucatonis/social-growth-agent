@@ -1,0 +1,26 @@
+{
+  "asset_id": "wpl-archive-003",
+  "is_sample": true,
+  "brand": "World Putting League",
+  "source_brand": "World Putting League",
+  "title": "WPL archive: playoff putt (SAMPLE)",
+  "description": "Archive World Putting League playoff moment.",
+  "media_path": "wpl_archive_003.mp4",
+  "content_id": "SAMPLE-WPL-003",
+  "provenance": "SYNTHETIC placeholder representing legacy WPL archive footage.",
+  "owner": "World Putting League (legacy, now Putt Tour)",
+  "license": "SAMPLE: legacy broadcast license",
+  "territory": ["US"],
+  "rights_expires_at": "2026-09-30",
+  "rights_verified": true,
+  "people_verified": true,
+  "people": [],
+  "music_cleared": true,
+  "moments": [
+    {"start": 4.0, "end": 9.0, "label": "Playoff putt", "kind": "clutch", "intensity": 0.8,
+     "description": "A playoff putt from the legacy WPL archive."}
+  ],
+  "flags": {},
+  "event_name": "WPL archive (SAMPLE)",
+  "event_date": "2025-06-01"
+}

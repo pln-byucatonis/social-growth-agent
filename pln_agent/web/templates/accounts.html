@@ -1,0 +1,9 @@
+{% extends "base.html" %}{% block body %}
+<div class="card tablewrap"><h3>Portfolio ({{ rows|length }} rows: user-supplied handles + pending LinkedIn placeholder — none verified by default)</h3>
+<table><tr><th>account id</th><th>handle (as supplied)</th><th>platform</th><th>role</th><th>verification</th><th>live publish</th></tr>
+{% for a in rows %}<tr><td>{{ a.account_id }}<br><span class="muted">{{ a.brand_id }} → {{ a.canonical_brand_id }}</span></td><td>{{ a.username_original or '(not supplied)' }}</td><td>{{ a.platform }}</td><td>{{ a.role }}</td>
+<td>{{ a.verification_status }}{% if a.hard_block_reason %}<br><span class="badge bad">{{ a.hard_block_reason }}</span>{% endif %}</td>
+<td>{% if a.live_ok %}<span class="badge ok">yes</span>{% else %}<span class="muted">{{ a.reasons|join(' · ') }}</span>{% endif %}</td></tr>{% endfor %}</table>
+<p class="muted">Verification, credential references and authorization are changed via audited CLI commands (pln accounts verify/connect/authorize) after a human confirms ownership. Raw tokens are never stored.</p></div>
+<div class="grid">{% for p, c in caps.items() %}<div class="card"><h3>{{ p }}</h3><ul>{% for r in c.requirements %}<li>{{ r }}</li>{% endfor %}</ul>{% for b in c.app_review_blockers %}<div class="badge warn">{{ b }}</div>{% endfor %}<p class="muted">profile edits: {{ c.profile_edits }} · delete: {{ c.delete }}</p></div>{% endfor %}</div>
+{% endblock %}

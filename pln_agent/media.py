@@ -1,0 +1,143 @@
+"""Native media packaging with FFmpeg: trim per EDL, reframe (9:16 / 4:5 / 1:1 / 16:9), burn on-screen text +
+caption track, extract a thumbnail. Without source media we write the EDL + an explicit "NOT RENDERED"
+placeholder preview — never a fake video. No platform logos or third-party watermarks are added.
+"""
+from __future__ import annotations
+
+import json
+import re
+import shutil
+import subprocess
+from pathlib import Path
+
+from .config import Settings
+from .db import DB, now_iso
+
+FONT_CANDIDATES = ["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+                   "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+                   "/System/Library/Fonts/Supplemental/Arial Bold.ttf"]
+
+
+def _font() -> str | None:
+    return next((f for f in FONT_CANDIDATES if Path(f).exists()), None)
+
+
+def _safe(s: str) -> str:
+    return re.sub(r"[^A-Za-z0-9._-]+", "_", s)
+
+
+def _wrap(text: str, width: int) -> str:
+    words, lines, cur = text.split(), [], ""
+    for w in words:
+        if len(cur) + len(w) + 1 > width:
+            lines.append(cur)
+            cur = w
+        else:
+            cur = f"{cur} {w}".strip()
+    if cur:
+        lines.append(cur)
+    return "\n".join(lines)
+
+
+def _reframe(out: dict, src_w: int, src_h: int) -> str:
+    W, H = out["w"], out["h"]
+    # scale to cover, then center-crop (subject-centred crop hook: replace x expression with tracked subject x)
+    return (f"scale=w='if(gt(a,{W}/{H}),-2,{W})':h='if(gt(a,{W}/{H}),{H},-2)',"
+            f"crop={W}:{H}:(in_w-{W})/2:(in_h-{H})/2,setsar=1")
+
+
+def _srt_time(t: float) -> str:
+    h, rem = divmod(t, 3600)
+    m, s = divmod(rem, 60)
+    return f"{int(h):02d}:{int(m):02d}:{int(s):02d},{int(round((s % 1) * 1000)):03d}"
+
+
+def build_caption_track(variant: dict, asset: dict) -> list[dict]:
+    """Map source transcript cues into output timeline; fall back to on-screen text."""
+    cues, t_out = [], 0.0
+    for seg in variant["edl"].get("segments", []):
+        for c in asset.get("transcript") or []:
+            if c["end"] > seg["source_in"] and c["start"] < seg["source_out"]:
+                cues.append({"start": t_out + max(0, c["start"] - seg["source_in"]),
+                             "end": t_out + min(seg["source_out"], c["end"]) - seg["source_in"], "text": c["text"]})
+        t_out += seg["source_out"] - seg["source_in"]
+    return cues
+
+
+def render_variant(db: DB, variant_id: str, settings: Settings, actor: str = "renderer") -> dict:
+    v = db.get("variants", "variant_id", variant_id)
+    asset = db.get("assets", "asset_id", v["asset_id"])
+    outdir = settings.render_dir / _safe(variant_id)
+    outdir.mkdir(parents=True, exist_ok=True)
+    (outdir / "edl.json").write_text(json.dumps({"variant_id": variant_id, "source": asset["media_path"],
+                                                 "source_sha256": asset["sha256"], **v["edl"]}, indent=2))
+    segs = v["edl"].get("segments", [])
+    out = v["edl"].get("output")
+    font = _font()
+    if not segs or not out:
+        status, path, detail = "not_applicable", "", "no video output for this format"
+    elif not (asset["media_present"] and shutil.which("ffmpeg")):
+        preview = outdir / "PREVIEW_NOT_RENDERED.svg"
+        lines = "".join(f'<text x="40" y="{200 + i * 60}" font-size="36" fill="#fff">{s["source_timecode"]} — {s["purpose"]}</text>'
+                        for i, s in enumerate(segs))
+        preview.write_text(f'<svg xmlns="http://www.w3.org/2000/svg" width="{out["w"] // 2}" height="{out["h"] // 2}" '
+                           f'viewBox="0 0 {out["w"]} {out["h"]}"><rect width="100%" height="100%" fill="#333"/>'
+                           f'<text x="40" y="100" font-size="48" fill="#ffcc00">NOT RENDERED — source media missing</text>{lines}</svg>')
+        status, path, detail = "edl_only", str(preview), "source media missing: EDL + placeholder preview only"
+    else:
+        has_audio = bool(asset.get("has_audio"))
+        parts, labels = [], []
+        for i, s in enumerate(segs):
+            parts.append(f"[0:v]trim=start={s['source_in']}:end={s['source_out']},setpts=PTS-STARTPTS[v{i}]")
+            labels.append(f"[v{i}]")
+            if has_audio:
+                parts.append(f"[0:a]atrim=start={s['source_in']}:end={s['source_out']},asetpts=PTS-STARTPTS[a{i}]")
+                labels.append(f"[a{i}]")
+        parts.append("".join(labels) + f"concat=n={len(segs)}:v=1:a={1 if has_audio else 0}" + ("[cv][ca]" if has_audio else "[cv]"))
+        chain = _reframe(out, asset.get("width") or out["w"], asset.get("height") or out["h"])
+        draws = []
+        if font:
+            for j, o in enumerate(v.get("onscreen_text") or []):
+                tf = outdir / f"overlay_{j}.txt"
+                tf.write_text(_wrap(o["text"], 22 if out["w"] <= 1080 else 40))
+                small = o.get("position", "").endswith("small")
+                y = {"upper_third": "h*0.18", "center": "(h-text_h)/2", "top": "h*0.06",
+                     "lower_third": "h*0.70", "lower_left_small": "h*0.90"}.get(o.get("position"), "h*0.15")
+                x = "w*0.05" if small else "(w-text_w)/2"
+                draws.append(f"drawtext=fontfile={font}:textfile={tf}:fontsize={34 if small else 64}:fontcolor=white:"
+                             f"borderw=4:bordercolor=black:line_spacing=10:x={x}:y={y}:"
+                             f"enable='between(t,{o['start']},{o['end']})'")
+            for k, c in enumerate(build_caption_track(v, asset)):
+                tf = outdir / f"cap_{k}.txt"
+                tf.write_text(_wrap(c["text"], 28))
+                draws.append(f"drawtext=fontfile={font}:textfile={tf}:fontsize=48:fontcolor=yellow:borderw=3:"
+                             f"bordercolor=black:x=(w-text_w)/2:y=h*0.78:enable='between(t,{c['start']:.2f},{c['end']:.2f})'")
+        parts.append(f"[cv]{chain}{(',' + ','.join(draws)) if draws else ''}[ov]")
+        video = outdir / "video.mp4"
+        cmd = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", asset["media_path"],
+               "-filter_complex", ";".join(parts), "-map", "[ov]"]
+        if has_audio:
+            cmd += ["-map", "[ca]", "-c:a", "aac", "-b:a", "128k"]
+        cmd += ["-c:v", "libx264", "-preset", "veryfast", "-crf", "28", "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(video)]
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+        if proc.returncode != 0:
+            status, path, detail = "render_failed", "", proc.stderr[-800:]
+        else:
+            status, path, detail = "rendered", str(video), "ok"
+            cues = build_caption_track(v, asset)
+            if cues:
+                (outdir / "captions.srt").write_text("\n".join(
+                    f"{i + 1}\n{_srt_time(c['start'])} --> {_srt_time(c['end'])}\n{c['text']}\n" for i, c in enumerate(cues)))
+            t = v["thumbnail"].get("source_time", 0)
+            thumb = outdir / "thumbnail.jpg"
+            subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-ss", str(t), "-i", asset["media_path"],
+                            "-frames:v", "1", "-vf", _reframe(out, asset["width"], asset["height"]), str(thumb)],
+                           capture_output=True, timeout=120)
+    db.update("variants", "variant_id", variant_id, {"render_status": status, "render_path": path, "updated_at": now_iso()})
+    db.audit(actor, "variant_rendered", "variants", variant_id, {"status": status, "detail": detail[:300]})
+    return {"variant_id": variant_id, "status": status, "path": path, "detail": detail, "dir": str(outdir)}
+
+
+def probe_output(path: str) -> dict:
+    from .ingest import ffprobe, summarize_probe
+    return summarize_probe(ffprobe(Path(path)))

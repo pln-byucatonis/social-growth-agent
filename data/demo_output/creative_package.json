@@ -1,0 +1,587 @@
+[
+  {
+    "variant_id": "carjitsu-sample-001:carjitsu.tiktok.carjitsuchampionship",
+    "pack_id": "pack-carjitsu-sample-001-e67b12",
+    "asset_id": "carjitsu-sample-001",
+    "account_id": "carjitsu.tiktok.carjitsuchampionship",
+    "platform": "tiktok",
+    "brand_id": "carjitsu",
+    "route_role": "canonical",
+    "series": "Wait For It",
+    "format": "9:16 native vertical, captions burned, no end card",
+    "hook": "Pinned on the bottom with nowhere to go. Then this.",
+    "hook_candidates": [
+      {
+        "score": 0.925,
+        "source_timecode": [
+          10.0,
+          14.0
+        ],
+        "style": "stakes",
+        "text": "Pinned on the bottom with nowhere to go. Then this."
+      },
+      {
+        "score": 0.91,
+        "source_timecode": [
+          10.0,
+          14.0
+        ],
+        "style": "wait_for_it",
+        "text": "Wait for it\u2026 the reversal inside a car"
+      },
+      {
+        "score": 0.835,
+        "source_timecode": [
+          10.0,
+          14.0
+        ],
+        "style": "pov",
+        "text": "POV: you thought you had this inside a car"
+      },
+      {
+        "score": 0.785,
+        "source_timecode": [
+          10.0,
+          14.0
+        ],
+        "style": "question",
+        "text": "How does this even work inside a car?"
+      }
+    ],
+    "title": null,
+    "caption": "Pinned on the bottom with nowhere to go. Then this. The competitor on the bottom flips position and takes control of the seat. Tap or keep fighting?",
+    "hashtags": [
+      "#CarJitsu",
+      "#Grappling"
+    ],
+    "hashtag_rationale": "#CarJitsu = owned brand tag: lets fans find the property's archive; #Grappling = sport/category discovery tag. No trend tags: we have no verified trend data.",
+    "voiceover": "None. Native source audio only (cleared). Optional creator-style VO recorded by talent, not synthetic.",
+    "onscreen_text": [
+      {
+        "end": 2.5,
+        "position": "upper_third",
+        "start": 0.0,
+        "text": "Pinned on the bottom with nowhere to go. Then this."
+      },
+      {
+        "end": 6.0,
+        "position": "lower_third",
+        "start": 3.0,
+        "text": "CarJitsu matches take place inside a car"
+      }
+    ],
+    "edl": {
+      "notes": "Cold-open 2\u20133s before payoff; first frame must show motion, not a title card. No external watermarks, no app-injected promo branding.",
+      "output": {
+        "h": 1920,
+        "reframe": "subject_center_crop",
+        "w": 1080
+      },
+      "segments": [
+        {
+          "moment": "Back-seat scramble",
+          "purpose": "tension (trimmed)",
+          "source_in": 6.5,
+          "source_out": 9.0,
+          "source_timecode": "00:03.00\u201300:09.00"
+        },
+        {
+          "moment": "Reversal",
+          "purpose": "payoff+reaction",
+          "source_in": 9.7,
+          "source_out": 17.0,
+          "source_timecode": "00:10.00\u201300:14.00"
+        }
+      ]
+    },
+    "thumbnail": {
+      "note": "TikTok cover chosen in-app from payoff frame",
+      "source_time": 12.0,
+      "text": null
+    },
+    "cta": "Follow for part 2",
+    "angle": "discovery: immediate stakes, zero context required",
+    "test_hypothesis": "Cold-opening 00:06.50 (pre-payoff) vs chronological cut lifts avg watch time and follows/1k views for 'stakes' hook.",
+    "utm_url": "",
+    "score": 0.891,
+    "score_breakdown": {
+      "allocation_weight": 0.25,
+      "parts": {
+        "empirical": {
+          "score": 0.5,
+          "weight": 0.2,
+          "why": "no data: fewer than 3 measured 'Wait For It' posts on this account (neutral prior)"
+        },
+        "platform_fit": {
+          "score": 0.7,
+          "weight": 0.2,
+          "why": "source 1920x1080 must be reframed to 1080x1920 (crop risk: check subject framing)"
+        },
+        "rights": {
+          "score": 1.0,
+          "weight": 0.15,
+          "why": "clear"
+        },
+        "source": {
+          "score": 0.9,
+          "weight": 0.3,
+          "why": "peak intensity 0.9 from annotated moments at 00:03.00\u201300:09.00, 00:10.00\u201300:14.00"
+        },
+        "timeliness": {
+          "score": 1.0,
+          "weight": 0.15,
+          "why": "event 2d ago; upcoming CarJitsu Fall Card (SAMPLE) on 2026-10-24"
+        }
+      },
+      "total": 0.891
+    },
+    "risk_flags": {
+      "blockers": [],
+      "labels": [],
+      "ok": true,
+      "review_flags": [],
+      "two_person_signoff": false
+    },
+    "validation": {
+      "errors": [],
+      "spec": {
+        "aspect": "9:16",
+        "audience": "younger discovery audiences",
+        "caption_max": 2200,
+        "hashtags_max": 4,
+        "max_s": 35,
+        "min_s": 7,
+        "north_star": "watch time + follows per 1k views"
+      }
+    },
+    "state": "in_review",
+    "caption_hash": "262148f29edb0630",
+    "render_status": "not_rendered",
+    "render_path": "",
+    "created_at": "2026-10-20T14:24:22+00:00",
+    "updated_at": "2026-10-20T14:24:22+00:00"
+  },
+  {
+    "variant_id": "carjitsu-sample-001:carjitsu.instagram.carjitsu_championship",
+    "pack_id": "pack-carjitsu-sample-001-e67b12",
+    "asset_id": "carjitsu-sample-001",
+    "account_id": "carjitsu.instagram.carjitsu_championship",
+    "platform": "instagram",
+    "brand_id": "carjitsu",
+    "route_role": "canonical",
+    "series": "The Moment",
+    "format": "Reel 9:16 + carousel alt (setup / payoff / reaction stills)",
+    "hook": "CarJitsu Championship: Reversal",
+    "hook_candidates": [
+      {
+        "score": 0.85,
+        "source_timecode": [
+          10.0,
+          14.0
+        ],
+        "style": "title_card",
+        "text": "CarJitsu Championship: Reversal"
+      },
+      {
+        "score": 0.805,
+        "source_timecode": [
+          10.0,
+          14.0
+        ],
+        "style": "share_prompt",
+        "text": "Send this to someone who thinks grappling inside a car isn't a sport"
+      },
+      {
+        "score": 0.8,
+        "source_timecode": [
+          20.0,
+          26.0
+        ],
+        "style": "explainer",
+        "text": "Rules in 20 Seconds: CarJitsu"
+      }
+    ],
+    "title": null,
+    "caption": "CarJitsu Championship: Reversal\n\nThe competitor on the bottom flips position and takes control of the seat.\nCarJitsu matches take place inside a car.\n\nSend this to the friend who needs to see it, and save it for the rematch.",
+    "hashtags": [
+      "#CarJitsu",
+      "#Grappling"
+    ],
+    "hashtag_rationale": "#CarJitsu = owned brand tag: lets fans find the property's archive; #Grappling = sport/category discovery tag. No trend tags: we have no verified trend data.",
+    "voiceover": "Optional host VO line over setup: 'Both competitors fight for position in the cramped back seat.'",
+    "onscreen_text": [
+      {
+        "end": 2.0,
+        "position": "center",
+        "start": 0.0,
+        "text": "CarJitsu Championship: Reversal"
+      },
+      {
+        "end": 14.2,
+        "position": "lower_left_small",
+        "start": 2.0,
+        "text": "CarJitsu Championship"
+      }
+    ],
+    "edl": {
+      "notes": "Chronological setup\u2192payoff\u2192reaction; branded lower-left text only (owned brand, no platform logos).",
+      "output": {
+        "h": 1920,
+        "reframe": "subject_center_crop",
+        "w": 1080
+      },
+      "segments": [
+        {
+          "moment": "Back-seat scramble",
+          "purpose": "setup",
+          "source_in": 2.5,
+          "source_out": 9.0,
+          "source_timecode": "00:03.00\u201300:09.00"
+        },
+        {
+          "moment": "Reversal",
+          "purpose": "payoff+reaction",
+          "source_in": 9.8,
+          "source_out": 17.5,
+          "source_timecode": "00:10.00\u201300:14.00"
+        }
+      ]
+    },
+    "thumbnail": {
+      "carousel_frames": [
+        3.0,
+        10.0,
+        14.0
+      ],
+      "source_time": 12.0,
+      "text": "CarJitsu Championship: Reversal"
+    },
+    "cta": "Send this to the friend who needs to see it, and save it for the rematch.",
+    "angle": "brand fandom: identity + shareability",
+    "test_hypothesis": "'title_card' cover text vs. no-text cover changes non-follower reach\u2192follow rate.",
+    "utm_url": "",
+    "score": 0.891,
+    "score_breakdown": {
+      "allocation_weight": 0.25,
+      "parts": {
+        "empirical": {
+          "score": 0.5,
+          "weight": 0.2,
+          "why": "no data: fewer than 3 measured 'The Moment' posts on this account (neutral prior)"
+        },
+        "platform_fit": {
+          "score": 0.7,
+          "weight": 0.2,
+          "why": "source 1920x1080 must be reframed to 1080x1920 (crop risk: check subject framing)"
+        },
+        "rights": {
+          "score": 1.0,
+          "weight": 0.15,
+          "why": "clear"
+        },
+        "source": {
+          "score": 0.9,
+          "weight": 0.3,
+          "why": "peak intensity 0.9 from annotated moments at 00:03.00\u201300:09.00, 00:10.00\u201300:14.00"
+        },
+        "timeliness": {
+          "score": 1.0,
+          "weight": 0.15,
+          "why": "event 2d ago; upcoming CarJitsu Fall Card (SAMPLE) on 2026-10-24"
+        }
+      },
+      "total": 0.891
+    },
+    "risk_flags": {
+      "blockers": [],
+      "labels": [],
+      "ok": true,
+      "review_flags": [],
+      "two_person_signoff": false
+    },
+    "validation": {
+      "errors": [],
+      "spec": {
+        "aspect": "9:16",
+        "audience": "property fandom",
+        "bridge_min_s": 4,
+        "caption_max": 2200,
+        "hashtags_max": 5,
+        "max_s": 45,
+        "min_s": 8,
+        "north_star": "non-follower reach \u2192 follows; shares/saves"
+      }
+    },
+    "state": "in_review",
+    "caption_hash": "f360d99ae0efb8e8",
+    "render_status": "not_rendered",
+    "render_path": "",
+    "created_at": "2026-10-20T14:24:22+00:00",
+    "updated_at": "2026-10-20T14:24:22+00:00"
+  },
+  {
+    "variant_id": "carjitsu-sample-001:pln.facebook.pro_league_network",
+    "pack_id": "pack-carjitsu-sample-001-e67b12",
+    "asset_id": "carjitsu-sample-001",
+    "account_id": "pln.facebook.pro_league_network",
+    "platform": "facebook",
+    "brand_id": "carjitsu",
+    "route_role": "pln_amplification",
+    "series": "Full Finish Friday",
+    "format": "native video 4:5 (feed) with burned captions; full sequence",
+    "hook": "Did you catch this CarJitsu moment?",
+    "hook_candidates": [
+      {
+        "score": 0.835,
+        "source_timecode": [
+          10.0,
+          14.0
+        ],
+        "style": "recall",
+        "text": "Did you catch this CarJitsu moment?"
+      },
+      {
+        "score": 0.825,
+        "source_timecode": [
+          10.0,
+          14.0
+        ],
+        "style": "debate",
+        "text": "Be honest: Tap or keep fighting?"
+      }
+    ],
+    "title": "Bottom-position reversal (SAMPLE)",
+    "caption": "Did you catch this CarJitsu moment?\n\nA scramble in the back seat ends with the bottom competitor reversing position.\n\nCarJitsu matches take place inside a car.\n\nDrop your answer below: Tap or keep fighting?\n\nNext up: CarJitsu Fall Card (SAMPLE) (2026-10-24).",
+    "hashtags": [
+      "#CarJitsu"
+    ],
+    "hashtag_rationale": "#CarJitsu = owned brand tag: lets fans find the property's archive. No trend tags: we have no verified trend data.",
+    "voiceover": "None; source audio + burned captions for sound-off viewing.",
+    "onscreen_text": [
+      {
+        "end": 3.0,
+        "position": "top",
+        "start": 0.0,
+        "text": "Did you catch this CarJitsu moment?"
+      }
+    ],
+    "edl": {
+      "notes": "Let the whole sequence breathe; FB viewers stay for context. No quick-cut TikTok edit.",
+      "output": {
+        "h": 1350,
+        "reframe": "pad_or_crop_4x5",
+        "w": 1080
+      },
+      "segments": [
+        {
+          "moment": "Back-seat scramble+Reversal+Corner reaction+Rules recap",
+          "purpose": "full sequence",
+          "source_in": 2.0,
+          "source_out": 27.0,
+          "source_timecode": "00:03.00\u201300:26.00"
+        }
+      ]
+    },
+    "thumbnail": {
+      "source_time": 12.0,
+      "text": "Bottom-position reversal (SAMPLE)"
+    },
+    "cta": "Comment your call and share with the fan who'd argue with you",
+    "angle": "community conversation + return viewing",
+    "test_hypothesis": "Specific debate question vs. generic 'thoughts?' raises meaningful comments per 1k reached.",
+    "utm_url": "",
+    "score": 0.891,
+    "score_breakdown": {
+      "allocation_weight": 0.25,
+      "parts": {
+        "empirical": {
+          "score": 0.5,
+          "weight": 0.2,
+          "why": "no data: fewer than 3 measured 'Full Finish Friday' posts on this account (neutral prior)"
+        },
+        "platform_fit": {
+          "score": 0.7,
+          "weight": 0.2,
+          "why": "source 1920x1080 must be reframed to 1080x1350 (crop risk: check subject framing)"
+        },
+        "rights": {
+          "score": 1.0,
+          "weight": 0.15,
+          "why": "clear"
+        },
+        "source": {
+          "score": 0.9,
+          "weight": 0.3,
+          "why": "peak intensity 0.9 from annotated moments at 00:03.00\u201300:26.00"
+        },
+        "timeliness": {
+          "score": 1.0,
+          "weight": 0.15,
+          "why": "event 2d ago; upcoming CarJitsu Fall Card (SAMPLE) on 2026-10-24"
+        }
+      },
+      "total": 0.891
+    },
+    "risk_flags": {
+      "blockers": [],
+      "labels": [],
+      "ok": true,
+      "review_flags": [],
+      "two_person_signoff": false
+    },
+    "validation": {
+      "errors": [],
+      "spec": {
+        "aspect": "4:5 or 16:9",
+        "audience": "existing fans, community, older viewers",
+        "caption_max": 5000,
+        "hashtags_max": 1,
+        "max_s": 120,
+        "min_s": 10,
+        "north_star": "returning engaged viewers, quality comments"
+      }
+    },
+    "state": "in_review",
+    "caption_hash": "192518571a776fad",
+    "render_status": "not_rendered",
+    "render_path": "",
+    "created_at": "2026-10-20T14:24:22+00:00",
+    "updated_at": "2026-10-20T14:24:22+00:00"
+  },
+  {
+    "variant_id": "carjitsu-sample-001:pln.linkedin.pending",
+    "pack_id": "pack-carjitsu-sample-001-e67b12",
+    "asset_id": "carjitsu-sample-001",
+    "account_id": "pln.linkedin.pending",
+    "platform": "linkedin",
+    "brand_id": "carjitsu",
+    "route_role": "pln_b2b",
+    "series": "Why This Sport Works",
+    "format": "native 1:1 clip with captions + text post (document-carousel alt)",
+    "hook": "Constraint is a format strategy.",
+    "hook_candidates": [
+      {
+        "score": 0.86,
+        "source_timecode": [
+          10.0,
+          14.0
+        ],
+        "style": "insight",
+        "text": "Constraint is a format strategy."
+      },
+      {
+        "score": 0.835,
+        "source_timecode": [
+          10.0,
+          14.0
+        ],
+        "style": "lesson",
+        "text": "What CarJitsu teaches about building sports audiences"
+      }
+    ],
+    "title": null,
+    "caption": "Constraint is a format strategy.\n\nIn this clip: The competitor on the bottom flips position and takes control of the seat.\n\nPut a grappling match inside a car and the rules explain themselves: tight space, visible stakes, and a single decisive moment a new viewer understands without commentary.\n\nVerified detail: CarJitsu matches take place inside a car.\n\nFor partners, that legibility is the asset: a moment a fan can explain to a friend in one sentence is a moment a brand can stand next to.\n\nWhat would you measure first: completion, shares, or the follow that comes after?\n\nIf you're building fan-first formats or looking for distinctive sports inventory, PLN is open to the conversation.",
+    "hashtags": [
+      "#SportsBusiness"
+    ],
+    "hashtag_rationale": "#SportsBusiness = single professional discovery tag; LinkedIn reach is driven by dwell + comments, not tags.",
+    "voiceover": "Optional exec POV voice-note recorded by a named PLN leader (requires their approval).",
+    "onscreen_text": [
+      {
+        "end": 3.0,
+        "position": "top",
+        "start": 0.0,
+        "text": "Constraint is a format strategy."
+      }
+    ],
+    "edl": {
+      "notes": "Sound-off friendly; captions mandatory; no hype graphics.",
+      "output": {
+        "h": 1080,
+        "reframe": "center_crop_1x1",
+        "w": 1080
+      },
+      "segments": [
+        {
+          "moment": "Back-seat scramble",
+          "purpose": "setup",
+          "source_in": 2.7,
+          "source_out": 9.3,
+          "source_timecode": "00:03.00\u201300:09.00"
+        },
+        {
+          "moment": "Reversal",
+          "purpose": "reversal+reaction",
+          "source_in": 9.7,
+          "source_out": 17.3,
+          "source_timecode": "00:10.00\u201300:14.00"
+        }
+      ]
+    },
+    "thumbnail": {
+      "source_time": 12.0,
+      "text": null
+    },
+    "cta": "Invite qualified partnership / distribution conversations",
+    "angle": "B2B: format legibility as commercial value",
+    "test_hypothesis": "Insight-led first line vs. clip-description first line increases right-person comments and inbound DMs.",
+    "utm_url": "",
+    "score": 0.957,
+    "score_breakdown": {
+      "allocation_weight": 0.25,
+      "parts": {
+        "empirical": {
+          "score": 0.5,
+          "weight": 0.2,
+          "why": "no data: fewer than 3 measured 'Why This Sport Works' posts on this account (neutral prior)"
+        },
+        "platform_fit": {
+          "score": 1.0,
+          "weight": 0.2,
+          "why": "source 1920x1080 matches target orientation"
+        },
+        "rights": {
+          "score": 1.0,
+          "weight": 0.15,
+          "why": "clear"
+        },
+        "source": {
+          "score": 0.9,
+          "weight": 0.3,
+          "why": "peak intensity 0.9 from annotated moments at 00:03.00\u201300:09.00, 00:10.00\u201300:14.00"
+        },
+        "timeliness": {
+          "score": 1.0,
+          "weight": 0.15,
+          "why": "event 2d ago; upcoming CarJitsu Fall Card (SAMPLE) on 2026-10-24"
+        }
+      },
+      "total": 0.957
+    },
+    "risk_flags": {
+      "blockers": [],
+      "labels": [],
+      "ok": true,
+      "review_flags": [],
+      "two_person_signoff": false
+    },
+    "validation": {
+      "errors": [],
+      "spec": {
+        "aspect": "1:1",
+        "audience": "sports media execs, sponsors, distributors, investors",
+        "caption_max": 3000,
+        "hashtags_max": 2,
+        "max_s": 90,
+        "min_s": 8,
+        "north_star": "qualified inbound conversations"
+      }
+    },
+    "state": "in_review",
+    "caption_hash": "30c0534f2a8eed3d",
+    "render_status": "not_rendered",
+    "render_path": "",
+    "created_at": "2026-10-20T14:24:22+00:00",
+    "updated_at": "2026-10-20T14:24:22+00:00"
+  }
+]

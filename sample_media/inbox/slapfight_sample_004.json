@@ -1,0 +1,20 @@
+{
+  "asset_id": "slapfight-sample-004",
+  "is_sample": true,
+  "brand": "SlapFIGHT Championship",
+  "title": "Title bout exchange (SAMPLE, media not delivered)",
+  "description": "Placeholder entry: media file not yet delivered.",
+  "media_path": "slapfight_sample_004.mp4",
+  "provenance": "SAMPLE metadata only; no media file present.",
+  "owner": "",
+  "license": "",
+  "territory": [],
+  "rights_verified": false,
+  "people_verified": false,
+  "people": [{"name": "Unverified Competitor", "verified": false}],
+  "moments": [
+    {"start": 1.0, "end": 4.0, "label": "Exchange", "kind": "payoff", "intensity": 0.7, "description": "A strike exchange."}
+  ],
+  "flags": {"combat": true},
+  "event_date": null
+}

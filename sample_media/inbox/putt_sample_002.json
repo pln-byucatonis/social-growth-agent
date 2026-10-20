@@ -1,0 +1,33 @@
+{
+  "asset_id": "putt-sample-002",
+  "is_sample": true,
+  "brand": "Putt Tour",
+  "title": "Pressure putt drops (SAMPLE)",
+  "description": "A long pressure putt drops and the gallery erupts.",
+  "media_path": "putt_sample_002.mp4",
+  "content_id": "SAMPLE-PT-002",
+  "provenance": "SYNTHETIC test pattern generated locally with FFmpeg. Not real footage.",
+  "owner": "Putt Tour (SAMPLE)",
+  "license": "SAMPLE: Putt Tour owned production",
+  "territory": ["US", "CA"],
+  "rights_expires_at": "2027-06-30",
+  "rights_verified": true,
+  "people_verified": true,
+  "people": [],
+  "music_cleared": true,
+  "sponsors": [{"name": "Sample Sponsor Co", "approved": true, "paid_partnership": true}],
+  "sponsor_approved": true,
+  "facts": [],
+  "moments": [
+    {"start": 2.0, "end": 7.0, "label": "Reading the line", "kind": "setup", "intensity": 0.45,
+     "description": "The player reads the line from behind the ball."},
+    {"start": 8.0, "end": 12.0, "label": "Putt drops", "kind": "clutch", "intensity": 0.85,
+     "description": "The long putt curls in and drops.", "stakes": "One putt for the lead"},
+    {"start": 12.0, "end": 15.5, "label": "Gallery reaction", "kind": "reaction", "intensity": 0.7,
+     "description": "The gallery erupts as the ball drops."}
+  ],
+  "flags": {"paid_partnership": true},
+  "series": "",
+  "event_name": "Putt Tour Stop (SAMPLE)",
+  "event_date": "2026-10-19"
+}

@@ -1,0 +1,10 @@
+# Core engine, CLI, demo and tests use only the Python 3.11+ standard library (+ FFmpeg on PATH for rendering).
+# Dashboard:
+fastapi==0.115.6
+uvicorn==0.32.1
+jinja2==3.1.4
+python-multipart==0.0.20
+httpx==0.28.1
+# Optional:
+# psycopg[binary]==3.2.3   # runtime Postgres (PLN_DATABASE_URL=postgresql://...)
+# anthropic                # PLN_LLM_PROVIDER=anthropic (optional caption refinement)

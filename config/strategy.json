@@ -1,0 +1,115 @@
+{
+  "brand": "Pro League Network",
+  "mission": "Grow qualified audiences and meaningful engagement for PLN sports IP while creating partner value, without engagement manipulation.",
+  "autopublish_enabled": false,
+  "weekly_targets_experiments_not_guarantees": {
+    "linkedin": 4,
+    "facebook": 7,
+    "instagram": 10,
+    "tiktok": 14
+  },
+  "platforms": {
+    "linkedin": {
+      "job": "B2B credibility and commercial pipeline",
+      "audience": "sports media executives, sponsors, league operators, investors, distribution partners",
+      "pillars": [
+        "sports-media insights with defensible POV",
+        "PLN production and reach proof",
+        "partner case studies",
+        "rights and distribution announcements"
+      ],
+      "formats": [
+        "founder/editorial commentary",
+        "native clips with business lesson",
+        "document/case-study posts"
+      ],
+      "cta": "Invite substantive industry discussion or qualified introductions",
+      "primary_kpi": "qualified inbound conversations"
+    },
+    "facebook": {
+      "job": "Repeat viewing, community and broad sports-fan reach",
+      "audience": "existing fans, local communities, older sports viewers, groups",
+      "pillars": [
+        "event highlights",
+        "athlete stories",
+        "match moments and recaps",
+        "fan debate with specific context"
+      ],
+      "formats": [
+        "native short video",
+        "photo highlights",
+        "event reminders",
+        "community posts"
+      ],
+      "cta": "Watch next event, join discussion, share with another sports fan",
+      "primary_kpi": "returning engaged viewers"
+    },
+    "instagram": {
+      "job": "Build distinct PLN/IP brand fandom and follows",
+      "audience": "sports entertainment fans and collaborators",
+      "pillars": [
+        "best-of reels",
+        "athlete and creator personalities",
+        "behind-the-scenes",
+        "brand worlds and collaborations"
+      ],
+      "formats": [
+        "9:16 reels",
+        "carousels",
+        "stories"
+      ],
+      "cta": "Follow the series, save or send to friends",
+      "primary_kpi": "non-follower reach converting into follows"
+    },
+    "tiktok": {
+      "job": "Top-of-funnel discovery and repeat series",
+      "audience": "younger sports and entertainment discovery audiences",
+      "pillars": [
+        "immediate-stakes moments",
+        "rules explained through conflict",
+        "unexpected outcomes",
+        "recurring personality-driven bits"
+      ],
+      "formats": [
+        "native vertical clips",
+        "reply-to-comment videos",
+        "serialized moments"
+      ],
+      "cta": "Watch part two or follow to see outcome",
+      "primary_kpi": "qualified watch time and new followers"
+    }
+  },
+  "safety": {
+    "no_fake_engagement": true,
+    "no_unlicensed_media": true,
+    "no_unapproved_sponsor_claims": true,
+    "no_impersonation": true,
+    "no_automated_spam_comments": true,
+    "human_review_required_for": [
+      "rights-sensitive clips",
+      "sponsor/partner claims",
+      "controversial topics",
+      "athlete personal claims",
+      "gambling calls-to-action",
+      "AI-generated realistic people"
+    ],
+    "disclose_material_sponsorships": true
+  },
+  "ip_priority": [
+    "Pro League Network",
+    "CarJitsu Championship",
+    "Putt Tour",
+    "World Putting League migration",
+    "SlapFIGHT Championship",
+    "STR33T",
+    "Pro Carrom Tour",
+    "World FootGolf Tour"
+  ],
+  "accounts_file": "config/accounts.json",
+  "primary_growth_properties": [
+    "Pro League Network",
+    "CarJitsu Championship",
+    "Putt Tour"
+  ],
+  "wpl_legacy_identity": "World Putting League is former brand of Putt Tour; consolidate audience only after ownership, reach and platform policy review"
+}

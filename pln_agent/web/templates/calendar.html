@@ -1,0 +1,6 @@
+{% extends "base.html" %}{% block body %}
+<div class="card"><form method="get"><input type="date" name="start" value="{{ start }}" style="max-width:200px"> <button>Plan week</button></form>
+<p class="muted">Slots are test hypotheses (config/slots.json). Coordination: canonical before PLN amplification (≥24h), same asset ≥6h apart across accounts, per-account caps, WPL bridge ≤2/week.</p></div>
+<div class="grid">{% for day, items in days.items() %}<div class="card"><h3>{{ day }}</h3><table>{% for p in items|sort(attribute='slot') %}<tr><td>{{ p.slot.strftime('%H:%M') }}</td><td>{{ p.platform }}<br><span class="muted">{{ p.account_id }}</span></td><td><a href="/variant/{{ p.variant_id }}">{{ p.hook }}</a><br><span class="badge">{{ p.route_role }}</span><span class="badge">{{ p.state }}</span></td></tr>{% endfor %}</table></div>{% endfor %}</div>
+<div class="card"><h3>Not placed</h3><table>{% for u in plan.unplaced %}<tr><td>{{ u.variant_id }}</td><td class="muted">{{ u.reason }}</td></tr>{% endfor %}</table><p>{{ plan.supply_note }}</p></div>
+{% endblock %}

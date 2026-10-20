@@ -1,0 +1,18 @@
+{
+  "_note": "PLANNING ASSUMPTION ONLY — editable. Not a statement about actual performance or staffing. Revisit after 30-day baselines exist.",
+  "creative_effort_share": {
+    "pln": 0.30, "carjitsu": 0.25, "putt_tour": 0.20, "world_putting_league": 0.05,
+    "slapfight": 0.06, "str33t": 0.06, "pro_carrom_tour": 0.06, "world_footgolf_tour": 0.02
+  },
+  "max_posts_per_account_per_day": {
+    "linkedin": 1, "facebook": 2, "instagram": 2, "tiktok": 2, "youtube": 1, "x": 4, "twitch": 1
+  },
+  "legacy_bridge_max_posts_per_week": 2,
+  "pln_amplification": {
+    "min_hours_after_canonical": 24,
+    "min_score": 0.55,
+    "max_per_day_per_platform": 1
+  },
+  "same_asset_min_hours_between_accounts": 6,
+  "series_max_per_account_per_week": 4
+}

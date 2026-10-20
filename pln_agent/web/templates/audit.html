@@ -1,0 +1,3 @@
+{% extends "base.html" %}{% block body %}
+<div class="card tablewrap"><h3>Audit log (latest 300)</h3><table><tr><th>at</th><th>actor</th><th>action</th><th>entity</th><th>detail</th></tr>
+{% for r in rows %}<tr><td>{{ r.at }}</td><td>{{ r.actor }}</td><td>{{ r.action }}</td><td>{{ r.entity }} {{ r.entity_id }}</td><td class="muted">{{ r.detail }}</td></tr>{% endfor %}</table></div>{% endblock %}
