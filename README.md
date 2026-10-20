@@ -6,6 +6,8 @@ LinkedIn, Facebook, Instagram and TikTok first, then YouTube, X and Twitch. It r
 
 > **Status:** No social account is connected. The supplied handles are **unverified**: these are 28 user-supplied handles, not 28 integrations. All publishing in this repo is **simulated** (`dryrun://` receipts). Live adapter code exists for the official APIs, but nobody has run it against a real platform. It needs OAuth credentials, platform app review, and admin roles on each account. See [docs/LAUNCH_READINESS.md](docs/LAUNCH_READINESS.md).
 
+Growth platform (Phase 1 audience intelligence, creative intelligence DB, knowledge engine, adaptive cadence; Phase 2 viral content scout and creative director): see [docs/GROWTH_PLATFORM.md](docs/GROWTH_PLATFORM.md) and [docs/GAP_ANALYSIS.md](docs/GAP_ANALYSIS.md).
+
 ## Quick start
 
 ```bash
