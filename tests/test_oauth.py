@@ -81,6 +81,12 @@ class OAuthTests(unittest.TestCase):
         self.assertTrue(fb["credential_ref"].startswith("vault:pln/growth-agent/tokens/"))
         self.assertEqual(resolve_token(fb["credential_ref"]), "PAGE-PLN")
         self.assertNotIn("PAGE-PLN", json.dumps(self.db.all("accounts")) + json.dumps(self.db.all("audit_log")))
+        # the long-lived user token is shared with the ops analytics ingest
+        shared = self.store.get(oauth.META_USER_SECRET)
+        self.assertEqual(shared["access_token"], "LONG-USER")
+        st = oauth.meta_user_token_status()
+        self.assertTrue(st["connected"])
+        self.assertGreater(st["days_left"], 50)
 
     def test_state_is_single_use_and_bound_to_provider(self):
         q = self._state(oauth.start(self.db, "meta", "", "admin@pln"))

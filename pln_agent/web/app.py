@@ -473,7 +473,11 @@ def accounts(request: Request):
             status = {"configured": False, "client_id_hint": "", "error": str(e)[:120]}
         apps.append({"p": p, "redirect_uri": oauth.redirect_uri(p.key), **status,
                      "accounts": [r for r in rows if r["provider"] == p.key]})
-    return page(request, "accounts.html", rows=rows, caps=caps, apps=apps)
+    try:
+        meta_user = oauth.meta_user_token_status()
+    except Exception as e:  # secret store unreachable
+        meta_user = {"connected": False, "error": str(e)[:120]}
+    return page(request, "accounts.html", rows=rows, caps=caps, apps=apps, meta_user=meta_user)
 
 
 def _admin(request: Request) -> None:

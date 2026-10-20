@@ -32,6 +32,9 @@ from .db import DB, now_iso
 
 APP_SECRET = "pln/growth-agent/oauth/{provider}"
 TOKEN_SECRET = "pln/growth-agent/tokens/{name}"
+# The long-lived Meta *user* token, shared with the ops portal's Instagram/Facebook analytics ingest
+# (ops reads it via META_TOKEN_SECRET), so one Meta sign-in reconnects publishing and analytics.
+META_USER_SECRET = "pln/growth-agent/tokens/meta-user"
 STATE_TTL_S = 900
 LINKEDIN_ORG_ID = os.environ.get("PLN_LINKEDIN_ORG_ID", "91515598")
 META_VERSION = os.environ.get("META_GRAPH_VERSION", "v26.0")
@@ -172,6 +175,17 @@ def _app(provider: str) -> dict:
     return app
 
 
+def meta_user_token_status() -> dict:
+    """For the Accounts page: is the shared Meta token present, and when does it expire?"""
+    rec = store().get(META_USER_SECRET) or {}
+    if not rec.get("access_token"):
+        return {"connected": False}
+    exp = rec.get("expires_at") or 0
+    days = round((exp - time.time()) / 86400, 1) if exp else None
+    return {"connected": True, "obtained_at": rec.get("obtained_at", ""), "days_left": days,
+            "expiring": days is not None and days < 10}
+
+
 def redirect_uri(provider: str) -> str:
     base = os.environ.get("PLN_PUBLIC_URL", "https://ops.proleaguenetwork.com/api/social-agent").rstrip("/")
     return f"{base}/oauth/callback/{provider}"
@@ -256,6 +270,7 @@ def discover(provider: str, body: dict, app: dict) -> list[dict]:
     if provider == "meta":
         long = _token_request(PROVIDERS["meta"], app, {"grant_type": "fb_exchange_token", "fb_exchange_token": tok})
         user_tok = long["access_token"]
+        store().put(META_USER_SECRET, _tok_record("meta", long, shared_with="ops social ingest"))
         pages = _get(f"https://graph.facebook.com/{META_VERSION}/me/accounts?limit=100&fields="
                      "id,name,username,access_token,instagram_business_account{id,username}", user_tok)
         for pg in pages.get("data", []):
