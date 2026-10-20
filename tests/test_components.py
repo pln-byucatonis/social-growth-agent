@@ -96,10 +96,43 @@ class MediaTests(unittest.TestCase):
         self.assertTrue((Path(r["dir"]) / "thumbnail.jpg").exists())
         self.assertTrue((Path(r["dir"]) / "edl.json").exists())
 
+    def test_crop_follows_the_action_not_the_frame_centre(self):
+        import subprocess
+        import tempfile
+        from pln_agent.media import _reframe, subject_x
+        src = str(Path(tempfile.mkdtemp()) / "left_action.mp4")
+        # 16:9 master; a box bounces around the left fifth of the frame, the rest is static
+        subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i",
+                        "color=c=gray:s=640x360:d=3:r=25", "-f", "lavfi", "-i", "color=c=white:s=60x60:d=3:r=25",
+                        "-filter_complex", "[0][1]overlay=x='40+60*abs(sin(t*6))':y='120+80*abs(cos(t*5))'",
+                        "-pix_fmt", "yuv420p", src], check=True)
+        fx, why = subject_x(src, [{"source_in": 0.0, "source_out": 3.0}])
+        self.assertLess(fx, 0.3, why)
+        self.assertIn("motion", why)
+        self.assertIn("in_w*", _reframe({"w": 1080, "h": 1920}, 640, 360, fx))
+        self.assertIn("(in_w-1080)/2", _reframe({"w": 1080, "h": 1920}, 640, 360))  # default stays centred
+        # a static shot falls back to the centre
+        still = str(Path(tempfile.mkdtemp()) / "still.mp4")
+        subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i",
+                        "color=c=gray:s=640x360:d=2:r=25", "-pix_fmt", "yuv420p", still], check=True)
+        self.assertEqual(subject_x(still, [{"source_in": 0.0, "source_out": 2.0}])[0], 0.5)
+
     def test_missing_media_never_fakes_a_video(self):
         r = render_variant(self.db, f"{SLAP}:slapfight.tiktok.slapfightchampionshipusa", self.s)
         self.assertEqual(r["status"], "edl_only")
         self.assertFalse((Path(r["dir"]) / "video.mp4").exists())
+
+
+class OpsSignalScoringTests(unittest.TestCase):
+    def test_ops_energy_is_blended_into_source_strength(self):
+        from pln_agent.scoring import _source
+        seg = {"segments": [{"moment": "Submission", "source_timecode": "00:06.00"}]}
+        asset = {"media_present": True, "moments": [{"label": "Submission", "intensity": 0.8}]}
+        base, _ = _source(asset, {"edl": seg})
+        hot, why = _source({**asset, "probe": {"ops_clip": {"energy_score": 1.0}}}, {"edl": seg})
+        self.assertEqual(base, 0.8)
+        self.assertAlmostEqual(hot, 0.84)
+        self.assertIn("energy", why)
 
 
 class MiscTests(unittest.TestCase):

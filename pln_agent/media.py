@@ -89,11 +89,60 @@ def _wrap(text: str, width: int) -> str:
     return "\n".join(lines)
 
 
-def _reframe(out: dict, src_w: int, src_h: int) -> str:
+def _reframe(out: dict, src_w: int, src_h: int, subject_x: float = 0.5) -> str:
+    """Scale to cover, then crop. subject_x (0..1 across the source width) centres the crop on the
+    action instead of the frame centre; the crop is clamped so it never runs off the picture."""
     W, H = out["w"], out["h"]
-    # scale to cover, then center-crop (subject-centred crop hook: replace x expression with tracked subject x)
+    fx = min(max(float(subject_x), 0.0), 1.0)
+    x = f"(in_w-{W})/2" if abs(fx - 0.5) < 1e-3 else f"'max(0,min(in_w-{W},in_w*{fx:.4f}-{W}/2))'"
     return (f"scale=w='if(gt(a,{W}/{H}),-2,{W})':h='if(gt(a,{W}/{H}),{H},-2)',"
-            f"crop={W}:{H}:(in_w-{W})/2:(in_h-{H})/2,setsar=1")
+            f"crop={W}:{H}:{x}:(in_h-{H})/2,setsar=1")
+
+
+ANALYSIS_W, ANALYSIS_H, ANALYSIS_FPS = 64, 36, 4
+
+
+def motion_centroid(frames: list[bytes], w: int = ANALYSIS_W) -> tuple[float, float]:
+    """Horizontal centre of motion across low-res grayscale frames: per-column sum of absolute frame
+    differences, then the energy-weighted mean column. Returns (x 0..1, energy per pixel per frame)."""
+    if len(frames) < 2:
+        return 0.5, 0.0
+    cols = [0.0] * w
+    for a, b in zip(frames, frames[1:]):
+        for i in range(0, min(len(a), len(b))):
+            d = a[i] - b[i]
+            cols[i % w] += d if d > 0 else -d
+    total = sum(cols)
+    if total <= 0:
+        return 0.5, 0.0
+    x = sum((i + 0.5) / w * c for i, c in enumerate(cols)) / total
+    return x, total / (len(frames) - 1) / max(len(frames[0]), 1)
+
+
+def subject_x(src: str, segments: list[dict], timeout: int = 60) -> tuple[float, str]:
+    """Where the action is in a landscape master, from motion in the cut's own seconds (cheap: a few
+    frames at 64x36). Falls back to centre when there's too little motion or FFmpeg fails."""
+    xs, ws = [], []
+    frame = ANALYSIS_W * ANALYSIS_H
+    for s in segments:
+        dur = max(0.5, s["source_out"] - s["source_in"])
+        try:
+            proc = subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-ss", f"{s['source_in']:.3f}",
+                                   "-t", f"{dur:.3f}", "-i", src, "-vf",
+                                   f"fps={ANALYSIS_FPS},scale={ANALYSIS_W}:{ANALYSIS_H},format=gray",
+                                   "-f", "rawvideo", "-"], capture_output=True, timeout=timeout)
+        except (subprocess.TimeoutExpired, OSError):
+            continue
+        data = proc.stdout
+        frames = [data[i:i + frame] for i in range(0, len(data) - frame + 1, frame)]
+        x, energy = motion_centroid(frames)
+        if energy > 0.5:  # mean abs change per pixel (0-255): below this it's noise / a static shot
+            xs.append(x)
+            ws.append(energy * dur)
+    if not xs:
+        return 0.5, "centre crop (no clear motion found)"
+    fx = sum(x * w for x, w in zip(xs, ws)) / sum(ws)
+    return round(fx, 4), f"crop centred on motion at {fx:.0%} of frame width"
 
 
 def _srt_time(t: float) -> str:
@@ -148,7 +197,11 @@ def render_variant(db: DB, variant_id: str, settings: Settings, actor: str = "re
                 parts.append(f"[{i}:a]asetpts=PTS-STARTPTS[a{i}]")
                 labels.append(f"[a{i}]")
         parts.append("".join(labels) + f"concat=n={len(segs)}:v=1:a={1 if has_audio else 0}" + ("[cv][ca]" if has_audio else "[cv]"))
-        chain = _reframe(out, asset.get("width") or out["w"], asset.get("height") or out["h"])
+        sw, sh = asset.get("width"), asset.get("height")
+        fx, framing = 0.5, "source already matches target orientation"
+        if out["h"] > out["w"] and not (sw and sh and sh > sw):  # landscape (or unknown) master → vertical
+            fx, framing = subject_x(src, segs)
+        chain = _reframe(out, sw or out["w"], sh or out["h"], fx)
         draws = []
         if font:
             for j, o in enumerate(v.get("onscreen_text") or []):
@@ -177,7 +230,7 @@ def render_variant(db: DB, variant_id: str, settings: Settings, actor: str = "re
         if proc.returncode != 0:
             status, path, detail = "render_failed", "", proc.stderr[-800:]
         else:
-            status, path, detail = "rendered", str(video), "ok"
+            status, path, detail = "rendered", str(video), f"ok; {framing}"
             cues = build_caption_track(v, asset)
             if cues:
                 (outdir / "captions.srt").write_text("\n".join(
@@ -185,7 +238,7 @@ def render_variant(db: DB, variant_id: str, settings: Settings, actor: str = "re
             t = v["thumbnail"].get("source_time", 0)
             thumb = outdir / "thumbnail.jpg"
             subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-ss", str(t), "-i", src,
-                            "-frames:v", "1", "-vf", _reframe(out, asset["width"], asset["height"]), str(thumb)],
+                            "-frames:v", "1", "-vf", _reframe(out, asset["width"], asset["height"], fx), str(thumb)],
                            capture_output=True, timeout=120)
     if status == "rendered" and os.environ.get("PLN_RENDER_BUCKET"):
         path = upload_render(outdir, variant_id, os.environ["PLN_RENDER_BUCKET"])

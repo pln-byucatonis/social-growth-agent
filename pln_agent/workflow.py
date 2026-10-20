@@ -130,6 +130,44 @@ def reject(db: DB, vid: str, reviewer: str, note: str) -> None:
     db.audit(reviewer, "variant_rejected", "variants", vid, {"note": note})
 
 
+BULK_MAX = 100
+
+
+def bulk_review(db: DB, picks: list[tuple[str, str]], reviewer: str, decision: str, note: str = "") -> dict:
+    """Approve or reject several posts at once from the queue. Each pick carries the caption hash the
+    reviewer saw: a post whose copy changed since the page loaded is skipped (approval binds to copy).
+    Posts needing two-person sign-off are never bulk-approved; they need their own review page."""
+    if decision not in ("approve", "reject"):
+        raise WorkflowError(f"unknown bulk decision {decision!r}")
+    if decision == "reject" and not note.strip():
+        raise WorkflowError("a note is required to reject")
+    if len(picks) > BULK_MAX:
+        raise WorkflowError(f"select at most {BULK_MAX} posts per bulk action")
+    done, skipped = [], {}
+    for vid, seen_hash in picks:
+        v = db.get("variants", "variant_id", vid)
+        if not v:
+            skipped[vid] = "not found"
+            continue
+        if seen_hash and v["caption_hash"] != seen_hash:
+            skipped[vid] = "copy changed since you loaded the queue; review it again"
+            continue
+        try:
+            if decision == "approve":
+                asset = db.get("assets", "asset_id", v["asset_id"])
+                if evaluate(asset).as_dict()["two_person_signoff"]:
+                    skipped[vid] = "sensitive content: needs two-person review on its own page"
+                    continue
+                approve(db, vid, reviewer, note or "bulk approval from queue")
+            else:
+                reject(db, vid, reviewer, note)
+            done.append(vid)
+        except WorkflowError as e:
+            skipped[vid] = str(e)
+    db.audit(reviewer, f"bulk_{decision}", "variants", "", {"done": done, "skipped": skipped, "note": note})
+    return {"done": done, "skipped": skipped}
+
+
 def idempotency_key(v: dict) -> str:
     return hashlib.sha256(f"{v['account_id']}|{v['asset_id']}|{v['caption_hash']}".encode()).hexdigest()[:32]
 

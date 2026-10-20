@@ -169,7 +169,8 @@ def queue(request: Request, platform: str = "", state: str = ""):
     cond = " AND ".join(where)
     total = d.one(f"SELECT COUNT(*) AS n FROM variants WHERE {cond}", params)["n"]
     vs = [d.decode("variants", r) for r in d.query(
-        "SELECT variant_id, asset_id, account_id, platform, state, hook, score, risk_flags, validation FROM variants "
+        "SELECT variant_id, asset_id, account_id, platform, state, hook, score, risk_flags, validation, caption_hash "
+        "FROM variants "
         f"WHERE {cond} ORDER BY platform, state, score DESC LIMIT {QUEUE_LIMIT}", params)]
     accs = {a["account_id"]: a for a in d.all("accounts")}
     perm = {k: publish_eligibility(a, settings, kill_switch_on(d)) for k, a in accs.items()}
@@ -184,6 +185,43 @@ def queue(request: Request, platform: str = "", state: str = ""):
             thumbs[a["asset_id"]] = asset_thumb_url(a)
     return page(request, "queue.html", variants=vs, accs=accs, perm=perm, platform=platform, state=state, thumbs=thumbs,
                 platforms=platforms, total=total, limit=QUEUE_LIMIT)
+
+
+@app.post("/queue/bulk")
+def queue_bulk(request: Request, pick: list[str] = Form([]), decision: str = Form(...), reviewer: str = Form(""),
+               note: str = Form(""), back_to: str = Form("/queue")):
+    """Bulk approve/reject. Each decision is a separate audited approval; runs in the background because
+    a full page of posts takes longer than the portal proxy's 25s window."""
+    import threading
+    from ..workflow import BULK_MAX, bulk_review
+    back_to = back_to if back_to.startswith("/queue") else "/queue"
+    picks = [tuple(x.split("|", 1)) if "|" in x else (x, "") for x in pick]
+    if not picks:
+        return back(request, back_to, err="Select at least one post.")
+    if len(picks) > BULK_MAX:
+        return back(request, back_to, err=f"Select at most {BULK_MAX} posts per bulk action.")
+    if decision == "reject" and not note.strip():
+        return back(request, back_to, err="Add a note to reject.")
+    try:
+        name = who(request, reviewer)
+    except WorkflowError as e:
+        return back(request, back_to, err=str(e))
+
+    def work():
+        own = DB(settings.database_url, init=False)
+        try:
+            bulk_review(own, picks, name, decision, note)
+        except Exception as e:
+            own.audit(name, "bulk_review_failed", "variants", "", {"error": str(e)[:300]})
+
+    if len(picks) <= 10:  # small batches finish well inside the window: show the outcome right away
+        r = bulk_review(db(), picks, name, decision, note)
+        skipped = "; ".join(f"{k.split(':')[-1]}: {v}" for k, v in list(r["skipped"].items())[:5])
+        return back(request, back_to, f"{decision.capitalize()}d {len(r['done'])} post(s)." +
+                    (f" Skipped {len(r['skipped'])}: {skipped}" if r["skipped"] else ""))
+    threading.Thread(target=work, daemon=True, name="bulk-review").start()
+    return back(request, back_to, f"Recording {decision} for {len(picks)} posts in the background — refresh in "
+                "a moment. Sensitive posts and posts whose copy changed are skipped (see Audit log).")
 
 
 @app.get("/variant/{vid:path}", response_class=HTMLResponse)

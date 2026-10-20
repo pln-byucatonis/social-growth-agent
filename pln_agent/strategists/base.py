@@ -185,11 +185,13 @@ def common_violations(text: str, ctx: CreativeContext) -> list[str]:
         name = (p.get("name") or "").strip()
         if (ctx.asset.get("people_verified") and p.get("verified")) or is_junk_name(name):
             continue
-        n = name.lower()
-        if n in vocab:  # e.g. a tagger "person" called "League" vs our own "Pro League Network"
-            continue
-        if re.search(rf"(?<![a-z0-9]){re.escape(n)}(?![a-z0-9])", low):
-            errs.append(f"names unverified person {name!r}")
+        for alt in [name, *(p.get("aliases") or [])]:  # every tagger spelling of the same person
+            n = alt.strip().lower()
+            if not n or n in vocab or is_junk_name(alt):  # e.g. a tagger "person" called "League"
+                continue
+            if re.search(rf"(?<![a-z0-9]){re.escape(n)}(?![a-z0-9])", low):
+                errs.append(f"names unverified person {name!r}")
+                break
     bad = ungrounded_numbers(text, ctx.grounding_corpus)
     if bad:
         errs.append(f"numbers not found in verified source material: {bad}")

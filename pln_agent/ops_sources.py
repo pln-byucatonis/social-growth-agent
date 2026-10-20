@@ -133,20 +133,128 @@ def clip_moments(start: float, end: float, center_offset: float | None, tags: li
     return out
 
 
+def _name_key(name: str) -> str:
+    """Matching key for tagger name variants: case-insensitive, punctuation-free, trailing numeric
+    tokens dropped ("OKUMA 915" / "Okuma 915" / "Okuma" → "okuma")."""
+    toks = re.findall(r"[a-z0-9]+", (name or "").lower())
+    while len(toks) > 1 and toks[-1].isdigit():
+        toks.pop()
+    return " ".join(toks)
+
+
+def _ops_people_index(ops: DB) -> dict[str, dict]:
+    """name/alias key → ops person {id, name} (hidden face clusters excluded)."""
+    import json
+    idx: dict[str, dict] = {}
+    try:
+        rows = ops.query("SELECT id, name, aliases, hidden FROM people WHERE name IS NOT NULL")
+    except Exception:  # older ops schema / no grant: merging still works on the names alone
+        return idx
+    for r in rows:
+        if r.get("hidden") or not r.get("name"):
+            continue
+        aliases = r.get("aliases") or []
+        if isinstance(aliases, str):
+            try:
+                aliases = json.loads(aliases)
+            except ValueError:
+                aliases = []
+        for n in [r["name"], *aliases]:
+            k = _name_key(n)
+            if k and k not in idx:
+                idx[k] = {"id": r["id"], "name": r["name"]}
+    return idx
+
+
+_SOURCE_RANK = {"manual": 0, "ops": 1, "face": 2, "nova": 3}
+
+
+def merge_people(raw: list[dict], ops_index: dict[str, dict] | None = None) -> list[dict]:
+    """Collapse tagger variants of the same athlete into one person. The canonical name is the ops
+    `people` name when one matches; otherwise the best-sourced variant (manual > face > nova OCR),
+    preferring mixed case over ALL CAPS. All spellings are kept in `aliases` so the copy checks still
+    catch any of them while the person is unverified."""
+    ops_index = ops_index or {}
+    groups: dict[str, dict] = {}
+    order: list[str] = []
+    for p in raw:
+        name = (p.get("name") or "").strip()
+        if is_junk_name(name):
+            continue
+        k = _name_key(name)
+        match = ops_index.get(k) or ops_index.get(_name_key(name.lower()))
+        gk = f"ops:{match['id']}" if match else k
+        if gk not in groups:
+            groups[gk] = {"variants": [], "match": match}
+            order.append(gk)
+        groups[gk]["variants"].append(p)
+    out = []
+    for gk in order:
+        g = groups[gk]
+        vs = sorted(g["variants"], key=lambda v: (_SOURCE_RANK.get(v.get("detected_by"), 9),
+                                                  (v.get("name") or "").isupper()))
+        canonical = g["match"]["name"] if g["match"] else vs[0]["name"].strip()
+        names = []
+        for v in [{"name": canonical}, *vs]:
+            n = v["name"].strip()
+            if n.lower() not in (x.lower() for x in names):
+                names.append(n)
+        person = {"name": canonical, "verified": any(v.get("verified") for v in vs),
+                  "detected_by": "+".join(dict.fromkeys(v.get("detected_by") or "?" for v in vs))}
+        if g["match"]:
+            person["ops_person_id"] = g["match"]["id"]
+        if len(names) > 1:
+            person["aliases"] = names[1:]
+        out.append(person)
+    return out
+
+
+PRIORITY_FLOOR = 30  # P0 brands with thin libraries (Putt Tour) still get their best clips imported
+
+
+def _fair_share(clips: list[dict], limit: int, min_score: int, priority_floor: int) -> list[dict]:
+    """Interleave properties instead of taking the global top-N by score (which hands the whole import
+    to the property with the most footage). P0 brands get two picks per round and a lower score floor."""
+    by_prop: dict[str, list[dict]] = {}
+    for c in clips:
+        brand = _brand(c["property"] or "")
+        p0 = bool(brand) and str(brand.get("priority", "")).startswith("P0")
+        if (c["highlight_score"] or 0) >= (priority_floor if p0 else min_score):
+            by_prop.setdefault(c["property"] or "", []).append(c)
+    def rank(prop: str):
+        b = _brand(prop)
+        return (0 if b and str(b.get("priority", "")).startswith("P0") else 1, prop)
+    props = sorted(by_prop, key=rank)
+    out: list[dict] = []
+    while len(out) < limit and any(by_prop.values()):
+        for prop in props:
+            take = 2 if rank(prop)[0] == 0 else 1
+            while take and by_prop[prop] and len(out) < limit:
+                out.append(by_prop[prop].pop(0))
+                take -= 1
+    return out
+
+
 def import_ops_clips(db: DB, ops: DB, assets_bucket: str, limit: int = 100, min_score: int = 50,
-                     properties: list[str] | None = None, actor: str = "ops-sync") -> dict:
-    where = ["c.superseded_by IS NULL", "c.status = 'tagged'", "c.highlight_score >= ?"]
-    params: list = [min_score]
+                     properties: list[str] | None = None, actor: str = "ops-sync",
+                     priority_floor: int = PRIORITY_FLOOR) -> dict:
+    floor = min(min_score, priority_floor)
+    where = ["superseded_by IS NULL", "status = 'tagged'", "highlight_score >= ?"]
+    params: list = [floor]
     if properties:
-        where.append("c.property IN (" + ",".join("?" for _ in properties) + ")")
+        where.append("property IN (" + ",".join("?" for _ in properties) + ")")
         params += properties
     params.append(limit)
-    clips = ops.query(
+    candidates = ops.query(
         "SELECT c.id, c.property, c.start_sec, c.end_sec, c.peak_offset_sec, c.moment_offset_sec, "
-        "c.highlight_score, c.caption, c.transcript, c.source_bucket, c.source_key, c.vertical_key, "
-        "c.vertical_mode, c.thumb_key, s.title AS source_title, s.aired_date::text AS aired_date, s.duration_sec AS source_duration "
-        "FROM clips c JOIN clip_sources s ON s.id = c.source_id WHERE " + " AND ".join(where) +
-        " ORDER BY c.highlight_score DESC NULLS LAST, c.id LIMIT ?", params)
+        "c.highlight_score, c.energy_score, c.caption, c.transcript, c.source_bucket, c.source_key, c.vertical_key, "
+        "c.vertical_mode, c.vertical_subject, c.thumb_key, s.title AS source_title, s.aired_date AS aired_date, "
+        "s.duration_sec AS source_duration "
+        "FROM (SELECT clips.*, row_number() OVER (PARTITION BY property ORDER BY highlight_score DESC, id) AS rn "
+        "      FROM clips WHERE " + " AND ".join(where) + ") c "
+        "JOIN clip_sources s ON s.id = c.source_id WHERE c.rn <= ? "
+        "ORDER BY c.highlight_score DESC, c.id", params)
+    clips = _fair_share(candidates, limit, min_score, priority_floor)
     if not clips:
         return {"imported": 0, "skipped": []}
     ids = [c["id"] for c in clips]
@@ -160,6 +268,7 @@ def import_ops_clips(db: DB, ops: DB, assets_bucket: str, limit: int = 100, min_
         talent.setdefault(t["clip_id"], []).append(
             # machine detections (nova/face) are NOT verified identities
             {"name": t["name"], "verified": t["source"] == "manual", "detected_by": t["source"]})
+    people_index = _ops_people_index(ops)
     imported, skipped = [], []
     brand_flags = {b["brand_id"]: b.get("content_flags", {}) for b in load_brands()}
     for c in clips:
@@ -175,14 +284,14 @@ def import_ops_clips(db: DB, ops: DB, assets_bucket: str, limit: int = 100, min_
         aid = clip_asset_id(c["id"])
         rights = db.get("asset_rights", "asset_id", aid) or rights_default(db, brand["brand_id"])
         raw_people = talent.get(c["id"], [])
-        people = [p for p in raw_people if not is_junk_name(p["name"])]  # drop "person #2775", "FPS"…
+        people = merge_people(raw_people, people_index)  # drops "person #2775"/"FPS", merges "OKUMA 915"/"Okuma"
         identities_ok = bool(rights.get("people_verified")) or (bool(people) and all(p["verified"] for p in people))
         # Copy is built from the description: never feed it machine text that may name unverified athletes.
         safe_caption = (c["caption"] or "").strip() if identities_ok else neutral_description(ctags, c["id"])
         row = {
             "asset_id": aid, "brand_id": canonical_brand_id(brand), "source_brand_name": brand["name"],
             # source titles are raw master filenames; never put them in copy or thumbnails
-            "title": f"{_label(ctags)} — {brand['name']}" + (f" ({c['aired_date']})" if c["aired_date"] else ""),
+            "title": f"{_label(ctags)} — {brand['name']}" + (f" ({str(c['aired_date'])[:10]})" if c["aired_date"] else ""),
             "description": safe_caption,
             "media_path": f"s3://{assets_bucket}/{c['vertical_key']}" if rel else f"s3://{c['source_bucket']}/{c['source_key']}",
             "media_present": True, "sha256": "", "content_id": c["id"], "parent_asset_id": "",
@@ -198,10 +307,11 @@ def import_ops_clips(db: DB, ops: DB, assets_bucket: str, limit: int = 100, min_
             # knockouts / drops are injury-adjacent: always manual review, never the hook
             "flags": {**brand_flags.get(brand["brand_id"], {}),
                       **({"injury": True} if set(ctags) & INJURY_TAGS else {})}, "series": "",
-            "event_name": "", "event_date": c["aired_date"],  # source titles are raw master filenames
+            "event_name": "", "event_date": str(c["aired_date"])[:10] if c["aired_date"] else None,  # source titles are raw master filenames
             "duration_s": (end - start) if rel else (float(c["source_duration"]) if c["source_duration"] else None),
             "width": 1080 if rel else None, "height": 1920 if rel else None, "has_audio": True,
             "probe": {"ops_clip": {"tags": ctags, "highlight_score": c["highlight_score"],
+                                   "energy_score": c.get("energy_score"), "vertical_subject": c.get("vertical_subject"),
                                    "machine_caption": c["caption"], "raw_talent": raw_people,
                                    "thumb": f"s3://{assets_bucket}/{c['thumb_key']}" if c.get("thumb_key") else None,  # for reviewers only; never used in copy unless verified
                                    "transcript": c["transcript"], "source_title": c["source_title"],
