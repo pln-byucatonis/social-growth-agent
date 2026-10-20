@@ -18,7 +18,9 @@ MAX_PER_PLATFORM = 2
 
 def plan_experiments(db: DB, week_start: date, persist: bool = True) -> list[dict]:
     exps = []
-    variants = db.all("variants", "state IN ('in_review','approved','scheduled')")
+    variants = [db.decode("variants", r) for r in db.query(
+        "SELECT variant_id, platform, account_id, series, score, hook_candidates FROM variants "
+        "WHERE state IN ('in_review','approved','scheduled')")]
     by_platform: dict[str, list[dict]] = {}
     for v in variants:
         by_platform.setdefault(v["platform"], []).append(v)
@@ -95,7 +97,8 @@ def recommendations(db: DB, now: datetime | None = None) -> list[dict]:
                      "evidence": "schedules.state=missed"})
     partner: dict[str, int] = {}
     blocked: dict[str, tuple[list[str], int]] = {}
-    for v in db.all("variants", "state IN ('in_review','needs_fix')"):
+    for v in (db.decode("variants", r) for r in db.query(
+            "SELECT asset_id, risk_flags FROM variants WHERE state IN ('in_review','needs_fix')")):
         rf = v.get("risk_flags") or {}
         if "paid_partnership" in rf.get("review_flags", []):
             partner[v["asset_id"]] = partner.get(v["asset_id"], 0) + 1

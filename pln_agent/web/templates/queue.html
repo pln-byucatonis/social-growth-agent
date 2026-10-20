@@ -1,7 +1,7 @@
 {% extends "base.html" %}{% block body %}
 <div class="card"><form method="get"><div class="grid"><select name="platform"><option value="">all platforms</option>{% for p in platforms %}<option {{ 'selected' if p==platform }}>{{ p }}</option>{% endfor %}</select>
 <select name="state"><option value="">all states</option>{% for s in ['needs_fix','in_review','approved','scheduled','simulated','published','failed','rejected','cancelled'] %}<option {{ 'selected' if s==state }}>{{ s }}</option>{% endfor %}</select><button>Filter</button></div></form></div>
-<div class="card tablewrap"><table><tr><th>platform</th><th>destination</th><th>state</th><th>hook</th><th>risk</th><th>permission</th><th>score</th></tr>
+<div class="card tablewrap"><p class="muted">{{ total }} posts match{% if total > limit %}; showing the top {{ limit }} by platform, state and score. Filter by platform or state to see the rest{% endif %}.</p><table><tr><th>platform</th><th>destination</th><th>state</th><th>hook</th><th>risk</th><th>permission</th><th>score</th></tr>
 {% for v in variants %}{% set a = accs[v.account_id] %}{% set p = perm[v.account_id] %}<tr>
 <td>{{ v.platform }}</td><td>{{ a.username_original or '(pending)' }}<br><span class="muted">{{ v.route_role }} · {{ a.canonical_brand_id }}</span></td>
 <td><span class="badge {{ 'ok' if v.state in ['approved','scheduled','simulated','published'] else ('bad' if v.state in ['needs_fix','failed'] else '') }}">{{ v.state }}</span></td>

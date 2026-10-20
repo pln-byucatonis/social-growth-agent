@@ -46,6 +46,7 @@ templates = Jinja2Templates(directory=str(HERE / "templates"))
 settings.render_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/renders", StaticFiles(directory=str(settings.render_dir)), name="renders")
 _db: DB | None = None
+QUEUE_LIMIT = 300
 _PREFIX_RE = re.compile(r"^(/[A-Za-z0-9._-]+)*$")
 
 
@@ -163,11 +164,16 @@ def queue(request: Request, platform: str = "", state: str = ""):
         where.append("platform=?"), params.append(platform)
     if state:
         where.append("state=?"), params.append(state)
-    vs = d.all("variants", " AND ".join(where), params, order="platform, state, score DESC")
+    cond = " AND ".join(where)
+    total = d.one(f"SELECT COUNT(*) AS n FROM variants WHERE {cond}", params)["n"]
+    vs = [d.decode("variants", r) for r in d.query(
+        "SELECT variant_id, account_id, platform, state, hook, score, risk_flags, validation FROM variants "
+        f"WHERE {cond} ORDER BY platform, state, score DESC LIMIT {QUEUE_LIMIT}", params)]
     accs = {a["account_id"]: a for a in d.all("accounts")}
     perm = {k: publish_eligibility(a, settings, kill_switch_on(d)) for k, a in accs.items()}
+    platforms = [r["platform"] for r in d.query("SELECT DISTINCT platform FROM variants ORDER BY platform")]
     return page(request, "queue.html", variants=vs, accs=accs, perm=perm, platform=platform, state=state,
-                platforms=sorted({v["platform"] for v in d.all("variants")}))
+                platforms=platforms, total=total, limit=QUEUE_LIMIT)
 
 
 @app.get("/variant/{vid:path}", response_class=HTMLResponse)
@@ -262,14 +268,14 @@ def do_publish(request: Request):
 def assets(request: Request, brand: str = "", rights: str = ""):
     d = db()
     rows = d.all("assets", "brand_id=?" if brand else "", [brand] if brand else [], order="ingested_at DESC")
+    counts = {r["asset_id"]: r["n"] for r in d.query("SELECT asset_id, COUNT(*) AS n FROM variants GROUP BY asset_id")}
     out = []
     for a in rows:
         r = evaluate(a)
         if rights == "blocked" and r.ok or rights == "clear" and not r.ok:
             continue
-        n = d.one("SELECT COUNT(*) AS n FROM variants WHERE asset_id=?", [a["asset_id"]])["n"]
-        out.append({**a, "rights_eval": r.as_dict(), "variants": n})
-    brands = sorted({a["brand_id"] for a in d.all("assets")})
+        out.append({**a, "rights_eval": r.as_dict(), "variants": counts.get(a["asset_id"], 0)})
+    brands = [r["brand_id"] for r in d.query("SELECT DISTINCT brand_id FROM assets ORDER BY brand_id")]
     return page(request, "assets.html", assets=out[:300], total=len(out), brand=brand, rights=rights, brands=brands)
 
 

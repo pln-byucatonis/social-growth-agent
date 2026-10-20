@@ -349,11 +349,37 @@ class _RdsData:
         if len(parts) - 1 != len(params):
             raise ValueError("placeholder/param count mismatch")
         named = parts[0] + "".join(f":p{i}" + parts[i + 1] for i in range(len(params)))
-        out = self.client.execute_statement(
-            resourceArn=self.cluster, secretArn=self.secret, database=self.database, sql=named,
-            parameters=[self._param(f"p{i}", v, i in (json_params or set())) for i, v in enumerate(params)],
-            formatRecordsAs="JSON")
+        bound = [self._param(f"p{i}", v, i in (json_params or set())) for i, v in enumerate(params)]
+        try:
+            return self._exec(named, bound)
+        except Exception as e:
+            # The Data API refuses any single result over 1 MB. Re-read a SELECT in pages instead.
+            if "UnsupportedResultException" not in type(e).__name__ + str(e) or \
+                    not named.lstrip().lower().startswith(("select", "with")):
+                raise
+            return self._paged(named, bound)
+
+    def _exec(self, sql: str, bound: list[dict]) -> list[dict]:
+        out = self.client.execute_statement(resourceArn=self.cluster, secretArn=self.secret, database=self.database,
+                                            sql=sql, parameters=bound, formatRecordsAs="JSON")
         return json.loads(out["formattedRecords"]) if out.get("formattedRecords") else []
+
+    def _paged(self, sql: str, bound: list[dict], size: int = 400) -> list[dict]:
+        rows: list[dict] = []
+        offset = 0
+        while True:
+            page_sql = f"SELECT * FROM ({sql}) AS _page LIMIT {size} OFFSET {offset}"
+            try:
+                page = self._exec(page_sql, bound)
+            except Exception as e:
+                if "UnsupportedResultException" in type(e).__name__ + str(e) and size > 1:
+                    size = max(1, size // 2)  # rows are large: shrink the page and retry
+                    continue
+                raise
+            rows.extend(page)
+            if len(page) < size:
+                return rows
+            offset += size
 
 
 class DB:

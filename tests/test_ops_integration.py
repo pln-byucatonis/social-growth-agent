@@ -64,6 +64,35 @@ class RdsDataTests(unittest.TestCase):
             r.run("SELECT ?", [])
 
 
+class FakePagedClient:
+    """Mimics the Data API's 1 MB result cap: full SELECTs fail, pages of <= 3 rows succeed."""
+
+    def __init__(self, rows):
+        self.rows, self.sql = rows, []
+
+    def execute_statement(self, **kw):
+        import json as _j
+        import re as _re
+        self.sql.append(kw["sql"])
+        m = _re.search(r"LIMIT (\d+) OFFSET (\d+)$", kw["sql"])
+        if not m:
+            raise type("UnsupportedResultException", (Exception,), {})("The result exceeds the size limit 1 MB.")
+        size, off = int(m.group(1)), int(m.group(2))
+        if size > 3:
+            raise type("UnsupportedResultException", (Exception,), {})("The result exceeds the size limit 1 MB.")
+        return {"formattedRecords": _j.dumps(self.rows[off:off + size])}
+
+
+class RdsPagingTests(unittest.TestCase):
+    def test_oversized_select_is_reread_in_pages(self):
+        r = object.__new__(_RdsData)
+        rows = [{"i": i} for i in range(10)]
+        r.client, r.cluster, r.secret, r.database = FakePagedClient(rows), "c", "s", "growth"
+        self.assertEqual(r.run("SELECT i FROM t ORDER BY i"), rows)
+        with self.assertRaises(Exception):
+            r.run("UPDATE t SET i = 1")  # writes are never retried as pages
+
+
 class ClipMappingTests(unittest.TestCase):
     def test_moments_split_around_decisive_point(self):
         ms = clip_moments(2026.5, 2042.9, 7.09, ["flush_slap", "knockout"], 0.92, "A flush slap lands.", relative=True)

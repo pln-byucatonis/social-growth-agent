@@ -37,7 +37,9 @@ def plan_week(db: DB, settings: Settings, start: date, days: int = 7, states=("i
     slots = slot_hypotheses()
 
     qs = ",".join("?" for _ in states)
-    variants = db.all("variants", f"state IN ({qs})", list(states))
+    variants = [db.decode("variants", r) for r in db.query(
+        "SELECT variant_id, account_id, asset_id, platform, route_role, series, hook, state, score "
+        f"FROM variants WHERE state IN ({qs})", list(states))]
     order = {"canonical": 0, "legacy_inplace": 0, "pln_b2b": 1, "pln_amplification": 2, "legacy_bridge": 3}
     variants.sort(key=lambda v: (order.get(v["route_role"], 9), -(v["score"] or 0)))
 
