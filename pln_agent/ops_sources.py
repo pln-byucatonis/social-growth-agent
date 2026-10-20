@@ -146,7 +146,7 @@ def import_ops_clips(db: DB, ops: DB, assets_bucket: str, limit: int = 100, min_
         score = float(c["highlight_score"] or 0) / 100
         ctags = tags.get(c["id"], [])
         aid = clip_asset_id(c["id"])
-        rights = db.get("asset_rights", "asset_id", aid) or {}
+        rights = db.get("asset_rights", "asset_id", aid) or rights_default(db, brand["brand_id"])
         people = talent.get(c["id"], [])
         row = {
             "asset_id": aid, "brand_id": canonical_brand_id(brand), "source_brand_name": brand["name"],
@@ -180,6 +180,25 @@ def import_ops_clips(db: DB, ops: DB, assets_bucket: str, limit: int = 100, min_
     db.audit(actor, "ops_clips_imported", "assets", "", {"imported": len(imported), "skipped": skipped,
                                                           "min_score": min_score, "on": date.today().isoformat()})
     return {"imported": len(imported), "asset_ids": imported, "skipped": skipped}
+
+
+def rights_default(db: DB, brand_id: str) -> dict:
+    """Standing rights policy for newly imported clips (e.g. "PLN owns all content").
+    Stored in settings_kv as JSON under rights_default:<brand_id> or rights_default:* .
+    Never includes people_verified: identities are confirmed clip by clip."""
+    import json
+    raw = db.kv_get(f"rights_default:{brand_id}") or db.kv_get("rights_default:*")
+    if not raw:
+        return {}
+    d = json.loads(raw)
+    d.pop("people_verified", None)
+    return d
+
+
+def set_rights_default(db: DB, actor: str, brand_id: str = "*", **fields) -> None:
+    import json
+    fields.pop("people_verified", None)
+    db.kv_set(f"rights_default:{brand_id}", json.dumps(fields, sort_keys=True), actor)
 
 
 def set_asset_rights(db: DB, asset_id: str, actor: str, **fields) -> dict:

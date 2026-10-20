@@ -120,6 +120,17 @@ class OpsImportTests(unittest.TestCase):
         self.assertTrue(master["media_path"].startswith("s3://pln-vod-library/"))
         self.assertEqual(master["moments"][0]["start"], 40.0)
 
+    def test_standing_rights_default_applies_to_new_imports_but_never_identities(self):
+        from pln_agent.ops_sources import set_rights_default
+        set_rights_default(self.db, "by@pln", license="PLN-owned production", owner="Pro League Network",
+                           territory=["WORLDWIDE"], rights_verified=True, music_cleared=True, people_verified=True)
+        import_ops_clips(self.db, self.ops, "b", min_score=50)
+        a = self.db.get("assets", "asset_id", clip_asset_id("CJ.mp4:10-24"))
+        ev = evaluate(a)
+        self.assertNotIn("media rights not verified", ev.blockers)
+        self.assertNotIn("audio present but music/sound not cleared", ev.blockers)
+        self.assertIn("people/athlete identities not verified", ev.blockers)
+
     def test_rights_overlay_survives_reimport(self):
         import_ops_clips(self.db, self.ops, "b", min_score=50)
         aid = clip_asset_id("CJ.mp4:10-24")
