@@ -276,7 +276,8 @@ def post_outcomes(db: DB, account_ids: list[str] | None = None, min_age_h: float
                                  "shares_per_1k_views": per1k("shares"), "saves_per_1k_views": per1k("saves"),
                                  "comments_per_1k_views": per1k("comments"), "likes_per_1k_views": per1k("likes"),
                                  "engagements_per_1k_views": per1k("engagements"),
-                                 "avg_watch_time_s": m.get("avg_watch_time_s")}})
+                                 "avg_watch_time_s": m.get("avg_watch_time_s"),
+                                 "follows_per_1k_views": per1k("follows"), "completion_rate": m.get("completion_rate")}})
     return out
 
 
@@ -304,10 +305,21 @@ def account_kpis(db: DB, account_id: str, days: int = 28, end: date | None = Non
     tot = lambda k: sum(p["metrics"].get(k, 0) or 0 for p in measured)
     has = lambda k: any(k in p["metrics"] for p in measured)
     k = {}
-    k["non_follower_reach"] = _k(None, "unavailable", MEASURABILITY.get(acc["platform"], {}).get("non_follower_reach", "not exposed"))
+    nf = [v for d, v in _account_series(db, account_id, "non_follower_views") if d <= end.isoformat()]
+    fv = [v for d, v in _account_series(db, account_id, "follower_views") if d <= end.isoformat()]
+    if nf and fv and (nf[-1] + fv[-1]):
+        k["non_follower_reach"] = _k(nf[-1] / (nf[-1] + fv[-1]), "measured",
+                                     "share of views from non-subscribers (platform-reported, last collected window)")
+    else:
+        k["non_follower_reach"] = _k(None, "unavailable", MEASURABILITY.get(acc["platform"], {}).get("non_follower_reach", "not exposed"))
     follows_daily = _account_series(db, account_id, "follows")
     fw = [v for d, v in follows_daily if start.isoformat() <= d <= end.isoformat()]
-    if fw and views:
+    post_follows = [p for p in measured if p["metrics"].get("follows") is not None]
+    if post_follows and views:
+        pv_views = sum(p["outcomes"]["views"] for p in post_follows)
+        k["follows_per_1k_views"] = _k(sum(p["metrics"]["follows"] for p in post_follows) / pv_views * 1000, "measured",
+                                       f"Σ subscribers gained ÷ Σ views, per video ({len(post_follows)} posts)", len(post_follows))
+    elif fw and views:
         k["follows_per_1k_views"] = _k(sum(fw) / views * 1000, "derived",
                                        "platform-reported daily follows ÷ views of posts published in the window "
                                        "(follows can come from older posts or the profile)", len(measured))

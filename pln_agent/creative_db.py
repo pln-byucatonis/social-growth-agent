@@ -74,8 +74,8 @@ def _brand_names(db: DB, brand_id: str) -> list[str]:
     return []
 
 
-def upsert_ingested_post(db: DB, acc: dict, p: dict, tz: str) -> dict:
-    """Historical post from the ops portal (platform API ingest)."""
+def upsert_ingested_post(db: DB, acc: dict, p: dict, tz: str, origin: str = "ops_ingested") -> dict:
+    """Historical post read from a platform API (via the ops portal ingest, or the agent's own collectors)."""
     from .audience import _dt, _extra
     pub = _dt(p["published_at"])
     media = _extra(p.get("media"))
@@ -98,7 +98,7 @@ def upsert_ingested_post(db: DB, acc: dict, p: dict, tz: str) -> dict:
         return existing
     rec = {"post_id": pid, "account_id": acc["account_id"], "brand_id": acc["brand_id"], "platform": acc["platform"],
            "platform_post_id": str(p["platform_post_id"]), "published_at": pub.replace(microsecond=0).isoformat() if pub else None,
-           "permalink": p.get("permalink") or "", "post_type": p.get("post_type") or "", "origin": "ops_ingested",
+           "permalink": p.get("permalink") or "", "post_type": p.get("post_type") or "", "origin": origin,
            "variant_id": "", "asset_id": "", "caption": p.get("text") or "", "duration_s": float(dur) if dur else None,
            "creative": creative, "provenance": prov, "source_footage": {},
            "first_seen_at": existing["first_seen_at"] if existing else now_iso(), "updated_at": now_iso()}
@@ -155,8 +155,8 @@ def upsert_agent_post(db: DB, variant: dict, platform_post_id: str, permalink: s
 VARIABLES = ["content_type", "format", "hook_style", "opening_style", "duration_bucket", "captions_burned", "commentary",
              "caption_length", "asks_question", "cta", "hashtags", "mentions", "emoji", "brand_named",
              "posting_hour_bucket", "weekday", "series", "route_role", "duration_variant"]
-OUTCOMES = ["views", "shares_per_1k_views", "saves_per_1k_views", "comments_per_1k_views", "engagements_per_1k_views",
-            "avg_watch_time_s"]
+OUTCOMES = ["views", "follows_per_1k_views", "shares_per_1k_views", "saves_per_1k_views", "comments_per_1k_views",
+            "engagements_per_1k_views", "avg_watch_time_s", "completion_rate"]
 MIN_N, CONCLUSIVE_N = 5, 8
 
 
@@ -201,7 +201,8 @@ def bh_adjust(ps: list[float]) -> list[float]:
     return q
 
 
-EVIDENCE_OUTCOMES = ["shares_per_1k_views", "saves_per_1k_views", "comments_per_1k_views", "engagements_per_1k_views"]
+EVIDENCE_OUTCOMES = ["follows_per_1k_views", "shares_per_1k_views", "saves_per_1k_views", "comments_per_1k_views",
+                     "engagements_per_1k_views", "completion_rate"]
 EVIDENCE_RULE = (f"Each value is compared with all other posts in the same slice (yes/no variables are tested once). "
                  f"Fewer than {MIN_N} posts on either side → insufficient. p-values come from a seeded permutation test on "
                  "the median difference and are adjusted for the number of comparisons in the slice (Benjamini–Hochberg). "

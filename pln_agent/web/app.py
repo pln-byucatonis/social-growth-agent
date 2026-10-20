@@ -625,6 +625,17 @@ def knowledge_review(request: Request):
     return back(request, "/knowledge", "Source review started — refresh in a minute.")
 
 
+@app.post("/insights/youtube")
+def insights_youtube(request: Request):
+    """Collect YouTube analytics for every connected channel now (background; also runs every refresh)."""
+    import threading
+    from ..insights import collect_youtube
+    _admin(request)
+    threading.Thread(target=lambda: collect_youtube(DB(settings.database_url, init=False), settings.timezone,
+                                                    actor=request.state.user or "dashboard"), daemon=True).start()
+    return back(request, "/intelligence", "Collecting YouTube analytics — refresh in a minute.")
+
+
 @app.get("/cadence", response_class=HTMLResponse)
 def cadence_page(request: Request):
     d = db()

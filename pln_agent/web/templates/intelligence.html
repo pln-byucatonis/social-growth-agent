@@ -3,6 +3,7 @@
 {% macro fmt(v) %}{% if v is none %}—{% elif v >= 1000 %}{{ '{:,.0f}'.format(v) }}{% else %}{{ '%.2f'|format(v) }}{% endif %}{% endmacro %}
 <div class="card"><h3>Audience intelligence — last {{ days }} days of data per account</h3>
 <p class="muted">Views are not the goal. Each number says how it was obtained: <b>measured</b> (reported by the platform), <b>derived</b> (computed from measured numbers with a stated attribution assumption) or <b>unavailable</b> (no current integration exposes it — never estimated). Source: platform APIs via the ops portal ingest. <a href="?days=7">7d</a> · <a href="?days=28">28d</a> · <a href="?days=90">90d</a></p>
+<form method="post" action="{{ base }}/insights/youtube"><button>Collect YouTube analytics now</button> <span class="muted">for channels connected on the Accounts page (also runs every refresh)</span></form>
 {% if not rows %}<p><b>No performance data yet.</b> It arrives from the ops portal's platform ingest on the next refresh, and from accounts connected under Accounts.</p>{% endif %}
 </div>
 <div class="grid">{% for r in rows %}<div class="card"><h3>{{ r.handle or r.account_id }} <span class="muted">{{ r.platform }} · {{ r.brand_id }}</span></h3>

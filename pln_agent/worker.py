@@ -78,9 +78,10 @@ def start_intelligence(settings: Settings) -> str:
 def refresh_intelligence(db: DB, settings: Settings, ops: DB | None) -> dict:
     """Phase 1 loop: real performance in → creative evidence → cadence → knowledge review.
     Each step is isolated so one failure (e.g. a platform page timing out) doesn't stop the rest."""
-    from . import audience, cadence, knowledge, scout
+    from . import audience, cadence, insights, knowledge, scout
     steps = [("knowledge_seed", lambda: knowledge.seed(db, "worker")),
              ("social", lambda: audience.import_ops_social(db, ops, settings.timezone, "worker") if ops else None),
+             ("youtube", lambda: insights.collect_youtube(db, settings.timezone, actor="worker")),
              ("pln_evidence", lambda: len(knowledge.derive_pln_evidence(db)["written"])),
              ("scout", lambda: scout.scan(db, ops, actor="worker") if ops else None),
              ("cadence", lambda: len(cadence.recommend_all(db))),
