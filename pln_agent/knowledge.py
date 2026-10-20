@@ -187,7 +187,8 @@ def derive_pln_evidence(db: DB, slices: list[dict] | None = None, actor: str = "
     """Turn conclusive/suggestive Creative Intelligence findings into dated `pln_evidence` entries.
     Re-running replaces each slice's entries; findings that no longer hold are superseded, not deleted."""
     from .creative_db import EVIDENCE_OUTCOMES, EVIDENCE_RULE, what_works
-    if slices is None:
+    full = slices is None
+    if full:
         slices = []
         from .creative_db import MIN_N
         for r in db.query("SELECT brand_id, platform, COUNT(*) AS n FROM posts GROUP BY brand_id, platform"):
@@ -224,6 +225,12 @@ def derive_pln_evidence(db: DB, slices: list[dict] | None = None, actor: str = "
             if old["entry_id"] not in keep:
                 db.update("knowledge", "entry_id", old["entry_id"], {"status": "superseded", "updated_at": now_iso(),
                                                                      "applicability": f"no longer supported as of {now_iso()[:10]}"})
+                superseded.append(old["entry_id"])
+    if full:  # a full run re-judges everything: what it didn't re-confirm (e.g. a retired outcome) is superseded
+        for old in db.all("knowledge", "level='pln_evidence' AND status='current'"):
+            if old["entry_id"] not in written:
+                db.update("knowledge", "entry_id", old["entry_id"], {"status": "superseded", "updated_at": now_iso(),
+                                                                     "applicability": f"not re-confirmed on {now_iso()[:10]}"})
                 superseded.append(old["entry_id"])
     db.audit(actor, "pln_evidence_derived", "knowledge", "", {"written": len(written), "superseded": superseded})
     return {"written": written, "superseded": superseded}

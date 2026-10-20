@@ -178,6 +178,13 @@ class KnowledgeEngineTests(Base):
         self.assertIn(e["entry_id"], out2["superseded"])
         self.assertEqual(self.db.get("knowledge", "entry_id", e["entry_id"])["status"], "superseded")
 
+    def test_full_run_supersedes_entries_from_retired_outcomes(self):
+        self.db.insert("knowledge", {"entry_id": "pln-pln-instagram-views-old", "level": "pln_evidence", "statement": "s",
+                                     "status": "current", "evidence": {}})
+        out = knowledge.derive_pln_evidence(self.db)
+        self.assertIn("pln-pln-instagram-views-old", out["superseded"])
+        self.assertTrue(out["written"])
+
     def test_guidance_precedence(self):
         knowledge.derive_pln_evidence(self.db, [{"brand_id": "carjitsu", "platform": "instagram", "outcome": "shares_per_1k_views"}])
         g = knowledge.guidance(self.db, platform="instagram", brand_id="carjitsu")

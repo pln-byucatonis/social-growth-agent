@@ -35,6 +35,15 @@ class ScoutTests(unittest.TestCase):
         self.assertIn("missed_short_putt", self.m("PT:1")["categories"])
         self.assertEqual(scout.scan(self.db, self.ops)["scored"], 0)  # incremental
 
+    def test_injury_adjacent_moments_are_ranked_down_and_flagged(self):
+        base = {"start_sec": 0, "end_sec": 15, "highlight_score": 80, "energy_score": 0.7, "transcript": ""}
+        ko = scout.score_clip(self.db, {**base, "caption": "Big slap, he drops hard, out cold"}, "slapfight", [], [], False)
+        react = scout.score_clip(self.db, {**base, "caption": "Big slap, the crowd reacts in shock"}, "slapfight", [], [], False)
+        self.assertLess(ko["potential"], react["potential"])
+        self.assertLess(ko["pln_potential"], react["pln_potential"])
+        self.assertIn("never the hook", ko["detail"]["safety"])
+        self.assertEqual(react["detail"]["safety"], "")
+
     def test_top_20_of_an_event_are_non_overlapping_and_diverse(self):
         top = scout.top_moments(self.db, fx.CJ_MASTER, n=20)
         self.assertLessEqual(len(top), 20)

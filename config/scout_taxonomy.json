@@ -1,62 +1,198 @@
 {
   "_note": "Viral Content Scout taxonomy: what makes someone stop scrolling, per property (PLN Social Growth Engine 2.0 brief, section 3). Patterns match the ops tagger's tags, machine caption and transcript (case-insensitive regex). Weights are starting priors; measured lift from the Creative Intelligence Database adjusts them via content_type.",
-  "model_version": "scout-v1",
-  "weights": {"category": 0.30, "highlight": 0.25, "energy": 0.10, "personality": 0.10, "duration_fit": 0.10, "novelty": 0.05, "learned": 0.10},
+  "model_version": "scout-v2",
+  "weights": {
+    "category": 0.3,
+    "highlight": 0.25,
+    "energy": 0.1,
+    "personality": 0.1,
+    "duration_fit": 0.1,
+    "novelty": 0.05,
+    "learned": 0.1
+  },
   "brands": {
     "carjitsu": [
-      {"key": "unexpected_reversal", "label": "Unexpected reversal", "weight": 1.0, "content_type": "reversal_highlight",
-       "pattern": "revers|comeback|flip|turn(s|ed)? the tables|escape"},
-      {"key": "trapped", "label": "Competitor trapped", "weight": 0.9, "content_type": "submission_highlight",
-       "pattern": "trapped|pinned|stuck|cornered|back seat|backseat|seat ?belt"},
-      {"key": "panic_confusion", "label": "Panic or confusion", "weight": 0.85, "content_type": "highlight",
-       "pattern": "panic|confus|scramble|chaos|frantic"},
-      {"key": "unusual_submission", "label": "Unusual submission", "weight": 0.95, "content_type": "submission_highlight",
-       "pattern": "submission|tap(s|ped)?( out)?|choke|armbar|triangle|kimura|neck crank"},
-      {"key": "reaction", "label": "Competitor reaction", "weight": 0.7, "content_type": "personality",
-       "pattern": "react|celebrat|shock|disbelief|crowd"},
-      {"key": "funny_commentary", "label": "Funny commentary", "weight": 0.75, "content_type": "personality",
-       "pattern": "laugh|funny|joke|hilarious|no way|oh my"},
-      {"key": "unexpected_ending", "label": "Unexpected ending", "weight": 0.9, "content_type": "highlight",
-       "pattern": "upset|out of nowhere|last second|buzzer|sudden|unexpected"}
+      {
+        "key": "unexpected_reversal",
+        "label": "Unexpected reversal",
+        "weight": 1.0,
+        "content_type": "reversal_highlight",
+        "pattern": "revers|comeback|flip|turn(s|ed)? the tables|escape"
+      },
+      {
+        "key": "trapped",
+        "label": "Competitor trapped",
+        "weight": 0.9,
+        "content_type": "submission_highlight",
+        "pattern": "trapped|pinned|stuck|cornered|back seat|backseat|seat ?belt"
+      },
+      {
+        "key": "panic_confusion",
+        "label": "Panic or confusion",
+        "weight": 0.85,
+        "content_type": "highlight",
+        "pattern": "panic|confus|scramble|chaos|frantic"
+      },
+      {
+        "key": "unusual_submission",
+        "label": "Unusual submission",
+        "weight": 0.95,
+        "content_type": "submission_highlight",
+        "pattern": "submission|tap(s|ped)?( out)?|choke|armbar|triangle|kimura|neck crank"
+      },
+      {
+        "key": "reaction",
+        "label": "Competitor reaction",
+        "weight": 0.7,
+        "content_type": "personality",
+        "pattern": "react|celebrat|shock|disbelief|crowd"
+      },
+      {
+        "key": "funny_commentary",
+        "label": "Funny commentary",
+        "weight": 0.75,
+        "content_type": "personality",
+        "pattern": "laugh|funny|joke|hilarious|no way|oh my"
+      },
+      {
+        "key": "unexpected_ending",
+        "label": "Unexpected ending",
+        "weight": 0.9,
+        "content_type": "highlight",
+        "pattern": "upset|out of nowhere|last second|buzzer|sudden|unexpected"
+      }
     ],
     "putt_tour": [
-      {"key": "impossible_putt", "label": "Impossible-looking putt", "weight": 1.0, "content_type": "putt_highlight",
-       "pattern": "impossible|trick shot|bank|ricochet|long putt|hole in one|ace|off the wall"},
-      {"key": "pressure", "label": "Pressure situation", "weight": 0.9, "content_type": "putt_highlight",
-       "pattern": "pressure|must make|to win|for the (win|title)|sudden death|playoff|clutch"},
-      {"key": "celebration", "label": "Competitor celebration", "weight": 0.75, "content_type": "personality",
-       "pattern": "celebrat|fist pump|scream|jump|roar|crowd"},
-      {"key": "missed_short_putt", "label": "Missed short putt", "weight": 0.85, "content_type": "putt_highlight",
-       "pattern": "miss(ed|es)?|lip(ped)? out|rim(med)? out|short putt|choke"},
-      {"key": "dramatic_finish", "label": "Dramatic finish", "weight": 0.95, "content_type": "putt_highlight",
-       "pattern": "final hole|finish|winner|wins|champion|last putt"},
-      {"key": "rivalry", "label": "Player rivalry", "weight": 0.7, "content_type": "personality",
-       "pattern": "rival|trash talk|grudge|head to head|versus|vs\\.?"},
-      {"key": "personality", "label": "Distinctive personality", "weight": 0.65, "content_type": "personality",
-       "pattern": "interview|mic'd|character|personality|outfit|signature"}
+      {
+        "key": "impossible_putt",
+        "label": "Impossible-looking putt",
+        "weight": 1.0,
+        "content_type": "putt_highlight",
+        "pattern": "impossible|trick shot|bank|ricochet|long putt|hole in one|ace|off the wall"
+      },
+      {
+        "key": "pressure",
+        "label": "Pressure situation",
+        "weight": 0.9,
+        "content_type": "putt_highlight",
+        "pattern": "pressure|must make|to win|for the (win|title)|sudden death|playoff|clutch"
+      },
+      {
+        "key": "celebration",
+        "label": "Competitor celebration",
+        "weight": 0.75,
+        "content_type": "personality",
+        "pattern": "celebrat|fist pump|scream|jump|roar|crowd"
+      },
+      {
+        "key": "missed_short_putt",
+        "label": "Missed short putt",
+        "weight": 0.85,
+        "content_type": "putt_highlight",
+        "pattern": "miss(ed|es)?|lip(ped)? out|rim(med)? out|short putt|choke"
+      },
+      {
+        "key": "dramatic_finish",
+        "label": "Dramatic finish",
+        "weight": 0.95,
+        "content_type": "putt_highlight",
+        "pattern": "final hole|finish|winner|wins|champion|last putt"
+      },
+      {
+        "key": "rivalry",
+        "label": "Player rivalry",
+        "weight": 0.7,
+        "content_type": "personality",
+        "pattern": "rival|trash talk|grudge|head to head|versus|vs\\.?"
+      },
+      {
+        "key": "personality",
+        "label": "Distinctive personality",
+        "weight": 0.65,
+        "content_type": "personality",
+        "pattern": "interview|mic'd|character|personality|outfit|signature"
+      }
     ],
     "pln": [
-      {"key": "unfamiliar_sport", "label": "Unfamiliar-looking sport", "weight": 0.95, "content_type": "highlight",
-       "pattern": "what is this|never seen|new sport|carjitsu|tire|carrom|footgolf|mini golf|slap|coffin|rodeo"},
-      {"key": "extraordinary_athletic", "label": "Extraordinary athletic moment", "weight": 1.0, "content_type": "highlight",
-       "pattern": "incredible|athletic|insane|unreal|superhuman|flip|leap|catch"},
-      {"key": "absurd_competition", "label": "Absurd but legitimate competition", "weight": 0.9, "content_type": "highlight",
-       "pattern": "absurd|ridiculous|only at|wild|bizarre|crazy"},
-      {"key": "entertaining_personality", "label": "Entertaining personality", "weight": 0.7, "content_type": "personality",
-       "pattern": "laugh|funny|celebrat|dance|trash talk|interview"},
-      {"key": "minimal_explanation", "label": "Needs no explanation", "weight": 0.8, "content_type": "highlight",
-       "pattern": "knock|ko|finish|win|tap|ace|hole in one|dunk|slam"}
+      {
+        "key": "unfamiliar_sport",
+        "label": "Unfamiliar-looking sport",
+        "weight": 0.95,
+        "content_type": "highlight",
+        "pattern": "what is this|never seen|new sport|carjitsu|tire|carrom|footgolf|mini golf|slap|coffin|rodeo"
+      },
+      {
+        "key": "extraordinary_athletic",
+        "label": "Extraordinary athletic moment",
+        "weight": 1.0,
+        "content_type": "highlight",
+        "pattern": "incredible|athletic|insane|unreal|superhuman|flip|leap|catch"
+      },
+      {
+        "key": "absurd_competition",
+        "label": "Absurd but legitimate competition",
+        "weight": 0.9,
+        "content_type": "highlight",
+        "pattern": "absurd|ridiculous|only at|wild|bizarre|crazy"
+      },
+      {
+        "key": "entertaining_personality",
+        "label": "Entertaining personality",
+        "weight": 0.7,
+        "content_type": "personality",
+        "pattern": "laugh|funny|celebrat|dance|trash talk|interview"
+      },
+      {
+        "key": "minimal_explanation",
+        "label": "Needs no explanation",
+        "weight": 0.8,
+        "content_type": "highlight",
+        "pattern": "finish|win(s|ner)?\\b|tap(s|ped)?|ace|hole in one|dunk|buzzer|last second"
+      }
     ],
     "slapfight": [
-      {"key": "knockout", "label": "Knockout (manual review: injury-adjacent)", "weight": 0.6, "content_type": "knockout_highlight",
-       "pattern": "knock|ko\\b|drop|out cold"},
-      {"key": "reaction", "label": "Reaction", "weight": 0.8, "content_type": "personality", "pattern": "react|celebrat|shock|crowd"},
-      {"key": "personality", "label": "Personality", "weight": 0.8, "content_type": "personality", "pattern": "interview|trash talk|walkout|staredown"}
+      {
+        "key": "knockout",
+        "label": "Knockout (manual review: injury-adjacent)",
+        "weight": 0.6,
+        "content_type": "knockout_highlight",
+        "pattern": "knock|ko\\b|drop|out cold"
+      },
+      {
+        "key": "reaction",
+        "label": "Reaction",
+        "weight": 0.8,
+        "content_type": "personality",
+        "pattern": "react|celebrat|shock|crowd"
+      },
+      {
+        "key": "personality",
+        "label": "Personality",
+        "weight": 0.8,
+        "content_type": "personality",
+        "pattern": "interview|trash talk|walkout|staredown"
+      }
     ],
     "_default": [
-      {"key": "decisive_moment", "label": "Decisive moment", "weight": 0.8, "content_type": "highlight",
-       "pattern": "finish|win|tap|ace|score|knock|revers"},
-      {"key": "reaction", "label": "Reaction", "weight": 0.7, "content_type": "personality", "pattern": "react|celebrat|shock|crowd|laugh"}
+      {
+        "key": "decisive_moment",
+        "label": "Decisive moment",
+        "weight": 0.8,
+        "content_type": "highlight",
+        "pattern": "finish|win|tap|ace|score|knock|revers"
+      },
+      {
+        "key": "reaction",
+        "label": "Reaction",
+        "weight": 0.7,
+        "content_type": "personality",
+        "pattern": "react|celebrat|shock|crowd|laugh"
+      }
     ]
+  },
+  "safety": {
+    "_note": "Injury-adjacent moments (knockouts, drops, 'out cold') are never the hook: they stay visible but are ranked down and flagged for manual review.",
+    "pattern": "knock(ed)? ?out|\\bko\\b|\\bdrop(s|ped)?\\b|out cold|chin shot|devastating|concuss|unconscious|injur|blood",
+    "multiplier": 0.6
   }
 }

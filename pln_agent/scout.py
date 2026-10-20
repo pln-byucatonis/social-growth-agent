@@ -24,8 +24,9 @@ from functools import lru_cache
 
 from .config import CONFIG_DIR
 from .db import DB, now_iso
+from .ops_sources import INJURY_TAGS as INJURY
 
-SCAN_BATCH = 1500
+SCAN_BATCH = 4000
 
 
 @lru_cache(maxsize=1)
@@ -93,9 +94,15 @@ def score_clip(db: DB, clip: dict, brand_id: str, tags: list[str], people: list[
                  "duration_fit": (_duration_fit(dur), f"{dur:.0f}s clip"),
                  "novelty": (0.2 if used else 1.0, "already used in a post" if used else "not yet used"),
                  "learned": (learned, lwhy)}
-        total = round(100 * sum(w[k] * v[0] for k, v in parts.items()), 1)
-        return total, {"parts": {k: {"score": round(v[0], 3), "why": v[1], "weight": w[k]} for k, v in parts.items()},
-                       "categories": cats, "content_type": ctype}
+        total = 100 * sum(w[k] * v[0] for k, v in parts.items())
+        safety = taxonomy().get("safety") or {}
+        hit = re.search(safety["pattern"], text, re.I) if safety.get("pattern") else None
+        if hit or set(t.lower() for t in tags) & INJURY:
+            total *= safety.get("multiplier", 0.6)
+        return round(total, 1), {"parts": {k: {"score": round(v[0], 3), "why": v[1], "weight": w[k]} for k, v in parts.items()},
+                                 "categories": cats, "content_type": ctype,
+                                 "safety": (f"injury-adjacent ('{hit.group(0) if hit else 'tag'}'): ranked ×"
+                                            f"{safety.get('multiplier', 0.6)}, manual review, never the hook") if (hit or set(t.lower() for t in tags) & INJURY) else ""}
 
     own, detail = one(brand_id)
     pln, pdetail = one("pln") if brand_id != "pln" else (own, detail)

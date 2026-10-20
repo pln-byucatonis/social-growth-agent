@@ -11,6 +11,6 @@
 <td>{% if m.thumb %}<img src="{{ m.thumb }}" width="96" height="54" style="object-fit:cover;border-radius:4px" loading="lazy" alt="">{% endif %}</td>
 <td><b>{{ (m.categories or ['—'])|join(', ') }}</b><br><span class="muted">{{ m.brand_id }} · {{ '%.0f'|format(m.start_sec) }}–{{ '%.0f'|format(m.end_sec) }}s · {{ m.status }}</span><br><span class="muted">{{ m.caption[:120] }}</span></td>
 <td><b>{{ '%.0f'|format(m.pln_potential if view == 'pln' else m.potential) }}</b></td>
-<td class="muted">{% for k, x in m.detail.parts.items() %}{{ k }} {{ '%.2f'|format(x.score) }} <span title="{{ x.why }}">ⓘ</span> · {% endfor %}<br>{{ m.detail.parts.category.why }} · {{ m.detail.parts.learned.why }}</td></tr>{% else %}<tr><td class="muted" colspan="5">No moments yet.</td></tr>{% endfor %}</table>
+<td class="muted">{% for k, x in m.detail.parts.items() %}{{ k }} {{ '%.2f'|format(x.score) }} <span title="{{ x.why }}">ⓘ</span> · {% endfor %}<br>{{ m.detail.parts.category.why }} · {{ m.detail.parts.learned.why }}{% if m.detail.safety %}<br><span class="badge warn">{{ m.detail.safety }}</span>{% endif %}</td></tr>{% else %}<tr><td class="muted" colspan="5">No moments yet.</td></tr>{% endfor %}</table>
 <button class="primary">Make drafts from selected</button> <span class="muted">Creates assets + a creative package per moment; rights and identity gates still apply.</span></form></div></div>
 {% endblock %}
