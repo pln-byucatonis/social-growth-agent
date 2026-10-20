@@ -120,7 +120,7 @@
       "slot": "2026-10-24 13:00:00-04:00",
       "route_role": "pln_amplification",
       "asset_id": "carjitsu-sample-001",
-      "hook": "Did you catch this CarJitsu moment?",
+      "hook": "New to CarJitsu? Start with this one.",
       "state": "in_review",
       "score": 0.891
     },
@@ -164,7 +164,7 @@
       "slot": "2026-10-25 13:00:00-04:00",
       "route_role": "pln_amplification",
       "asset_id": "putt-sample-002",
-      "hook": "Did you catch this Putt Tour moment?",
+      "hook": "New to Putt Tour? Start with this one.",
       "state": "in_review",
       "score": 0.819
     },

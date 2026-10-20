@@ -84,18 +84,28 @@ def _label(tags: list[str]) -> str:
 INJURY_TAGS = {"knockout", "ko", "tko", "injury", "blood", "down_hard"}
 # Neutral, name-free descriptions of the action, used instead of the machine caption when the clip's
 # athletes are unverified (machine captions routinely contain fighter names and nicknames).
+# Several phrasings per tag, picked per clip, so a feed of submissions doesn't read like one post repeated.
 TAG_SENTENCES = {
-    "submission": "A submission ends it.", "flush_slap": "A flush slap lands.", "knockout": "The exchange ends the match.",
-    "reversal": "A reversal flips the position.", "tap": "The tap comes.", "three_pointer": "The shot drops from deep.",
-    "putt": "The putt drops.", "hole_in_one": "It drops for a hole-in-one.", "dunk": "The dunk lands.",
+    "submission": ["A submission ends it.", "The hold gets locked in, and that's the match.", "One grip changes everything.",
+                   "Trapped with nowhere to go, the tap is the only way out."],
+    "flush_slap": ["A flush slap lands.", "Clean contact, right on target.", "That's what a perfect strike looks like."],
+    "knockout": ["The exchange ends the match.", "One strike decides it.", "That's the end of the bout."],
+    "reversal": ["A reversal flips the position.", "From the bottom to the top in one move.", "The position flips in an instant."],
+    "tap": ["The tap comes.", "And there's the tap."],
+    "three_pointer": ["The shot drops from deep.", "Pull-up from range, and it's good."],
+    "putt": ["The putt drops.", "Pressure putt, right in the cup."],
+    "hole_in_one": ["It drops for a hole-in-one."], "dunk": ["The dunk lands."],
 }
+GENERIC_SENTENCES = ["The decisive moment.", "This is the moment the match turns.", "Watch how this one ends."]
 
 
-def neutral_description(tags: list[str]) -> str:
+def neutral_description(tags: list[str], seed: str = "") -> str:
+    h = int(hashlib.sha1(seed.encode()).hexdigest(), 16) if seed else 0
     for t in tags:
         if t in TAG_SENTENCES:
-            return TAG_SENTENCES[t]
-    return "The decisive moment."
+            opts = TAG_SENTENCES[t]
+            return opts[h % len(opts)]
+    return GENERIC_SENTENCES[h % len(GENERIC_SENTENCES)]
 
 
 FINISH_TAGS = {"submission", "flush_slap", "knockout", "ko", "tap", "pin", "win", "hole_in_one"}
@@ -166,10 +176,11 @@ def import_ops_clips(db: DB, ops: DB, assets_bucket: str, limit: int = 100, min_
         people = talent.get(c["id"], [])
         identities_ok = bool(rights.get("people_verified")) or (bool(people) and all(p["verified"] for p in people))
         # Copy is built from the description: never feed it machine text that may name unverified athletes.
-        safe_caption = (c["caption"] or "").strip() if identities_ok else neutral_description(ctags)
+        safe_caption = (c["caption"] or "").strip() if identities_ok else neutral_description(ctags, c["id"])
         row = {
             "asset_id": aid, "brand_id": canonical_brand_id(brand), "source_brand_name": brand["name"],
-            "title": f"{_label(ctags)} — {c['source_title'] or c['property']}",
+            # source titles are raw master filenames; never put them in copy or thumbnails
+            "title": f"{_label(ctags)} — {brand['name']}" + (f" ({c['aired_date']})" if c["aired_date"] else ""),
             "description": safe_caption,
             "media_path": f"s3://{assets_bucket}/{c['vertical_key']}" if rel else f"s3://{c['source_bucket']}/{c['source_key']}",
             "media_present": True, "sha256": "", "content_id": c["id"], "parent_asset_id": "",

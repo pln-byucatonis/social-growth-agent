@@ -129,19 +129,21 @@ ALT HOOKS: ["Send this to someone who thinks grappling inside a car isn't a spor
 SCORE 0.891: empirical=0.5 (no data: fewer than 3 measured 'The Moment' posts on this ac); platform_fit=0.7 (source 1920x1080 must be reframed to 1080x1920 (crop risk: c); rights=1.0 (clear); source=0.9 (peak intensity 0.9 from annotated moments at 00:03.00–00:09.); timeliness=1.0 (event 2d ago; upcoming CarJitsu Fall Card (SAMPLE) on 2026-1)
 
 --- FACEBOOK → pln.facebook.pro_league_network [pln_amplification] series='Full Finish Friday' format=native video 4:5 (feed) with burned captions; full sequence
-HOOK: Did you catch this CarJitsu moment?
+HOOK: New to CarJitsu? Start with this one.
 CAPTION:
-  Did you catch this CarJitsu moment?
+  New to CarJitsu? Start with this one.
+  
+  CarJitsu is grappling inside a car, one of the sports on the Pro League Network.
   
   A scramble in the back seat ends with the bottom competitor reversing position.
   
-  CarJitsu matches take place inside a car.
+  Seen this sport before? Tell us where you first found it.
   
-  Drop your answer below: Tap or keep fighting?
+  More from CarJitsu: @carjitsu_championship
   
   Next up: CarJitsu Fall Card (SAMPLE) (2026-10-24).
 EDL: cut 2.00s–27.00s full sequence (annotated 00:03.00–00:26.00)
-OUTPUT: {'h': 1350, 'reframe': 'pad_or_crop_4x5', 'w': 1080} · ON-SCREEN: ['Did you catch this CarJitsu moment?']
+OUTPUT: {'h': 1350, 'reframe': 'pad_or_crop_4x5', 'w': 1080} · ON-SCREEN: ['New to CarJitsu? Start with this one.']
 HASHTAGS: ['#CarJitsu'] — #CarJitsu = owned brand tag: lets fans find the property's archive. No trend tags: we have no verified trend data.
 CTA: Comment your call and share with the fan who'd argue with you · ANGLE: community conversation + return viewing
 TEST: Specific debate question vs. generic 'thoughts?' raises meaningful comments per 1k reached.
@@ -173,10 +175,10 @@ ALT HOOKS: ['What CarJitsu teaches about building sports audiences']
 SCORE 0.957: empirical=0.5 (no data: fewer than 3 measured 'Why This Sport Works' posts ); platform_fit=1.0 (source 1920x1080 matches target orientation); rights=1.0 (clear); source=0.9 (peak intensity 0.9 from annotated moments at 00:03.00–00:09.); timeliness=1.0 (event 2d ago; upcoming CarJitsu Fall Card (SAMPLE) on 2026-1)
 
 Caption similarity matrix (trigram Jaccard; gate rejects > 0.45):
-  tiktok    1.00 0.22 0.03 0.09
-  instagram 0.22 1.00 0.07 0.12
-  facebook  0.03 0.07 1.00 0.03
-  linkedin  0.09 0.12 0.03 1.00
+  tiktok    1.00 0.22 0.00 0.09
+  instagram 0.22 1.00 0.01 0.12
+  facebook  0.00 0.01 1.00 0.01
+  linkedin  0.09 0.12 0.01 1.00
 
 ====================================================================================================
 5) NATIVE MEDIA PACKAGING (FFmpeg) — real renders from SAMPLE clips; EDL-only when media missing
@@ -210,11 +212,11 @@ Fri 2026-10-23
   16:00  youtube   carjitsu.youtube.carjitsuchampionship6540        [canonical] in_review “Reversal | CarJitsu Championship”
   18:30  instagram pln.instagram.proleaguenetwork                   [pln_amplification] in_review “Sports you didn't know you needed: Putt Tour”
 Sat 2026-10-24
-  13:00  facebook  pln.facebook.pro_league_network                  [pln_amplification] in_review “Did you catch this CarJitsu moment?”
+  13:00  facebook  pln.facebook.pro_league_network                  [pln_amplification] in_review “New to CarJitsu? Start with this one.”
   16:00  youtube   pln.youtube.proleaguenetwork                     [pln_amplification] in_review “Putt Tour in one moment | PLN Network Picks”
   19:30  tiktok    pln.tiktok.proleaguenetwork                      [pln_amplification] in_review “How does this even work inside a car?”
 Sun 2026-10-25
-  13:00  facebook  pln.facebook.pro_league_network                  [pln_amplification] in_review “Did you catch this Putt Tour moment?”
+  13:00  facebook  pln.facebook.pro_league_network                  [pln_amplification] in_review “New to Putt Tour? Start with this one.”
   16:00  youtube   pln.youtube.proleaguenetwork                     [pln_amplification] in_review “CarJitsu in one moment | PLN Network Picks”
   19:30  tiktok    pln.tiktok.proleaguenetwork                      [pln_amplification] in_review “How does this even work on the green?”
 Mon 2026-10-26
@@ -251,23 +253,23 @@ Mon 2026-10-26
     x          needs_fix  2
     youtube    in_review  4
     youtube    needs_fix  3
-  SCHEDULE carjitsu-sample-001:carjitsu.tiktok.carjitsuchampionship           → job job-c3a2d12563 key=374579bde8f3…
-  SCHEDULE putt-sample-002:putt_tour.instagram.putttour                       → job job-d04c33a817 key=b468730c4019…
-  SCHEDULE carjitsu-sample-001:pln.linkedin.pending                           → job job-115e6bc4c4 key=d86d96767784…
+  SCHEDULE carjitsu-sample-001:carjitsu.tiktok.carjitsuchampionship           → job job-45f6fb4314 key=374579bde8f3…
+  SCHEDULE putt-sample-002:putt_tour.instagram.putttour                       → job job-64d74908b3 key=b468730c4019…
+  SCHEDULE carjitsu-sample-001:pln.linkedin.pending                           → job job-9627042ad3 key=d86d96767784…
   SCHEDULE carjitsu-sample-001:carjitsu.instagram.carjitsu_championship       → REFUSED: only approved variants can be scheduled (state=in_review)
   SCHEDULE (double-submit of same post)                            → REFUSED: duplicate: an identical post for this account already has a publish job
   EMERGENCY STOP ON → publisher: [{'skipped': 'emergency stop is ON'}]
-  PUBLISH (dry-run) job-c3a2d12563 → simulated; not live because: ['global dry-run is ON (PLN_DRY_RUN)', 'global publishing disabled (PLN_PUBLISHING_ENABLED)', 'account is unverified, not oauth_connected', 'no credential reference configured', 'publishing not authorized for this account']
-  PUBLISH (dry-run) job-d04c33a817 → simulated; not live because: ['global dry-run is ON (PLN_DRY_RUN)', 'global publishing disabled (PLN_PUBLISHING_ENABLED)', 'account is unverified, not oauth_connected', 'no credential reference configured', 'publishing not authorized for this account']
-  PUBLISH (dry-run) job-115e6bc4c4 → simulated; not live because: ['global dry-run is ON (PLN_DRY_RUN)', 'global publishing disabled (PLN_PUBLISHING_ENABLED)', 'hard block: No LinkedIn company Page ID supplied: connect via OAuth with Page admin role first', 'account is unverified, not oauth_connected', 'no credential reference configured', 'publishing not authorized for this account']
+  PUBLISH (dry-run) job-45f6fb4314 → simulated; not live because: ['global dry-run is ON (PLN_DRY_RUN)', 'global publishing disabled (PLN_PUBLISHING_ENABLED)', 'account is unverified, not oauth_connected', 'no credential reference configured', 'publishing not authorized for this account']
+  PUBLISH (dry-run) job-64d74908b3 → simulated; not live because: ['global dry-run is ON (PLN_DRY_RUN)', 'global publishing disabled (PLN_PUBLISHING_ENABLED)', 'account is unverified, not oauth_connected', 'no credential reference configured', 'publishing not authorized for this account']
+  PUBLISH (dry-run) job-9627042ad3 → simulated; not live because: ['global dry-run is ON (PLN_DRY_RUN)', 'global publishing disabled (PLN_PUBLISHING_ENABLED)', 'hard block: No LinkedIn company Page ID supplied: connect via OAuth with Page admin role first', 'account is unverified, not oauth_connected', 'no credential reference configured', 'publishing not authorized for this account']
   → simulated receipts incl. exact (token-redacted) API requests: simulated_receipts.json
 
 ====================================================================================================
 8) LIVE-PATH REHEARSAL WITH A MOCK TRANSPORT (no network; proves retry/backoff/idempotency/error handling)
 ====================================================================================================
-  2026-10-21T16:00:00+00:00 → [{'job_id': 'job-c5f0402d5c', 'state': 'retry_scheduled', 'next_attempt_at': '2026-10-21T16:01:00+00:00', 'error': 'x create post: HTTP 503 {"title": "Service Unavailable"}'}]
-  2026-10-21T16:01:01+00:00 → [{'job_id': 'job-c5f0402d5c', 'state': 'retry_scheduled', 'next_attempt_at': '2026-10-21T16:03:01+00:00', 'error': 'x create post: HTTP 429 {"title": "Too Many Requests"}'}]
-  2026-10-21T16:03:02+00:00 → [{'job_id': 'job-c5f0402d5c', 'state': 'published', 'permalink': 'https://x.com/carjitsuusa/status/1850000000000000001'}]
+  2026-10-21T16:00:00+00:00 → [{'job_id': 'job-c4f8db5b53', 'state': 'retry_scheduled', 'next_attempt_at': '2026-10-21T16:01:00+00:00', 'error': 'x create post: HTTP 503 {"title": "Service Unavailable"}'}]
+  2026-10-21T16:01:01+00:00 → [{'job_id': 'job-c4f8db5b53', 'state': 'retry_scheduled', 'next_attempt_at': '2026-10-21T16:03:01+00:00', 'error': 'x create post: HTTP 429 {"title": "Too Many Requests"}'}]
+  2026-10-21T16:03:02+00:00 → [{'job_id': 'job-c4f8db5b53', 'state': 'published', 'permalink': 'https://x.com/carjitsuusa/status/1850000000000000001'}]
   final job: {'state': 'published', 'attempts': 3, 'permalink': 'https://x.com/carjitsuusa/status/1850000000000000001'} · HTTP calls made: 3 (Authorization header redacted in logs)
   re-run publisher after success → nothing due (no duplicate post; calls still 3)
   401 Unauthorized → failed (kind=auth); no retry storm; rollback guidance stored

@@ -37,7 +37,8 @@ def test_db_url() -> str:
 def make(packs=True, **overrides):
     tmp = Path(tempfile.mkdtemp(prefix="pln-test-"))
     s = replace(load_settings(), dry_run=True, publishing_enabled=False, database_url="sqlite:///:memory:",
-                render_dir=tmp / "renders", media_inbox=ROOT / "sample_media" / "inbox", **overrides)
+                render_dir=tmp / "renders", media_inbox=ROOT / "sample_media" / "inbox",
+                content_calendar_csv=ROOT / "sample_media" / "content_calendar.sample.csv", **overrides)
     db = DB(test_db_url())
     acc_mod.load_accounts(db, actor="test")
     mig.sync_decisions(db)

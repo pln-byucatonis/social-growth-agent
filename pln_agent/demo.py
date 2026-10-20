@@ -58,6 +58,7 @@ def run_demo(out_dir: Path) -> dict:
     out_dir.mkdir(parents=True, exist_ok=True)
     settings = load_settings()
     settings = replace(settings, dry_run=True, publishing_enabled=False, render_dir=out_dir / "renders",
+                       content_calendar_csv=ROOT / "sample_media" / "content_calendar.sample.csv",
                        database_url=f"sqlite:///{out_dir / 'demo.db'}")
     dbfile = out_dir / "demo.db"
     for f in (dbfile, Path(str(dbfile) + "-wal"), Path(str(dbfile) + "-shm")):

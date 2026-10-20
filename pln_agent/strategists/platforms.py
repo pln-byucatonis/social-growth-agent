@@ -302,6 +302,12 @@ class FacebookStrategist(Strategist):
         if _first_fact(ctx):
             lines.append(_sentence(_first_fact(ctx)))
         lines.append(f"Drop your answer below: {L['debate']}")
+        if ctx.route_role == "pln_amplification":  # PLN's page = the network's front door, not a repost of the property page
+            h = Hook(f"New to {L['noun']}? Start with this one.", p, "network_intro", 0.85, 0.7, 0.95)
+            lines = [h.text, f"{L['noun']} is {L['what']}, one of the sports on the Pro League Network.",
+                     _sentence(ctx.asset.get("description") or (p.description if p else "")),
+                     f"Seen this sport before? Tell us where you first found it.",
+                     f"More from {L['noun']}: {ctx.canonical_handle}"]
         if ctx.upcoming_event:
             lines.append(f"Next up: {ctx.upcoming_event['event_name']} ({ctx.upcoming_event['date']}).")
         if ctx.utm_url:
@@ -365,7 +371,7 @@ class LinkedInStrategist(Strategist):
 
 class YouTubeStrategist(Strategist):
     platform = "youtube"
-    spec = {"caption_max": 5000, "hashtags_max": 3, "title_max": 100, "min_s": 8, "max_s": 60, "aspect": "9:16",
+    spec = {"caption_max": 5000, "hashtags_max": 3, "title_max": 100, "min_s": 5, "max_s": 60, "aspect": "9:16",
             "north_star": "watch time, subs gained, Shorts→long-form", "audience": "search + Shorts feed"}
 
     def hooks(self, ctx):
@@ -408,7 +414,7 @@ class YouTubeStrategist(Strategist):
 
 class XStrategist(Strategist):
     platform = "x"
-    spec = {"caption_max": 280, "hashtags_max": 1, "min_s": 3, "max_s": 30, "aspect": "16:9",
+    spec = {"caption_max": 280, "hashtags_max": 1, "min_s": 2, "max_s": 30, "aspect": "16:9",
             "north_star": "replies + link clicks in live windows", "audience": "live/real-time fans, media"}
 
     def hooks(self, ctx):

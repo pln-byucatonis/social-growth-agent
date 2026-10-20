@@ -1,7 +1,7 @@
 [
   {
     "variant_id": "carjitsu-sample-001:carjitsu.tiktok.carjitsuchampionship",
-    "pack_id": "pack-carjitsu-sample-001-24526c",
+    "pack_id": "pack-carjitsu-sample-001-24c1fa",
     "asset_id": "carjitsu-sample-001",
     "account_id": "carjitsu.tiktok.carjitsuchampionship",
     "platform": "tiktok",
@@ -158,12 +158,12 @@
     "caption_hash": "262148f29edb0630",
     "render_status": "not_rendered",
     "render_path": "",
-    "created_at": "2026-10-20T15:20:21+00:00",
-    "updated_at": "2026-10-20T15:20:21+00:00"
+    "created_at": "2026-10-20T16:37:13+00:00",
+    "updated_at": "2026-10-20T16:37:13+00:00"
   },
   {
     "variant_id": "carjitsu-sample-001:carjitsu.instagram.carjitsu_championship",
-    "pack_id": "pack-carjitsu-sample-001-24526c",
+    "pack_id": "pack-carjitsu-sample-001-24c1fa",
     "asset_id": "carjitsu-sample-001",
     "account_id": "carjitsu.instagram.carjitsu_championship",
     "platform": "instagram",
@@ -316,12 +316,12 @@
     "caption_hash": "f360d99ae0efb8e8",
     "render_status": "not_rendered",
     "render_path": "",
-    "created_at": "2026-10-20T15:20:21+00:00",
-    "updated_at": "2026-10-20T15:20:21+00:00"
+    "created_at": "2026-10-20T16:37:13+00:00",
+    "updated_at": "2026-10-20T16:37:13+00:00"
   },
   {
     "variant_id": "carjitsu-sample-001:pln.facebook.pro_league_network",
-    "pack_id": "pack-carjitsu-sample-001-24526c",
+    "pack_id": "pack-carjitsu-sample-001-24c1fa",
     "asset_id": "carjitsu-sample-001",
     "account_id": "pln.facebook.pro_league_network",
     "platform": "facebook",
@@ -329,7 +329,7 @@
     "route_role": "pln_amplification",
     "series": "Full Finish Friday",
     "format": "native video 4:5 (feed) with burned captions; full sequence",
-    "hook": "Did you catch this CarJitsu moment?",
+    "hook": "New to CarJitsu? Start with this one.",
     "hook_candidates": [
       {
         "score": 0.835,
@@ -351,7 +351,7 @@
       }
     ],
     "title": "Bottom-position reversal (SAMPLE)",
-    "caption": "Did you catch this CarJitsu moment?\n\nA scramble in the back seat ends with the bottom competitor reversing position.\n\nCarJitsu matches take place inside a car.\n\nDrop your answer below: Tap or keep fighting?\n\nNext up: CarJitsu Fall Card (SAMPLE) (2026-10-24).",
+    "caption": "New to CarJitsu? Start with this one.\n\nCarJitsu is grappling inside a car, one of the sports on the Pro League Network.\n\nA scramble in the back seat ends with the bottom competitor reversing position.\n\nSeen this sport before? Tell us where you first found it.\n\nMore from CarJitsu: @carjitsu_championship\n\nNext up: CarJitsu Fall Card (SAMPLE) (2026-10-24).",
     "hashtags": [
       "#CarJitsu"
     ],
@@ -362,7 +362,7 @@
         "end": 3.0,
         "position": "top",
         "start": 0.0,
-        "text": "Did you catch this CarJitsu moment?"
+        "text": "New to CarJitsu? Start with this one."
       }
     ],
     "edl": {
@@ -442,15 +442,15 @@
       }
     },
     "state": "in_review",
-    "caption_hash": "192518571a776fad",
+    "caption_hash": "6aff73b80d63b180",
     "render_status": "not_rendered",
     "render_path": "",
-    "created_at": "2026-10-20T15:20:21+00:00",
-    "updated_at": "2026-10-20T15:20:21+00:00"
+    "created_at": "2026-10-20T16:37:13+00:00",
+    "updated_at": "2026-10-20T16:37:13+00:00"
   },
   {
     "variant_id": "carjitsu-sample-001:pln.linkedin.pending",
-    "pack_id": "pack-carjitsu-sample-001-24526c",
+    "pack_id": "pack-carjitsu-sample-001-24c1fa",
     "asset_id": "carjitsu-sample-001",
     "account_id": "pln.linkedin.pending",
     "platform": "linkedin",
@@ -581,7 +581,7 @@
     "caption_hash": "30c0534f2a8eed3d",
     "render_status": "not_rendered",
     "render_path": "",
-    "created_at": "2026-10-20T15:20:21+00:00",
-    "updated_at": "2026-10-20T15:20:21+00:00"
+    "created_at": "2026-10-20T16:37:13+00:00",
+    "updated_at": "2026-10-20T16:37:13+00:00"
   }
 ]

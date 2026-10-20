@@ -21,6 +21,13 @@ class FakeRdsClient:
         return {"formattedRecords": '[{"n": 1}]'}
 
 
+class ProductionConfigTests(unittest.TestCase):
+    def test_shipped_content_calendar_has_no_sample_events(self):
+        from pln_agent.config import CONFIG_DIR
+        rows = (CONFIG_DIR / "content_calendar.csv").read_text().strip().splitlines()
+        self.assertEqual(len(rows), 1, "config/content_calendar.csv must hold only official events (header only by default)")
+
+
 class RdsDataTests(unittest.TestCase):
     def test_placeholders_and_typed_params(self):
         r = object.__new__(_RdsData)
@@ -139,7 +146,9 @@ class OpsImportTests(unittest.TestCase):
         import_ops_clips(self.db, self.ops, "b", min_score=50)
         a = self.db.get("assets", "asset_id", clip_asset_id("CJ.mp4:10-24"))
         # machine caption/transcript/event title are kept for reviewers but not used for copy
-        self.assertEqual(a["description"], "A submission ends it.")
+        from pln_agent.ops_sources import TAG_SENTENCES
+        self.assertIn(a["description"], TAG_SENTENCES["submission"])
+        self.assertNotIn("CJ ep 1", a["title"])  # raw source titles never reach copy
         self.assertEqual(a["transcript"], [])
         self.assertEqual(a["probe"]["ops_clip"]["machine_caption"], "Back-seat reversal into a submission.")
         self.assertIn("people/athlete identities not verified", evaluate(a).blockers)  # default policy blocks
