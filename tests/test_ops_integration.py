@@ -21,6 +21,31 @@ class FakeRdsClient:
         return {"formattedRecords": '[{"n": 1}]'}
 
 
+class MergePeopleTests(unittest.TestCase):
+    def test_tagger_variants_collapse_to_the_ops_name(self):
+        from pln_agent.ops_sources import merge_people
+        raw = [{"name": "OKUMA 915", "verified": False, "detected_by": "nova"},
+               {"name": "RUNT", "verified": False, "detected_by": "nova"},
+               {"name": "Okuma 915", "verified": False, "detected_by": "nova"},
+               {"name": "Runt", "verified": False, "detected_by": "face"},
+               {"name": "person #136", "verified": False, "detected_by": "face"}]
+        out = merge_people(raw, {"okuma": {"id": 1294, "name": "Okuma"}})
+        self.assertEqual([p["name"] for p in out], ["Okuma", "Runt"])
+        self.assertEqual(out[0]["ops_person_id"], 1294)
+        self.assertEqual(out[0]["aliases"], ["Okuma 915"])  # "OKUMA 915" folds case-insensitively
+        self.assertEqual(out[1]["name"], "Runt")  # face-detected mixed case wins over OCR caps
+        self.assertNotIn("aliases", out[1])        # spellings differing only by case are one name
+        self.assertEqual(out[1]["detected_by"], "face+nova")
+
+    def test_every_spelling_is_still_withheld_from_copy(self):
+        from types import SimpleNamespace
+        asset = {"people": [{"name": "Okuma", "aliases": ["OKUMA 915", "Okuma 915"], "verified": False}],
+                 "people_verified": False}
+        ctx = SimpleNamespace(asset=asset, display_brand="SlapFIGHT", canonical_handle="", grounding_corpus="915")
+        errs = common_violations("okuma 915 lands it", ctx)
+        self.assertTrue(any("unverified person" in e for e in errs), errs)
+
+
 class JunkNameTests(unittest.TestCase):
     def test_junk_detection(self):
         from pln_agent.strategists.base import is_junk_name
@@ -118,9 +143,9 @@ CREATE TABLE clip_sources (id text PRIMARY KEY, bucket text, property text, titl
 CREATE TABLE clips (id text PRIMARY KEY, source_id text, property text, start_sec numeric, end_sec numeric,
   peak_offset_sec numeric, moment_offset_sec numeric, highlight_score integer, caption text, transcript text,
   source_bucket text, source_key text, vertical_key text, vertical_mode text, status text, superseded_by text,
-  thumb_key text);
+  thumb_key text, energy_score real, vertical_subject text);
 CREATE TABLE clip_tags (clip_id text, tag text, source text);
-CREATE TABLE people (id bigint PRIMARY KEY, name text);
+CREATE TABLE people (id bigint PRIMARY KEY, name text, aliases jsonb DEFAULT '[]', hidden boolean DEFAULT false);
 CREATE TABLE clip_talent (clip_id text, name_raw text, person_id bigint, source text);
 INSERT INTO social_account (brand, platform, platform_account_id, handle, display_name, status) VALUES
   ('putt-tour','instagram','17841400000000001','@putttour','Putt Tour','active'),
@@ -136,9 +161,41 @@ INSERT INTO clips VALUES
   'pln-vod-library','PLNstudio/CJ.mp4',NULL,NULL,'tagged','CJ.mp4:60-71'),
  ('X.mp4:1-9','pln-vod-library/PLNstudio/CJ.mp4','Mystery',1,9,2,2,99,'Unknown',NULL,'b','k',NULL,NULL,'tagged',NULL);
 INSERT INTO clip_tags VALUES ('CJ.mp4:10-24','submission','nova');
-INSERT INTO people VALUES (7,'Athlete Seven');
+INSERT INTO people VALUES (7,'Athlete Seven','[]',false), (8,'Okuma','[]',false), (9,NULL,'[]',true);
 INSERT INTO clip_talent VALUES ('CJ.mp4:10-24','ATHLETE SEVEN',7,'face');
 """
+
+
+class BulkReviewTests(unittest.TestCase):
+    def setUp(self):
+        self.db, self.s = make()
+
+    def _pick(self, vid):
+        return (vid, self.db.get("variants", "variant_id", vid)["caption_hash"])
+
+    def test_bulk_approve_skips_sensitive_and_changed_copy(self):
+        from pln_agent.workflow import bulk_review, edit_variant
+        ok = "carjitsu-sample-001:carjitsu.tiktok.carjitsuchampionship"
+        sensitive = "putt-sample-002:putt_tour.instagram.putttour"   # paid partnership → two-person
+        changed = "carjitsu-sample-001:carjitsu.x.carjitsuusa"
+        picks = [self._pick(ok), self._pick(sensitive), self._pick(changed)]
+        v = self.db.get("variants", "variant_id", changed)
+        edit_variant(self.db, changed, {"caption": v["caption"] + " Watch it again."}, "editor")
+        r = bulk_review(self.db, picks, "by@pln", "approve")
+        self.assertEqual(r["done"], [ok])
+        self.assertIn("two-person", r["skipped"][sensitive])
+        self.assertIn("copy changed", r["skipped"][changed])
+        self.assertEqual(self.db.get("variants", "variant_id", ok)["state"], "approved")
+        self.assertEqual(self.db.get("variants", "variant_id", sensitive)["state"], "in_review")
+
+    def test_bulk_reject_needs_a_note_and_records_each(self):
+        from pln_agent.workflow import WorkflowError, bulk_review
+        vid = "wpl-archive-003:putt_tour.instagram.putttour"
+        with self.assertRaises(WorkflowError):
+            bulk_review(self.db, [self._pick(vid)], "by@pln", "reject")
+        r = bulk_review(self.db, [self._pick(vid)], "by@pln", "reject", "off-brand")
+        self.assertEqual(r["done"], [vid])
+        self.assertEqual(self.db.get("variants", "variant_id", vid)["state"], "rejected")
 
 
 @unittest.skipUnless(PG, "set PLN_TEST_DATABASE_URL to run the ops import against Postgres")
@@ -168,7 +225,8 @@ class OpsImportTests(unittest.TestCase):
         self.assertEqual(a["media_path"], "s3://assets-bucket/verticals/CJ-10-24_9x16.mp4")
         self.assertEqual(a["brand_id"], "carjitsu")
         self.assertEqual(a["moments"][1]["kind"], "finish")
-        self.assertEqual(a["people"], [{"name": "Athlete Seven", "verified": False, "detected_by": "face"}])
+        self.assertEqual(a["people"], [{"name": "Athlete Seven", "verified": False, "detected_by": "face",
+                                        "ops_person_id": 7}])
         self.assertTrue(a["flags"]["combat"])
         ev = evaluate(a)
         self.assertIn("media rights not verified", ev.blockers)
@@ -214,6 +272,21 @@ class OpsImportTests(unittest.TestCase):
         finally:
             os.environ.pop("PLN_IDENTITY_POLICY")
 
+    def test_import_shares_slots_across_properties_and_keeps_thin_p0_libraries(self):
+        self.ops.execute(
+            "INSERT INTO clip_sources VALUES ('s/PT.mp4','b','PuttTour','PT',NULL,600);"
+            "INSERT INTO clips (id, source_id, property, start_sec, end_sec, highlight_score, caption, source_bucket,"
+            " source_key, status) VALUES "
+            "('PT:1','s/PT.mp4','PuttTour',0,10,35,'Long putt drops.','b','PT.mp4','tagged'),"
+            "('PT:2','s/PT.mp4','PuttTour',10,20,20,'Course overview.','b','PT.mp4','tagged'),"
+            + ",".join(f"('CJ:x{i}','pln-vod-library/PLNstudio/CJ.mp4','CarJitsu',{i},{i + 5},{60 + i},'c','b','k','tagged')"
+                       for i in range(10)))
+        r = import_ops_clips(self.db, self.ops, "b", limit=4, min_score=50)
+        ids = {a["content_id"] for a in self.db.all("assets") if a["content_id"]}
+        self.assertIn("PT:1", ids)        # P0 brand below the global floor but above the priority floor
+        self.assertNotIn("PT:2", ids)     # junk-level score never imported
+        self.assertEqual(r["imported"], 3)  # 4 picked: PT:1 + 2 CarJitsu (P0) per round, Mystery (score 99) skipped
+
     def test_rights_overlay_survives_reimport(self):
         import_ops_clips(self.db, self.ops, "b", min_score=50)
         aid = clip_asset_id("CJ.mp4:10-24")
@@ -249,6 +322,21 @@ class ProxiedDashboardTests(unittest.TestCase):
         from pln_agent.web import app as webapp
         from pln_agent.config import load_settings
         webapp.settings = load_settings()
+
+    def test_queue_bulk_route_approves_selected_posts(self):
+        vid = "carjitsu-sample-001:carjitsu.tiktok.carjitsuchampionship"
+        h = self.db.get("variants", "variant_id", vid)["caption_hash"]
+        page = self.c.get("/queue", headers=self.h).text
+        self.assertIn(f'value="{vid}|{h}"', page)
+        self.assertIn("Approve selected", page)
+        admin = {**self.h, "X-PLN-User-Admin": "1"}
+        r = self.c.post("/queue/bulk", headers=admin, data={"pick": [f"{vid}|{h}"], "decision": "approve"},
+                        follow_redirects=False)
+        self.assertEqual(r.status_code, 303)
+        self.assertIn("Approved+1", r.headers["location"])
+        self.assertEqual(self.db.get("variants", "variant_id", vid)["state"], "approved")
+        self.assertIn("err=", self.c.post("/queue/bulk", headers=admin, data={"decision": "approve"},
+                                          follow_redirects=False).headers["location"])
 
     def test_requires_proxy_key_and_identity(self):
         self.assertEqual(self.c.get("/queue").status_code, 401)

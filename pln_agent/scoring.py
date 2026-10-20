@@ -31,8 +31,12 @@ def _source(asset: dict, variant: dict) -> tuple[float, str]:
     inten = max((m.get("intensity", 0.5) for m in (used or moments)), default=0.5)
     if not asset.get("media_present"):
         return round(inten * 0.5, 3), f"peak intensity {inten} (annotated) but media file missing → halved"
-    return round(inten, 3), f"peak intensity {inten} from annotated moments at " + \
-        ", ".join(s["source_timecode"] for s in segs)
+    why = f"peak intensity {inten} from annotated moments at " + ", ".join(s["source_timecode"] for s in segs)
+    energy = ((asset.get("probe") or {}).get("ops_clip") or {}).get("energy_score")
+    if energy is not None:  # ops tagger's audio/motion energy: a second, independent read on the moment
+        inten = 0.8 * inten + 0.2 * min(max(float(energy), 0.0), 1.0)
+        why += f"; ops energy {float(energy):.2f} blended in (20%)"
+    return round(inten, 3), why
 
 
 def _fit(asset: dict, variant: dict) -> tuple[float, str]:

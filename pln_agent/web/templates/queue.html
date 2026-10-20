@@ -1,12 +1,23 @@
 {% extends "base.html" %}{% block body %}
 <div class="card"><form method="get"><div class="grid"><select name="platform"><option value="">all platforms</option>{% for p in platforms %}<option {{ 'selected' if p==platform }}>{{ p }}</option>{% endfor %}</select>
 <select name="state"><option value="">all states</option>{% for s in ['needs_fix','in_review','approved','scheduled','simulated','published','failed','rejected','cancelled'] %}<option {{ 'selected' if s==state }}>{{ s }}</option>{% endfor %}</select><button>Filter</button></div></form></div>
-<div class="card tablewrap"><p class="muted">{{ total }} posts match{% if total > limit %}; showing the top {{ limit }} by platform, state and score. Filter by platform or state to see the rest{% endif %}.</p><table><tr><th></th><th>platform</th><th>destination</th><th>state</th><th>hook</th><th>risk</th><th>permission</th><th>score</th></tr>
+<form method="post" action="{{ base }}/queue/bulk" id="bulk">
+<input type="hidden" name="back_to" value="/queue{% if platform or state %}?{% if platform %}platform={{ platform|urlencode }}{% endif %}{% if platform and state %}&{% endif %}{% if state %}state={{ state|urlencode }}{% endif %}{% endif %}">
+<div class="card tablewrap"><p class="muted">{{ total }} posts match{% if total > limit %}; showing the top {{ limit }} by platform, state and score. Filter by platform or state to see the rest{% endif %}.</p><table class="queue"><tr><th><input type="checkbox" aria-label="select all" onclick="for(const c of document.querySelectorAll('input[name=pick]'))c.checked=this.checked;document.getElementById('bulkn').textContent=document.querySelectorAll('input[name=pick]:checked').length+' selected'" style="width:auto"></th><th></th><th>platform</th><th>destination</th><th>state</th><th>hook</th><th>risk</th><th>permission</th><th>score</th></tr>
 {% for v in variants %}{% set a = accs[v.account_id] %}{% set p = perm[v.account_id] %}<tr>
-<td><a href="{{ base }}/variant/{{ v.variant_id }}">{% if thumbs.get(v.asset_id) %}<img src="{{ thumbs[v.asset_id] }}" alt="" loading="lazy" style="width:96px;height:54px;object-fit:cover;border-radius:6px;display:block">{% else %}<span class="muted">no preview</span>{% endif %}</a></td>
-<td>{{ v.platform }}</td><td>{{ a.username_original or '(pending)' }}<br><span class="muted">{{ v.route_role }} · {{ a.canonical_brand_id }}</span></td>
-<td><span class="badge {{ 'ok' if v.state in ['approved','scheduled','simulated','published'] else ('bad' if v.state in ['needs_fix','failed'] else '') }}">{{ v.state }}</span></td>
-<td><a href="{{ base }}/variant/{{ v.variant_id }}">{{ v.hook }}</a></td>
-<td>{% for b in v.risk_flags.blockers %}<span class="badge bad">{{ b }}</span>{% endfor %}{% for f in v.risk_flags.review_flags %}<span class="badge warn">{{ f }}</span>{% endfor %}{% for e in v.validation.errors %}<span class="badge bad">{{ e }}</span>{% endfor %}</td>
-<td>{% if p[0] %}<span class="badge ok">live OK</span>{% else %}<span class="badge">{{ a.verification_status }}</span>{% if a.hard_block_reason %}<span class="badge bad">hard block</span>{% endif %}{% endif %}</td>
-<td>{{ '%.3f'|format(v.score or 0) }}</td></tr>{% endfor %}</table></div>{% endblock %}
+<td data-l="">{% if v.state in ['in_review','approved','needs_fix'] %}<input type="checkbox" name="pick" value="{{ v.variant_id }}|{{ v.caption_hash }}" aria-label="select" onchange="document.getElementById('bulkn').textContent=document.querySelectorAll('input[name=pick]:checked').length+' selected'" style="width:auto">{% endif %}</td>
+<td class="thumb"><a href="{{ base }}/variant/{{ v.variant_id }}">{% if thumbs.get(v.asset_id) %}<img src="{{ thumbs[v.asset_id] }}" alt="" loading="lazy" style="width:96px;height:54px;object-fit:cover;border-radius:6px;display:block">{% else %}<span class="muted">no preview</span>{% endif %}</a></td>
+<td data-l="platform">{{ v.platform }}</td><td data-l="destination">{{ a.username_original or '(pending)' }}<br><span class="muted">{{ v.route_role }} · {{ a.canonical_brand_id }}</span></td>
+<td data-l="state"><span class="badge {{ 'ok' if v.state in ['approved','scheduled','simulated','published'] else ('bad' if v.state in ['needs_fix','failed'] else '') }}">{{ v.state }}</span></td>
+<td data-l="hook" class="hook"><a href="{{ base }}/variant/{{ v.variant_id }}">{{ v.hook }}</a></td>
+<td data-l="risk">{% for b in v.risk_flags.blockers %}<span class="badge bad">{{ b }}</span>{% endfor %}{% for f in v.risk_flags.review_flags %}<span class="badge warn">{{ f }}</span>{% endfor %}{% for e in v.validation.errors %}<span class="badge bad">{{ e }}</span>{% endfor %}</td>
+<td data-l="permission">{% if p[0] %}<span class="badge ok">live OK</span>{% else %}<span class="badge">{{ a.verification_status }}</span>{% if a.hard_block_reason %}<span class="badge bad">hard block</span>{% endif %}{% endif %}</td>
+<td data-l="score">{{ '%.3f'|format(v.score or 0) }}</td></tr>{% endfor %}</table></div>
+<div class="card bulkbar"><b id="bulkn">0 selected</b>
+{% if not user %}<input name="reviewer" placeholder="your name" style="max-width:180px">{% endif %}
+<input name="note" placeholder="note (required to reject)" style="max-width:280px">
+<button class="primary" name="decision" value="approve">Approve selected</button>
+<button class="danger" name="decision" value="reject">Reject selected</button>
+<span class="muted">Each approval is recorded under your name. Sensitive posts (two-person sign-off) and posts whose copy changed are skipped.</span></div>
+</form>
+{% endblock %}
