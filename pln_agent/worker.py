@@ -18,17 +18,32 @@ from .workflow import poll_statuses, run_publisher
 log = logging.getLogger("pln_agent.worker")
 
 
-def plan_new_clear_assets(db: DB, settings: Settings) -> int:
-    """Generate posts for rights-clear assets that have none yet (never re-plans reviewed work)."""
-    n = 0
-    for a in db.all("assets"):
-        if evaluate(a).ok and not db.one("SELECT 1 AS x FROM variants WHERE asset_id=? LIMIT 1", [a["asset_id"]]):
-            generate_pack(db, a["asset_id"], settings, actor="worker")
-            n += 1
-    return n
+PLAN_PER_TICK = 10  # bounded work per scheduler call; a backlog drains over successive ticks
+_tick_lock = threading.Lock()
+
+
+def plan_new_clear_assets(db: DB, settings: Settings, limit: int = PLAN_PER_TICK) -> int:
+    """Generate posts for rights-clear assets that have none yet (never re-plans reviewed work).
+    Highest-scoring clips first, at most `limit` per call."""
+    planned = {r["asset_id"] for r in db.query("SELECT DISTINCT asset_id FROM variants")}
+    todo = [a for a in db.all("assets") if a["asset_id"] not in planned and evaluate(a).ok]
+    todo.sort(key=lambda a: -max((m.get("intensity", 0) for m in (a.get("moments") or [])), default=0))
+    for a in todo[:limit]:
+        generate_pack(db, a["asset_id"], settings, actor="worker")
+    return min(len(todo), limit)
 
 
 def tick(db: DB, settings: Settings, do_ops: bool) -> dict:
+    """One pass. Overlapping calls (scheduler fires every minute) are skipped, not queued."""
+    if not _tick_lock.acquire(blocking=False):
+        return {"skipped": "previous tick still running", "planned": 0, "publisher": []}
+    try:
+        return _tick(db, settings, do_ops)
+    finally:
+        _tick_lock.release()
+
+
+def _tick(db: DB, settings: Settings, do_ops: bool) -> dict:
     out = {"publisher": run_publisher(db, settings), "status": poll_statuses(db, settings)}
     if do_ops and settings.ops_database_url:
         from .ops_sources import import_ops_accounts, import_ops_clips
