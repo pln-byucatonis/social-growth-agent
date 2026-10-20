@@ -77,3 +77,52 @@ def build(ops, agent_db):
                                  cap.strftime("%Y-%m-%d %H:%M:%S")])
                 post_id += 1
     return post_id - 1
+
+
+CLIP_DDL = """
+CREATE TABLE clip_sources (id text PRIMARY KEY, bucket text, property text, title text, aired_date date, duration_sec numeric);
+CREATE TABLE clips (id text PRIMARY KEY, source_id text, property text, start_sec numeric, end_sec numeric,
+  peak_offset_sec numeric, moment_offset_sec numeric, highlight_score integer, caption text, transcript text,
+  source_bucket text, source_key text, vertical_key text, vertical_mode text, status text, superseded_by text,
+  thumb_key text, energy_score real, vertical_subject text);
+CREATE TABLE clip_tags (clip_id text, tag text, source text);
+CREATE TABLE people (id bigint PRIMARY KEY, name text, aliases text, hidden boolean);
+CREATE TABLE clip_talent (clip_id text, name_raw text, person_id bigint, source text)
+"""
+CJ_MASTER = "pln-vod-library/PLNstudio/CarJitsu__2026-09-12.mp4"
+PT_MASTER = "pln-vod-library/PLNstudio/PuttTour__2026-09-20.mp4"
+
+
+def build_clips(ops):
+    """A 3-hour CarJitsu event (30 clips) and a Putt Tour event (8 clips)."""
+    for stmt in [s for s in CLIP_DDL.split(";") if s.strip()]:
+        ops.execute(stmt)
+    ops.execute("INSERT INTO clip_sources VALUES (?,?,?,?,?,?)", [CJ_MASTER, "pln-vod-library", "CarJitsu", "CJ ep", "2026-09-12", 10800])
+    ops.execute("INSERT INTO clip_sources VALUES (?,?,?,?,?,?)", [PT_MASTER, "pln-vod-library", "Putt Tour", "PT ep", "2026-09-20", 7200])
+    ops.execute("INSERT INTO people VALUES (?,?,?,?)", [7, "Rocky", "[]", False])
+    kinds = [("Back-seat reversal: he escapes and flips it", ["reversal"]),
+             ("Trapped in the passenger seat, taps to the choke", ["submission"]),
+             ("Wild scramble at the door, total chaos", ["scramble"]),
+             ("Competitors reset in the car", ["reset"])]
+    for i in range(30):
+        cap, tags = kinds[i % 4]
+        start = 300.0 * i + (5 if i == 29 else 0)
+        cid = f"CJ:{i}"
+        ops.execute("INSERT INTO clips VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    [cid, CJ_MASTER, "CarJitsu", start, start + 18, 9, 9, 70, cap, "", "pln-vod-library",
+                     "PLNstudio/CarJitsu__2026-09-12.mp4", None, None, "tagged", None, f"frames/cj{i}.jpg", 0.6, None])
+        for t in tags:
+            ops.execute("INSERT INTO clip_tags VALUES (?,?,?)", [cid, t, "nova"])
+        if i % 4 == 0:
+            ops.execute("INSERT INTO clip_talent VALUES (?,?,?,?)", [cid, "ROCKY", 7, "face"])
+    # an overlapping near-duplicate of clip 0 (must not both be picked)
+    ops.execute("INSERT INTO clips VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                ["CJ:0b", CJ_MASTER, "CarJitsu", 4, 20, 5, 5, 69, "Reversal from the back seat", "", "pln-vod-library",
+                 "PLNstudio/CarJitsu__2026-09-12.mp4", None, None, "tagged", None, None, 0.6, None])
+    putts = ["Impossible bank putt off the wall", "Missed a short putt for the win", "Pressure putt to win the title",
+             "Players walk to the next hole"]
+    for i in range(8):
+        start = 500.0 * i
+        ops.execute("INSERT INTO clips VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    [f"PT:{i}", PT_MASTER, "Putt Tour", start, start + 14, 8, 8, 65, putts[i % 4], "", "pln-vod-library",
+                     "PLNstudio/PuttTour__2026-09-20.mp4", None, None, "tagged", None, None, 0.5, None])

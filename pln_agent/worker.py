@@ -58,10 +58,11 @@ def _tick(db: DB, settings: Settings, do_ops: bool) -> dict:
 def refresh_intelligence(db: DB, settings: Settings, ops: DB | None) -> dict:
     """Phase 1 loop: real performance in → creative evidence → cadence → knowledge review.
     Each step is isolated so one failure (e.g. a platform page timing out) doesn't stop the rest."""
-    from . import audience, cadence, knowledge
+    from . import audience, cadence, knowledge, scout
     steps = [("knowledge_seed", lambda: knowledge.seed(db, "worker")),
              ("social", lambda: audience.import_ops_social(db, ops, settings.timezone, "worker") if ops else None),
              ("pln_evidence", lambda: len(knowledge.derive_pln_evidence(db)["written"])),
+             ("scout", lambda: scout.scan(db, ops, actor="worker") if ops else None),
              ("cadence", lambda: len(cadence.recommend_all(db))),
              ("knowledge_review", lambda: {k: v for k, v in knowledge.review_sources(db).items() if k != "ok"})]
     out = {}

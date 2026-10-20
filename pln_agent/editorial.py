@@ -56,6 +56,8 @@ def generate_pack(db: DB, asset_id: str, settings: Settings, today: date | None 
             continue
         v = strat.build(ctx)
         v = provider.refine(v, ctx, strat)
+        from .creative_director import treat
+        v["treatment"] = treat(db, ctx, v)
         v.update({"variant_id": vid, "pack_id": pack_id, "asset_id": asset_id, "account_id": r.account["account_id"],
                   "brand_id": asset["brand_id"], "route_role": r.role})
         sc = score_variant(db, asset, v, rights, calendar, today)
@@ -78,13 +80,18 @@ def generate_pack(db: DB, asset_id: str, settings: Settings, today: date | None 
         row = {k: v.get(k) for k in ("variant_id", "pack_id", "asset_id", "account_id", "platform", "brand_id", "route_role",
                                       "series", "format", "hook", "hook_candidates", "title", "caption", "hashtags",
                                       "hashtag_rationale", "voiceover", "onscreen_text", "edl", "thumbnail", "cta", "angle",
-                                      "test_hypothesis", "caption_hash")}
+                                      "test_hypothesis", "caption_hash", "treatment")}
         row.update({"utm_url": ctx.utm_url, "score": sc["total"], "score_breakdown": sc,
                     "risk_flags": rights, "validation": v["validation"], "state": state,
                     "render_status": "not_rendered", "render_path": "", "created_at": now_iso(), "updated_at": now_iso()})
         db.insert("variants", row, upsert_key="variant_id")
         out.append(row)
+    package_id = ""
+    if out:
+        from .creative_director import save_package
+        package_id = save_package(db, asset, {o["account_id"]: o["treatment"] for o in out if o.get("treatment")}, actor)
     db.insert("editorial_packs", {"pack_id": pack_id, "asset_id": asset_id, "created_at": now_iso(),
-                                  "summary": {"variants": [o["variant_id"] for o in out], "notes": notes, "rights": rights}})
+                                  "summary": {"variants": [o["variant_id"] for o in out], "notes": notes, "rights": rights,
+                                              "creative_package": package_id}})
     db.audit(actor, "editorial_pack_generated", "assets", asset_id, {"pack_id": pack_id, "variants": len(out), "notes": notes})
-    return {"pack_id": pack_id, "variants": out, "notes": notes, "rights": rights}
+    return {"pack_id": pack_id, "variants": out, "notes": notes, "rights": rights, "creative_package": package_id}

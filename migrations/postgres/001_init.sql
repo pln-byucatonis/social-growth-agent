@@ -129,6 +129,7 @@ CREATE TABLE IF NOT EXISTS variants (
   render_status TEXT,
   render_path TEXT,
   public_media_url TEXT,
+  treatment JSONB,
   created_at TEXT,
   updated_at TEXT
 );
@@ -284,6 +285,33 @@ CREATE TABLE IF NOT EXISTS posts (
   updated_at TEXT
 );
 
+CREATE TABLE IF NOT EXISTS scout_moments (
+  clip_id TEXT PRIMARY KEY,
+  source_id TEXT,
+  brand_id TEXT,
+  start_sec DOUBLE PRECISION,
+  end_sec DOUBLE PRECISION,
+  potential DOUBLE PRECISION,
+  pln_potential DOUBLE PRECISION,
+  categories JSONB,
+  content_type TEXT,
+  detail JSONB,
+  caption TEXT,
+  model_version TEXT,
+  status TEXT,
+  scored_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS creative_packages (
+  package_id TEXT PRIMARY KEY,
+  asset_id TEXT NOT NULL,
+  moment JSONB,
+  treatments JSONB,
+  knowledge_refs JSONB,
+  created_by TEXT,
+  created_at TEXT
+);
+
 CREATE TABLE IF NOT EXISTS knowledge (
   entry_id TEXT PRIMARY KEY,
   level TEXT NOT NULL,
@@ -344,6 +372,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS ux_metrics_key ON metrics(metric_key);
 CREATE INDEX IF NOT EXISTS ix_metrics_post ON metrics(platform_post_id);
 
 CREATE INDEX IF NOT EXISTS ix_posts_account ON posts(account_id, published_at);
+
+CREATE INDEX IF NOT EXISTS ix_scout_source ON scout_moments(source_id, potential);
+
+CREATE INDEX IF NOT EXISTS ix_scout_brand ON scout_moments(brand_id, potential);
 
 CREATE INDEX IF NOT EXISTS ix_jobs_state ON publish_jobs(state, next_attempt_at);
 

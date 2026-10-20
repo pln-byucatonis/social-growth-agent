@@ -25,6 +25,16 @@
 {% elif render_url %}<p class="muted">A public link can be created once this post is approved.</p>{% endif %}
 <h4>Edit decision list</h4><table>{% for s in v.edl.segments %}<tr><td>{{ '%.2f'|format(s.source_in) }}–{{ '%.2f'|format(s.source_out) }}s</td><td>{{ s.purpose }}</td><td class="muted">{{ s.source_timecode }}</td></tr>{% endfor %}</table><p class="muted">{{ v.edl.notes }}</p></div>
 </div>
+{% set t = v.treatment %}{% if t %}<div class="card"><h3>Creative treatment — {{ t.platform }}{% if t.route_role %} <span class="muted">({{ t.route_role }})</span>{% endif %}</h3>
+<table><tr><td><b>Hook</b></td><td>{{ t.hook.opening_beat }}<br><span class="muted">first seconds: “{{ t.hook.first_seconds }}”</span></td></tr>
+<tr><td><b>Edit</b></td><td>{{ t.edit.pace }}</td></tr><tr><td><b>Context</b></td><td>{{ t.context.approach }}</td></tr>
+<tr><td><b>Payoff</b></td><td>{{ t.payoff.label }}{% if t.payoff.what %} — {{ t.payoff.what }}{% endif %}</td></tr>
+<tr><td><b>Conversion</b></td><td>{{ t.conversion.reason_to_follow }}{% if t.conversion.cta %}<br><span class="muted">CTA: {{ t.conversion.cta }}</span>{% endif %}</td></tr></table>
+{% if t.note %}<p class="muted">{{ t.note }}</p>{% endif %}
+<h4>Duration variants</h4><table>{% for x in t.duration_variants %}<tr><td><b>{{ x.label }}</b>{% if x.label == t.recommended_variant %} <span class="badge ok">recommended</span>{% endif %}{% if (v.edl or {}).get('variant_label') == x.label %} <span class="badge">in use</span>{% endif %}</td>
+<td>≈{{ x.target_s|int }}s · {{ x.idea }}</td><td class="muted">{% if x.available %}{{ x.actual_s }}s, payoff at {{ x.payoff_at_s }}s{% else %}{{ x.why }}{% endif %}</td>
+<td>{% if x.available and v.state in ('in_review','needs_fix','approved') %}<form method="post" action="{{ base }}/variant/{{ v.variant_id }}/cut"><input type="hidden" name="label" value="{{ x.label }}"><button>Use cut {{ x.label }}</button></form>{% endif %}</td></tr>{% endfor %}</table>
+<p class="muted">Why {{ t.recommended_variant }}: {{ t.recommended_why }} · Knowledge used: {% for k in t.knowledge_refs %}<a href="{{ base }}/knowledge">{{ k }}</a> {% endfor %}</p></div>{% endif %}
 <div class="card"><h3>Score (explainable)</h3><table>{% for k, x in v.score_breakdown.parts.items() %}<tr><td>{{ k }}</td><td>{{ x.score }}</td><td class="muted">{{ x.why }}</td></tr>{% endfor %}</table></div>
 <div class="card"><h3>Exact API requests this would send (tokens redacted, dry-run preview)</h3><pre>{{ would_send|tojson(indent=2) }}</pre></div>
 <div class="card"><h3>Publish jobs</h3><pre>{{ jobs|tojson(indent=2) }}</pre><h3>Audit</h3><table>{% for a in audit %}<tr><td>{{ a.at }}</td><td>{{ a.actor }}</td><td>{{ a.action }}</td><td class="muted">{{ a.detail }}</td></tr>{% endfor %}</table></div>

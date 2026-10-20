@@ -639,6 +639,76 @@ def cadence_recompute(request: Request):
     return back(request, "/cadence", f"Recomputed {n} accounts")
 
 
+# --- Phase 2: viral content scout + creative director --------------------------------------------
+
+def _ops_db() -> DB:
+    if not settings.ops_database_url:
+        raise HTTPException(400, "ops portal database is not configured (PLN_OPS_DATABASE_URL)")
+    return DB(settings.ops_database_url, init=False)
+
+
+@app.get("/scout", response_class=HTMLResponse)
+def scout_page(request: Request, brand: str = "", source: str = "", view: str = "potential"):
+    from .. import scout
+    from ..media import resolve_media
+    d = db()
+    field = "pln_potential" if view == "pln" else "potential"
+    moments = scout.top_moments(d, source, brand, 20, field)
+    for m in moments:
+        tk = (m.get("detail") or {}).get("thumb_key")
+        m["thumb"] = resolve_media(f"s3://{settings.ops_assets_bucket}/{tk}", "image/jpeg") if tk and settings.ops_assets_bucket else ""
+    srcs = scout.sources(d, brand)[:60]
+    counts = {r["brand_id"]: r["n"] for r in d.query("SELECT brand_id, COUNT(*) AS n FROM scout_moments GROUP BY brand_id")}
+    return page(request, "scout.html", moments=moments, sources=srcs, brand=brand, source=source, view=view,
+                counts=counts, weights=scout.taxonomy()["weights"], model=scout.taxonomy()["model_version"])
+
+
+@app.post("/scout/promote")
+async def scout_promote(request: Request):
+    """Moments → assets + creative packages. Background: imports and drafting outlast the proxy window."""
+    import threading
+    from .. import scout
+    _admin(request)
+    form = await request.form()
+    ids = [i for i in form.getlist("clip_id") if i][:40]
+    if not ids:
+        return back(request, "/scout", err="Pick at least one moment")
+    actor = request.state.user or "dashboard"
+    ops = _ops_db()
+    threading.Thread(target=lambda: scout.promote(DB(settings.database_url, init=False), ops, ids, settings, actor),
+                     daemon=True).start()
+    return back(request, "/scout", f"Making {len(ids)} moment(s) into drafts — they'll appear in the Approval queue shortly.")
+
+
+@app.post("/scout/{clip_id:path}/dismiss")
+def scout_dismiss(request: Request, clip_id: str, reason: str = Form("")):
+    from .. import scout
+    _admin(request)
+    scout.dismiss(db(), clip_id, request.state.user or "dashboard", reason)
+    return back(request, "/scout", "Dismissed")
+
+
+@app.post("/scout/scan")
+def scout_scan(request: Request):
+    import threading
+    from .. import scout
+    _admin(request)
+    ops = _ops_db()
+    threading.Thread(target=lambda: scout.scan(DB(settings.database_url, init=False), ops, actor=request.state.user or "dashboard"),
+                     daemon=True).start()
+    return back(request, "/scout", "Scanning the library — refresh in a minute.")
+
+
+@app.post("/variant/{vid:path}/cut")
+def variant_cut(request: Request, vid: str, label: str = Form(...)):
+    from ..creative_director import use_cut
+    try:
+        use_cut(db(), vid, label, request.state.user or "dashboard")
+    except ValueError as e:
+        return back(request, f"/variant/{vid}", err=str(e))
+    return back(request, f"/variant/{vid}", f"Switched to cut {label} — render it and review again.")
+
+
 @app.get("/migration", response_class=HTMLResponse)
 def migration(request: Request):
     d = db()

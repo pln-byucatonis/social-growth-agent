@@ -237,10 +237,15 @@ def _fair_share(clips: list[dict], limit: int, min_score: int, priority_floor: i
 
 def import_ops_clips(db: DB, ops: DB, assets_bucket: str, limit: int = 100, min_score: int = 50,
                      properties: list[str] | None = None, actor: str = "ops-sync",
-                     priority_floor: int = PRIORITY_FLOOR) -> dict:
+                     priority_floor: int = PRIORITY_FLOOR, clip_ids: list[str] | None = None) -> dict:
+    """`clip_ids` imports exactly those clips (Viral Content Scout promotion) instead of the ranked top."""
     floor = min(min_score, priority_floor)
     where = ["superseded_by IS NULL", "status = 'tagged'", "highlight_score >= ?"]
     params: list = [floor]
+    if clip_ids:
+        where = ["superseded_by IS NULL", "id IN (" + ",".join("?" for _ in clip_ids) + ")"]
+        params = list(clip_ids)
+        limit = len(clip_ids)
     if properties:
         where.append("property IN (" + ",".join("?" for _ in properties) + ")")
         params += properties
@@ -254,7 +259,7 @@ def import_ops_clips(db: DB, ops: DB, assets_bucket: str, limit: int = 100, min_
         "      FROM clips WHERE " + " AND ".join(where) + ") c "
         "JOIN clip_sources s ON s.id = c.source_id WHERE c.rn <= ? "
         "ORDER BY c.highlight_score DESC, c.id", params)
-    clips = _fair_share(candidates, limit, min_score, priority_floor)
+    clips = candidates if clip_ids else _fair_share(candidates, limit, min_score, priority_floor)
     if not clips:
         return {"imported": 0, "skipped": []}
     ids = [c["id"] for c in clips]

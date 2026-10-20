@@ -151,6 +151,7 @@ TABLES: dict[str, list[tuple[str, str, str]]] = {
         ("render_status", "text", ""),
         ("render_path", "text", ""),
         ("public_media_url", "text", ""),  # approved render on the public CDN (platform pull-from-URL)
+        ("treatment", "json", ""),  # Creative Director: hook / edit / context / payoff / conversion + duration variants
         ("created_at", "ts", ""),
         ("updated_at", "ts", ""),
     ],
@@ -296,6 +297,33 @@ TABLES: dict[str, list[tuple[str, str, str]]] = {
         ("first_seen_at", "ts", ""),
         ("updated_at", "ts", ""),
     ],
+    # Viral Content Scout: every library clip scored for creative potential (own property + PLN crossover).
+    "scout_moments": [
+        ("clip_id", "text", "PRIMARY KEY"),
+        ("source_id", "text", ""),  # the master (event) the clip was cut from
+        ("brand_id", "text", ""),
+        ("start_sec", "real", ""),
+        ("end_sec", "real", ""),
+        ("potential", "real", ""),
+        ("pln_potential", "real", ""),
+        ("categories", "json", ""),
+        ("content_type", "text", ""),
+        ("detail", "json", ""),  # explainable parts
+        ("caption", "text", ""),  # machine description (reviewer context only — never copy)
+        ("model_version", "text", ""),
+        ("status", "text", ""),  # candidate | promoted | dismissed
+        ("scored_at", "ts", ""),
+    ],
+    # Creative Director: one package per asset — five-part treatment per destination + duration variants.
+    "creative_packages": [
+        ("package_id", "text", "PRIMARY KEY"),
+        ("asset_id", "text", "NOT NULL"),
+        ("moment", "json", ""),
+        ("treatments", "json", ""),  # account_id -> treatment
+        ("knowledge_refs", "json", ""),
+        ("created_by", "text", ""),
+        ("created_at", "ts", ""),
+    ],
     # Knowledge Engine: every piece of guidance is attributed, dated and classified.
     "knowledge": [
         ("entry_id", "text", "PRIMARY KEY"),
@@ -353,6 +381,8 @@ INDEXES = [
     "CREATE UNIQUE INDEX IF NOT EXISTS ux_metrics_key ON metrics(metric_key)",
     "CREATE INDEX IF NOT EXISTS ix_metrics_post ON metrics(platform_post_id)",
     "CREATE INDEX IF NOT EXISTS ix_posts_account ON posts(account_id, published_at)",
+    "CREATE INDEX IF NOT EXISTS ix_scout_source ON scout_moments(source_id, potential)",
+    "CREATE INDEX IF NOT EXISTS ix_scout_brand ON scout_moments(brand_id, potential)",
     "CREATE INDEX IF NOT EXISTS ix_jobs_state ON publish_jobs(state, next_attempt_at)",
     "CREATE INDEX IF NOT EXISTS ix_sched_slot ON schedules(slot_at)",
 ]
