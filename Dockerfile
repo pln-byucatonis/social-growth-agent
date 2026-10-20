@@ -1,4 +1,5 @@
-FROM python:3.12-slim
+# AWS public mirror of the Docker Official Image (no Docker Hub pull limits)
+FROM public.ecr.aws/docker/library/python:3.12-slim
 RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg fonts-dejavu-core && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY requirements.txt .
