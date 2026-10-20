@@ -34,8 +34,11 @@ the agent's creative decisions (hook style, opening beat, duration and cut, burn
 series, source footage, timecodes, transcript excerpt, render, public URL); historical posts record only
 what the caption/metadata show, with every other variable `unknown`. Provenance is stored per variable.
 `what_works(brand, platform, outcome)` compares each variable value against the rest of the slice with a
-stated rule: < 5 posts a side → insufficient; ≥ 8 a side and permutation p < 0.05 on the median
-difference → conclusive; p < 0.2 → suggestive.
+stated rule: < 5 posts a side → insufficient; permutation test on the median difference, adjusted for the
+number of comparisons in the slice (Benjamini–Hochberg); ≥ 8 a side and q < 0.05 → conclusive, q < 0.2 →
+suggestive; yes/no variables tested once; the effect must point the same way in the earlier and later
+half of the posts or it is "unstable". Only per-1k-view rates become PLN evidence (raw views mostly
+reflect a post's age and distribution).
 
 **Knowledge Engine** (`knowledge`, `knowledge_sources`): seeded from `config/knowledge_seed.json` — every
 platform entry has its URL, publisher, publication date (or "undated" + what the page shows), retrieval

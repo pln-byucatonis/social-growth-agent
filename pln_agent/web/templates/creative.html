@@ -7,8 +7,8 @@
 <label>Format <input name="fmt" value="{{ fmt }}" placeholder="e.g. reels" size="8"></label> <button>What works?</button></form>
 <p class="muted"><b>evidence rule:</b> {{ rule }}</p></div>
 {% if res %}<div class="card tablewrap"><h3>What goes with higher {{ res.outcome }} — {{ res.brand_id or 'all brands' }} / {{ res.platform or 'all platforms' }} ({{ res.posts }} posts)</h3>
-<table><tr><th>variable</th><th>value</th><th>n</th><th>median</th><th>rest</th><th>lift</th><th>p</th><th>evidence</th></tr>
-{% for f in res.findings %}<tr><td>{{ f.variable }}</td><td>{{ f.value }}</td><td>{{ f.n }} / {{ f.n_rest }}</td><td>{{ '%.2f'|format(f.median) }}</td><td>{{ '%.2f'|format(f.median_rest) if f.median_rest is not none else '—' }}</td><td>{{ '{:+.0%}'.format(f.lift) if f.lift is not none else '—' }}</td><td>{{ '%.3f'|format(f.p) if f.p is not none else '—' }}</td>
+<table><tr><th>variable</th><th>value</th><th>n</th><th>median</th><th>rest</th><th>lift</th><th>q</th><th>evidence</th></tr>
+{% for f in res.findings %}<tr><td>{{ f.variable }}</td><td>{{ f.value }}</td><td>{{ f.n }} / {{ f.n_rest }}</td><td>{{ '%.2f'|format(f.median) }}</td><td>{{ '%.2f'|format(f.median_rest) if f.median_rest is not none else '—' }}</td><td>{{ '{:+.0%}'.format(f.lift) if f.lift is not none else '—' }}</td><td>{{ '%.3f'|format(f.q) if f.q is not none else '—' }}</td>
 <td><span class="badge {{ 'ok' if f.evidence == 'conclusive' else 'warn' if f.evidence == 'suggestive' else '' }}">{{ f.evidence }}</span></td></tr>{% else %}<tr><td class="muted">No comparable groups yet.</td></tr>{% endfor %}</table></div>{% endif %}
 <div class="card tablewrap"><h3>Recent posts</h3><table><tr><th>published</th><th>account</th><th>post</th><th>creative (provenance)</th><th>views</th><th>shares/1k</th><th>eng/1k</th></tr>
 {% for p in recent %}<tr><td>{{ (p.published_at or '')[:16] }}</td><td>{{ p.account_id }}<br><span class="muted">{{ p.origin }} · {{ p.post_type }}</span></td>

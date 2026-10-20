@@ -178,20 +178,37 @@ def permutation_p(a: list[float], b: list[float], iters: int = 2000, seed: int =
     return (hits + 1) / (done + 1)
 
 
-def evidence_class(n_a: int, n_b: int, p: float | None) -> str:
-    if min(n_a, n_b) < MIN_N or p is None:
+def evidence_class(n_a: int, n_b: int, q: float | None) -> str:
+    """`q` is the false-discovery-adjusted p-value (Benjamini–Hochberg within the slice)."""
+    if min(n_a, n_b) < MIN_N or q is None:
         return "insufficient"
-    if min(n_a, n_b) >= CONCLUSIVE_N and p < 0.05:
+    if min(n_a, n_b) >= CONCLUSIVE_N and q < 0.05:
         return "conclusive"
-    if p < 0.2:
+    if q < 0.2:
         return "suggestive"
     return "no_clear_difference"
 
 
-EVIDENCE_RULE = (f"Each value is compared with all other posts in the same slice. Fewer than {MIN_N} posts on either side "
-                 f"→ insufficient. ≥{CONCLUSIVE_N} on both sides and permutation p<0.05 on the median difference → "
-                 "conclusive. p<0.2 → suggestive. Otherwise no clear difference. Posts younger than 72h are excluded, "
-                 "and slices compare like with like (same platform; same format unless format is the variable).")
+def bh_adjust(ps: list[float]) -> list[float]:
+    """Benjamini–Hochberg q-values (same order as input)."""
+    m = len(ps)
+    order = sorted(range(m), key=lambda i: ps[i])
+    q = [0.0] * m
+    prev = 1.0
+    for rank, i in reversed(list(enumerate(order, start=1))):
+        prev = min(prev, ps[i] * m / rank)
+        q[i] = prev
+    return q
+
+
+EVIDENCE_OUTCOMES = ["shares_per_1k_views", "saves_per_1k_views", "comments_per_1k_views", "engagements_per_1k_views"]
+EVIDENCE_RULE = (f"Each value is compared with all other posts in the same slice (yes/no variables are tested once). "
+                 f"Fewer than {MIN_N} posts on either side → insufficient. p-values come from a seeded permutation test on "
+                 "the median difference and are adjusted for the number of comparisons in the slice (Benjamini–Hochberg). "
+                 f"≥{CONCLUSIVE_N} posts a side and adjusted q<0.05 → conclusive; q<0.2 → suggestive. The difference must "
+                 "point the same way in the earlier and the later half of the posts, otherwise it is reported as unstable "
+                 "(a sign of a time confound, e.g. a strategy change). Posts younger than 72h are excluded; slices compare "
+                 "like with like. Only per-1k-view rates become PLN evidence — raw views mostly reflect age and distribution.")
 
 
 def what_works(db: DB, brand_id: str = "", platform: str = "", outcome: str = "shares_per_1k_views",
@@ -205,25 +222,53 @@ def what_works(db: DB, brand_id: str = "", platform: str = "", outcome: str = "s
     posts = [p for p in post_outcomes(db, accs) if not p["young"] and p["outcomes"].get(outcome) is not None
              and (not fmt or p.get("post_type") == fmt)]
     findings = []
+    ordered = sorted(posts, key=lambda p: str(p.get("published_at") or ""))
+    half = len(ordered) // 2
+    early = {id(p) for p in ordered[:half]}
     for var in variables or VARIABLES:
         if var == "format" and fmt:
             continue
-        groups: dict[str, list[float]] = {}
+        groups: dict[str, list[dict]] = {}
         for p in posts:
             val = (p.get("creative") or {}).get(var)
             if val in (None, "", "unknown"):
                 continue
-            groups.setdefault(str(val), []).append(p["outcomes"][outcome])
+            groups.setdefault(str(val), []).append(p)
         if len(groups) < 2:
             continue
-        for val, xs in groups.items():
-            rest = [x for v, ys in groups.items() if v != val for x in ys]
-            p = permutation_p(xs, rest) if min(len(xs), len(rest)) >= MIN_N else None
+        values = list(groups)
+        if len(values) == 2:  # two-valued: one comparison, reported once ('yes' side if any, else the smaller group)
+            values = ["yes"] if "yes" in values else [min(values, key=lambda v: (len(groups[v]), v))]
+        for val in values:
+            xs = [p["outcomes"][outcome] for p in groups[val]]
+            rest_p = [p for v, ps in groups.items() if v != val for p in ps]
+            rest = [p["outcomes"][outcome] for p in rest_p]
+            pv = permutation_p(xs, rest) if min(len(xs), len(rest)) >= MIN_N else None
             med, rmed = statistics.median(xs), statistics.median(rest) if rest else None
+
+            def half_sign(in_early: bool):
+                a = [p["outcomes"][outcome] for p in groups[val] if (id(p) in early) == in_early]
+                b = [p["outcomes"][outcome] for p in rest_p if (id(p) in early) == in_early]
+                if len(a) < 3 or len(b) < 3:
+                    return None
+                d = statistics.median(a) - statistics.median(b)
+                return 0 if d == 0 else (1 if d > 0 else -1)
+            s1, s2 = half_sign(True), half_sign(False)
             findings.append({"variable": var, "value": val, "n": len(xs), "n_rest": len(rest), "median": med,
-                             "median_rest": rmed, "lift": (med / rmed - 1) if rmed else None, "p": p,
-                             "evidence": evidence_class(len(xs), len(rest), p)})
-    order = {"conclusive": 0, "suggestive": 1, "no_clear_difference": 2, "insufficient": 3}
+                             "median_rest": rmed, "lift": (med / rmed - 1) if rmed else None, "p": pv,
+                             "stable": None if s1 is None or s2 is None else (s1 == s2 and s1 != 0)})
+    testable = [f for f in findings if f["p"] is not None]
+    for f, q in zip(testable, bh_adjust([f["p"] for f in testable]) if testable else []):
+        f["q"] = q
+    for f in findings:
+        f.setdefault("q", None)
+        f["evidence"] = evidence_class(f["n"], f["n_rest"], f["q"])
+        if f["evidence"] in ("conclusive", "suggestive"):
+            if f["stable"] is False:
+                f["evidence"] = "unstable"
+            elif f["stable"] is None and f["evidence"] == "conclusive":
+                f["evidence"] = "suggestive"  # can't check stability with this few posts per half
+    order = {"conclusive": 0, "suggestive": 1, "unstable": 2, "no_clear_difference": 3, "insufficient": 4}
     findings.sort(key=lambda f: (order[f["evidence"]], -(abs(f["lift"]) if f["lift"] is not None else 0)))
     return {"brand_id": brand_id, "platform": platform, "format": fmt, "outcome": outcome, "posts": len(posts),
             "rule": EVIDENCE_RULE, "findings": findings}

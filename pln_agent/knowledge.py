@@ -186,14 +186,14 @@ def _flag(db: DB, e: dict, why: str, actor: str) -> None:
 def derive_pln_evidence(db: DB, slices: list[dict] | None = None, actor: str = "knowledge-engine") -> dict:
     """Turn conclusive/suggestive Creative Intelligence findings into dated `pln_evidence` entries.
     Re-running replaces each slice's entries; findings that no longer hold are superseded, not deleted."""
-    from .creative_db import EVIDENCE_RULE, what_works
+    from .creative_db import EVIDENCE_OUTCOMES, EVIDENCE_RULE, what_works
     if slices is None:
         slices = []
         from .creative_db import MIN_N
         for r in db.query("SELECT brand_id, platform, COUNT(*) AS n FROM posts GROUP BY brand_id, platform"):
             if r["n"] < 2 * MIN_N:
                 continue
-            for out in ("shares_per_1k_views", "engagements_per_1k_views", "views"):
+            for out in EVIDENCE_OUTCOMES:
                 slices.append({"brand_id": r["brand_id"], "platform": r["platform"], "outcome": out})
     written, superseded = [], []
     for sl in slices:
@@ -208,7 +208,8 @@ def derive_pln_evidence(db: DB, slices: list[dict] | None = None, actor: str = "
             direction = "higher" if f["lift"] > 0 else "lower"
             stmt = (f"On {sl.get('platform') or 'all platforms'} for {sl.get('brand_id') or 'all brands'}, posts with "
                     f"{f['variable']} = {f['value']} have {direction} median {sl['outcome']} "
-                    f"({f['median']:.2f} vs {f['median_rest']:.2f}, {f['lift']:+.0%}; n={f['n']} vs {f['n_rest']}).")
+                    f"({f['median']:.2f} vs {f['median_rest']:.2f}, {f['lift']:+.0%}; n={f['n']} vs {f['n_rest']}; "
+                    f"q={f['q']:.3f}).")
             db.insert("knowledge", {
                 "entry_id": eid, "level": "pln_evidence", "platform": sl.get("platform", ""),
                 "brand_id": sl.get("brand_id", ""), "account_id": "", "topic": f["variable"], "statement": stmt,

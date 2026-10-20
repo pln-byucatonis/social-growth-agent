@@ -65,15 +65,34 @@ class CreativeIntelligenceTests(Base):
 
     def test_what_works_finds_the_planted_effects_with_a_stated_rule(self):
         r = what_works(self.db, "carjitsu", "instagram", "shares_per_1k_views")
-        sub = next(f for f in r["findings"] if f["variable"] == "content_type" and f["value"] == "submission_highlight")
-        self.assertEqual(sub["evidence"], "conclusive")
-        self.assertGreater(sub["lift"], 1.0)
+        ct = next(f for f in r["findings"] if f["variable"] == "content_type")  # two values → reported once
+        self.assertEqual(ct["evidence"], "conclusive")
+        submission_higher = ct["lift"] > 0 if ct["value"] == "submission_highlight" else ct["lift"] < 0
+        self.assertTrue(submission_higher, ct)
         q = what_works(self.db, "carjitsu", "instagram", "comments_per_1k_views")
         ask = next(f for f in q["findings"] if f["variable"] == "asks_question" and f["value"] == "yes")
         self.assertEqual(ask["evidence"], "conclusive")
         self.assertIn("insufficient", r["rule"])
+        # yes/no variables are reported once, not as a mirrored pair
+        self.assertEqual(len([f for f in q["findings"] if f["variable"] == "asks_question"]), 1)
+
+    def test_effects_that_flip_over_time_are_unstable_not_evidence(self):
+        posts = sorted(self.db.all("posts", "account_id=?", [CJ_IG]), key=lambda p: p["published_at"])
+        half = len(posts) // 2
+        late_ann = 0
+        for i, p in enumerate(posts):  # 'yes' on every early high-share post, and on a few late low-share ones
+            c = dict(p["creative"])
+            sub = c["content_type"] == "submission_highlight"
+            yes = (i < half and sub) or (i >= half and not sub and late_ann < 6)
+            late_ann += int(i >= half and not sub and yes)
+            c["emoji"] = "yes" if yes else "no"
+            self.db.update("posts", "post_id", p["post_id"], {"creative": c})
+        r = what_works(self.db, "carjitsu", "instagram", "shares_per_1k_views", variables=["emoji"])
+        self.assertEqual(r["findings"][0]["evidence"], "unstable")
 
     def test_small_samples_are_insufficient_not_guessed(self):
+        from pln_agent.creative_db import bh_adjust
+        self.assertEqual([round(x, 3) for x in bh_adjust([0.01, 0.04, 0.03, 0.5])], [0.04, 0.053, 0.053, 0.5])
         self.assertEqual(evidence_class(3, 40, 0.001), "insufficient")
         self.assertEqual(evidence_class(6, 6, 0.1), "suggestive")
         self.assertAlmostEqual(permutation_p([1, 2, 3], [1, 2, 3]), 1.0, places=2)
@@ -147,8 +166,8 @@ class KnowledgeEngineTests(Base):
     def test_pln_evidence_is_derived_dated_and_superseded(self):
         out = knowledge.derive_pln_evidence(self.db, [{"brand_id": "carjitsu", "platform": "instagram",
                                                         "outcome": "shares_per_1k_views"}])
-        self.assertTrue(any("content-type-submission-highlight" in e for e in out["written"]))
-        e = self.db.get("knowledge", "entry_id", [x for x in out["written"] if "submission-highlight" in x][0])
+        self.assertTrue(any("-content-type-" in e for e in out["written"]), out)
+        e = self.db.get("knowledge", "entry_id", [x for x in out["written"] if "-content-type-" in x][0])
         self.assertEqual(e["level"], "pln_evidence")
         self.assertEqual(e["evidence"]["evidence"], "conclusive")
         self.assertEqual(e["source_date"], e["retrieved_at"])

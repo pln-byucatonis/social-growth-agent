@@ -51,7 +51,7 @@ def match_categories(brand_id: str, text: str) -> list[dict]:
 def learned_lift(db: DB, brand_id: str, content_type: str) -> tuple[float, str]:
     """From current PLN evidence on content_type (shares per 1k views preferred)."""
     rows = db.all("knowledge", "level='pln_evidence' AND status='current' AND topic='content_type' AND brand_id=?", [brand_id])
-    for outcome in ("shares_per_1k_views", "engagements_per_1k_views", "views"):
+    for outcome in ("shares_per_1k_views", "engagements_per_1k_views", "saves_per_1k_views", "comments_per_1k_views"):
         for e in rows:
             ev = e.get("evidence") or {}
             if ev.get("outcome") == outcome and ev.get("value") == content_type and ev.get("lift") is not None:
