@@ -8,7 +8,9 @@ Connecting never turns on publishing — that stays a separate step per account 
 <div class="grid">{% for a in apps %}<div class="card"><h3>{{ a.p.label }}</h3>
 <p>{% if a.configured %}<span class="badge ok">app saved {{ a.client_id_hint }}</span>{% else %}<span class="badge warn">app not saved yet</span>{% endif %}
 {% if a.error %}<span class="badge bad">{{ a.error }}</span>{% endif %}</p>
-{% if a.p.key == 'meta' %}<p>{% if meta_user.connected %}<span class="badge {{ 'warn' if meta_user.expiring else 'ok' }}">Meta analytics + publishing token: {% if meta_user.days_left is not none %}{{ meta_user.days_left }} days left{% else %}no expiry{% endif %}</span>{% if meta_user.expiring %} — reconnect soon (Meta long-lived tokens last ~60 days){% endif %}{% else %}<span class="badge warn">not connected — ops Instagram/Facebook analytics are paused until someone connects Meta</span>{% endif %}</p>{% endif %}
+{% if a.p.key == 'meta' %}{% if meta_user.connected %}<p>Meta logins shared with analytics + publishing:</p><ul>{% for l in meta_user.logins %}<li>{{ l.name }} — <span class="badge {{ 'bad' if l.expired else 'warn' if l.expiring else 'ok' }}">{% if l.days_left is not none %}{{ l.days_left }} days left{% else %}no expiry{% endif %}</span></li>{% endfor %}</ul>
+<p class="muted">Someone else manages other Pages? They sign in with Connect too (they need a role on the Meta app while it's in Development mode); each login adds the accounts it manages. Long-lived Meta tokens last ~60 days.</p>
+{% else %}<p><span class="badge warn">not connected — ops Instagram/Facebook analytics are paused until someone connects Meta</span></p>{% endif %}{% endif %}
 <p class="muted">Redirect URL to register:<br><code>{{ a.redirect_uri }}</code></p>
 <p class="muted">Scopes: {{ a.p.scopes|join(', ') }}</p>
 <p class="muted">{{ a.p.review_note }} <a href="{{ a.p.console }}" target="_blank" rel="noopener">Developer console ↗</a></p>

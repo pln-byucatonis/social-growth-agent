@@ -175,15 +175,34 @@ def _app(provider: str) -> dict:
     return app
 
 
+def _share_meta_login(me: dict, body: dict) -> None:
+    """Different people manage different Pages, so the shared secret keeps one long-lived token per
+    Facebook login (keyed by user id); the ops ingest unions the Pages every login can see. A repeat
+    sign-in by the same person replaces only their entry. `access_token` mirrors the newest login for
+    older readers."""
+    shared = store().get(META_USER_SECRET) or {}
+    logins = dict(shared.get("tokens") or {})
+    rec = _tok_record("meta", body, user_id=me.get("id", ""), user_name=me.get("name", ""))
+    logins[me.get("id") or f"login-{len(logins) + 1}"] = rec
+    store().put(META_USER_SECRET, {"tokens": logins, "access_token": rec["access_token"],
+                                   "expires_at": rec["expires_at"], "shared_with": "ops social ingest"})
+
+
 def meta_user_token_status() -> dict:
-    """For the Accounts page: is the shared Meta token present, and when does it expire?"""
-    rec = store().get(META_USER_SECRET) or {}
-    if not rec.get("access_token"):
-        return {"connected": False}
-    exp = rec.get("expires_at") or 0
-    days = round((exp - time.time()) / 86400, 1) if exp else None
-    return {"connected": True, "obtained_at": rec.get("obtained_at", ""), "days_left": days,
-            "expiring": days is not None and days < 10}
+    """For the Accounts page: which Meta logins are shared with analytics, and when each expires."""
+    shared = store().get(META_USER_SECRET) or {}
+    logins = shared.get("tokens") or ({"legacy": shared} if shared.get("access_token") else {})
+    if not logins:
+        return {"connected": False, "logins": []}
+    out = []
+    for uid, rec in logins.items():
+        exp = rec.get("expires_at") or 0
+        days = round((exp - time.time()) / 86400, 1) if exp else None
+        out.append({"user_id": uid, "name": rec.get("user_name") or uid, "obtained_at": rec.get("obtained_at", ""),
+                    "days_left": days, "expiring": days is not None and days < 10, "expired": days is not None and days <= 0})
+    soonest = min((x["days_left"] for x in out if x["days_left"] is not None), default=None)
+    return {"connected": True, "logins": out, "days_left": soonest,
+            "expiring": any(x["expiring"] for x in out)}
 
 
 def redirect_uri(provider: str) -> str:
@@ -270,7 +289,8 @@ def discover(provider: str, body: dict, app: dict) -> list[dict]:
     if provider == "meta":
         long = _token_request(PROVIDERS["meta"], app, {"grant_type": "fb_exchange_token", "fb_exchange_token": tok})
         user_tok = long["access_token"]
-        store().put(META_USER_SECRET, _tok_record("meta", long, shared_with="ops social ingest"))
+        me = _get(f"https://graph.facebook.com/{META_VERSION}/me?fields=id,name", user_tok)
+        _share_meta_login(me, long)
         pages = _get(f"https://graph.facebook.com/{META_VERSION}/me/accounts?limit=100&fields="
                      "id,name,username,access_token,instagram_business_account{id,username}", user_tok)
         for pg in pages.get("data", []):

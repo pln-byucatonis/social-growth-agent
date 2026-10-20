@@ -16,6 +16,7 @@ from helpers import CJ, make
 class FakePlatform:
     def __init__(self):
         self.calls = []
+        self.me_id = "u1"
 
     def __call__(self, req):
         self.calls.append(req)
@@ -24,6 +25,8 @@ class FakePlatform:
             return HttpResponse(200, {"access_token": "LONG-USER", "expires_in": 5184000})
         if "oauth/access_token" in u:
             return HttpResponse(200, {"access_token": "SHORT-USER", "expires_in": 3600})
+        if "/me?fields=id,name" in u:
+            return HttpResponse(200, {"id": self.me_id, "name": "Admin " + self.me_id})
         if "/me/accounts" in u:
             return HttpResponse(200, {"data": [
                 {"id": "1001", "name": "Pro League Network", "access_token": "PAGE-PLN",
@@ -83,10 +86,19 @@ class OAuthTests(unittest.TestCase):
         self.assertNotIn("PAGE-PLN", json.dumps(self.db.all("accounts")) + json.dumps(self.db.all("audit_log")))
         # the long-lived user token is shared with the ops analytics ingest
         shared = self.store.get(oauth.META_USER_SECRET)
-        self.assertEqual(shared["access_token"], "LONG-USER")
+        self.assertEqual(shared["tokens"]["u1"]["access_token"], "LONG-USER")
         st = oauth.meta_user_token_status()
         self.assertTrue(st["connected"])
         self.assertGreater(st["days_left"], 50)
+
+    def test_each_meta_login_is_kept_for_analytics(self):
+        for uid in ("u1", "u2", "u1"):  # two managers; the first signs in again later
+            self.fake.me_id = uid
+            q = self._state(oauth.start(self.db, "meta", "", "admin@pln"))
+            oauth.callback(self.db, "meta", {"code": "C", "state": q["state"][0]}, "admin@pln")
+        shared = self.store.get(oauth.META_USER_SECRET)
+        self.assertEqual(sorted(shared["tokens"]), ["u1", "u2"])
+        self.assertEqual(len(oauth.meta_user_token_status()["logins"]), 2)
 
     def test_state_is_single_use_and_bound_to_provider(self):
         q = self._state(oauth.start(self.db, "meta", "", "admin@pln"))
