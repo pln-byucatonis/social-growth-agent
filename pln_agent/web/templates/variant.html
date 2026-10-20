@@ -20,6 +20,9 @@
 {% else %}<p class="muted">No playable source for this asset.</p>{% endif %}
 <h3>Finished post</h3>{% if v.render_status == 'rendering' %}<p><b>Rendering…</b> refresh in a minute.</p>{% elif render_url and '.mp4' in render_url %}<video src="{{ render_url }}" controls muted playsinline></video>{% elif render_url %}<img src="{{ render_url }}" style="max-width:100%">{% else %}<p class="muted">Not rendered yet ({{ v.render_status }}).</p>{% endif %}
 <form method="post" action="{{ base }}/variant/{{ v.variant_id }}/render"><button>{{ 'Re-render' if render_url else 'Render finished post (9:16, burned text)' }}</button></form>
+{% if v.public_media_url %}<p>Public link: <a href="{{ v.public_media_url }}" target="_blank" rel="noopener">{{ v.public_media_url }}</a></p>
+{% elif render_url and v.state in ('approved','scheduled') %}<form method="post" action="{{ base }}/variant/{{ v.variant_id }}/public-link"><button>Create public link</button> <span class="muted">for platforms that pull the video from a URL (Instagram, Facebook, TikTok); created automatically at publish time</span></form>
+{% elif render_url %}<p class="muted">A public link can be created once this post is approved.</p>{% endif %}
 <h4>Edit decision list</h4><table>{% for s in v.edl.segments %}<tr><td>{{ '%.2f'|format(s.source_in) }}–{{ '%.2f'|format(s.source_out) }}s</td><td>{{ s.purpose }}</td><td class="muted">{{ s.source_timecode }}</td></tr>{% endfor %}</table><p class="muted">{{ v.edl.notes }}</p></div>
 </div>
 <div class="card"><h3>Score (explainable)</h3><table>{% for k, x in v.score_breakdown.parts.items() %}<tr><td>{{ k }}</td><td>{{ x.score }}</td><td class="muted">{{ x.why }}</td></tr>{% endfor %}</table></div>

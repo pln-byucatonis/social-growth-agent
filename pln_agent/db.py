@@ -150,6 +150,7 @@ TABLES: dict[str, list[tuple[str, str, str]]] = {
         ("caption_hash", "text", ""),
         ("render_status", "text", ""),
         ("render_path", "text", ""),
+        ("public_media_url", "text", ""),  # approved render on the public CDN (platform pull-from-URL)
         ("created_at", "ts", ""),
         ("updated_at", "ts", ""),
     ],

@@ -40,11 +40,12 @@ class InventoryTests(unittest.TestCase):
         self.assertEqual(self.db.get("accounts", "account_id", "carjitsu.tiktok.carjitsuchampionship")["verification_status"],
                          "ownership_confirmed")
 
-    def test_linkedin_pending_placeholder_has_no_fabricated_handle(self):
+    def test_linkedin_company_page_is_the_supplied_org(self):
         li = self.db.get("accounts", "account_id", "pln.linkedin.pending")
-        self.assertEqual(li["username_original"], "")
-        self.assertEqual(li["source"], "system_placeholder")
-        self.assertTrue(li["hard_block_reason"])
+        self.assertEqual(li["stable_platform_id"], "91515598")
+        self.assertEqual(li["role"], "canonical")
+        self.assertEqual(li["hard_block_reason"], "")
+        self.assertEqual(li["credential_ref"], "")  # not connected until a Page admin signs in
 
     def test_brand_ids_and_account_ids_are_separate(self):
         wpl = self.db.get("accounts", "account_id", "world_putting_league.instagram.worldputtingleague")
@@ -302,7 +303,7 @@ class GateTests(unittest.TestCase):
         calls = []
         r = run_publisher(self.db, live, now=SLOT, transport=lambda req: calls.append(req))
         self.assertEqual(r[0]["state"], "simulated")
-        self.assertTrue(any("hard block" in x for x in r[0]["why_not_live"]))
+        self.assertTrue(any("not oauth_connected" in x for x in r[0]["why_not_live"]))
         self.assertEqual(calls, [])
         with self.assertRaises(PermissionError):
             acc_mod.authorize_publishing(self.db, "pln.linkedin.pending", "t")
@@ -390,6 +391,7 @@ class LivePathFailureTests(unittest.TestCase):
             go_live(self.db, acc)
             v = self.db.get("variants", "variant_id", f"{CJ}:{acc}")
             v["render_path"] = "/x/y/video.mp4"
+            v["public_media_url"] = "https://cdn.example.invalid/v/abc/carjitsu-tiktok.mp4"
             a = get_adapter("tiktok", transport=lambda req: HttpResponse(200, {"data": {"privacy_level_options": ["PUBLIC_TO_EVERYONE"]}}))
             init = a.plan_requests(v, self.db.get("accounts", "account_id", acc), "u")[1]
             self.assertEqual(init.json_body["post_info"]["privacy_level"], "SELF_ONLY")

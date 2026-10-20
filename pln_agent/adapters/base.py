@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import os
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
 from typing import Callable, Protocol
@@ -22,12 +23,13 @@ class HttpRequest:
     headers: dict = field(default_factory=dict)
     json_body: dict | None = None
     purpose: str = ""
+    form_body: dict | None = None  # application/x-www-form-urlencoded (OAuth token endpoints)
 
     def redacted(self) -> dict:
         h = {k: ("***REDACTED***" if k.lower() in ("authorization", "access-token") else v) for k, v in self.headers.items()}
         body = dict(self.json_body or {})
         for k in list(body):
-            if "token" in k.lower():
+            if "token" in k.lower() or "secret" in k.lower():
                 body[k] = "***REDACTED***"
         return {"method": self.method, "url": self.url, "headers": h, "json": body, "purpose": self.purpose}
 
@@ -44,9 +46,13 @@ class Transport(Protocol):
 
 
 def urllib_transport(req: HttpRequest, timeout: float = 30) -> HttpResponse:
-    data = json.dumps(req.json_body).encode() if req.json_body is not None else None
-    r = urllib.request.Request(req.url, data=data, method=req.method,
-                               headers={**req.headers, **({"Content-Type": "application/json"} if data else {})})
+    if req.form_body is not None:
+        data = urllib.parse.urlencode(req.form_body).encode()
+        ctype = {"Content-Type": "application/x-www-form-urlencoded"}
+    else:
+        data = json.dumps(req.json_body).encode() if req.json_body is not None else None
+        ctype = {"Content-Type": "application/json"} if data else {}
+    r = urllib.request.Request(req.url, data=data, method=req.method, headers={**req.headers, **ctype})
     try:
         with urllib.request.urlopen(r, timeout=timeout) as resp:
             raw = resp.read().decode() or "{}"
@@ -89,6 +95,8 @@ def classify_http(resp: HttpResponse, context: str) -> None:
 
 
 def resolve_token(credential_ref: str) -> str:
+    """env:NAME → that env var. vault:<secret name> → the OAuth token record in AWS Secrets Manager written by
+    the Connect flow (pln_agent.oauth), refreshed first when it is about to expire."""
     if not credential_ref:
         raise AdapterError("blocked", "no credential reference configured for account")
     scheme, _, name = credential_ref.partition(":")
@@ -97,15 +105,23 @@ def resolve_token(credential_ref: str) -> str:
         if not tok:
             raise AdapterError("auth", f"credential env var {name} is not set")
         return tok
-    raise AdapterError("blocked", f"credential scheme {scheme!r} not wired yet (add your vault client)")
+    if scheme == "vault":
+        from ..oauth import access_token
+        try:
+            return access_token(name)
+        except LookupError as e:
+            raise AdapterError("auth", str(e))
+    raise AdapterError("blocked", f"credential scheme {scheme!r} is not supported")
 
 
-def media_public_url(render_path: str) -> str:
-    base = os.environ.get("PLN_MEDIA_PUBLIC_BASE_URL", "")
-    if not base:
-        raise AdapterError("blocked", "rendered media must be hosted at a public HTTPS URL for pull-based APIs; set "
-                                      "PLN_MEDIA_PUBLIC_BASE_URL (S3/CDN) and upload renders there")
-    return base.rstrip("/") + "/" + os.path.basename(os.path.dirname(render_path)) + "/" + os.path.basename(render_path)
+def media_public_url(variant: dict) -> str:
+    """The approved render's public HTTPS URL (pull-from-URL APIs: Instagram, Facebook, TikTok). Set by
+    pln_agent.public_media.publish_render once the post is approved."""
+    url = variant.get("public_media_url") or ""
+    if not url:
+        raise AdapterError("blocked", "no public link for this render yet: render it, approve it, then create the "
+                                      "public link (done automatically when the post is scheduled)")
+    return url
 
 
 class BaseAdapter:

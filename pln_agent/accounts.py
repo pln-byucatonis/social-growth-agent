@@ -22,6 +22,8 @@ EXTENDED_PLATFORMS = ["youtube", "x", "twitch"]
 VERIFICATION_ORDER = ["unverified", "ownership_confirmed", "oauth_connected"]
 
 
+LINKEDIN_ORG_ID = "91515598"  # PLN company Page
+
 def load_brands() -> list[dict]:
     return json.loads((CONFIG_DIR / "brands.json").read_text())["brands"]
 
@@ -128,23 +130,25 @@ def load_accounts(db: DB, path: Path | None = None, actor: str = "system") -> In
         db.insert("accounts", rec, upsert_key="account_id")
         ids.append(acc_id)
 
-    # PLN LinkedIn company page: strategically required, but NO handle/page id was supplied.
+    # PLN LinkedIn company Page (linkedin.com/company/91515598, supplied by PLN). The account id keeps its
+    # historical name so existing drafts stay attached.
     li = {
         "account_id": "pln.linkedin.pending", "brand_id": "pln", "canonical_brand_id": "pln",
-        "source_brand_name": "Pro League Network", "platform": "linkedin", "username_original": "",
-        "username_normalized": "", "stable_platform_id": "", "priority": "P0", "role": "pending_placeholder",
-        "supplied_status": "not_supplied", "verification_status": "unverified", "ownership_owner": "",
-        "credential_ref": "", "publishing_authorized": False, "publishing_policy": "approval_required",
-        "hard_block_reason": "No LinkedIn company Page ID supplied: connect via OAuth with Page admin role first",
+        "source_brand_name": "Pro League Network", "platform": "linkedin", "username_original": "Pro League Network",
+        "username_normalized": "proleaguenetwork", "stable_platform_id": LINKEDIN_ORG_ID, "priority": "P0",
+        "role": "canonical", "supplied_status": "company_page_supplied", "verification_status": "ownership_confirmed",
+        "ownership_owner": "Pro League Network (company Page admin)", "credential_ref": "",
+        "publishing_authorized": False, "publishing_policy": "approval_required", "hard_block_reason": "",
         "redirect_to_account_id": "", "campaign": "", "source": "system_placeholder", "csv_row": None,
-        "notes": "Planning-only placeholder. Handle intentionally left blank (not fabricated).",
+        "notes": f"Company Page https://www.linkedin.com/company/{LINKEDIN_ORG_ID}/ — connect via OAuth as a Page admin.",
         "created_at": now_iso(), "updated_at": now_iso(),
     }
     existing = db.get("accounts", "account_id", li["account_id"])
     if existing:
-        for k in ("verification_status", "credential_ref", "publishing_authorized", "stable_platform_id",
-                  "username_original", "username_normalized", "hard_block_reason", "created_at"):
+        for k in ("credential_ref", "publishing_authorized", "created_at"):
             li[k] = existing[k]
+        if existing["verification_status"] == "oauth_connected":
+            li["verification_status"] = "oauth_connected"
     li.update({k: v for k, v in state.get(li["account_id"], {}).items() if k in li})
     db.insert("accounts", li, upsert_key="account_id")
     db.audit(actor, "inventory_loaded", "accounts", "", {"supplied_rows": len(rows), "warnings": warnings})

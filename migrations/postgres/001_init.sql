@@ -128,6 +128,7 @@ CREATE TABLE IF NOT EXISTS variants (
   caption_hash TEXT,
   render_status TEXT,
   render_path TEXT,
+  public_media_url TEXT,
   created_at TEXT,
   updated_at TEXT
 );

@@ -1,0 +1,8 @@
+{% extends "base.html" %}{% block body %}
+<div class="card">{% if error %}<h3>Couldn't connect</h3><p class="badge bad">{{ error }}</p>
+{% else %}<h3>{{ label }} connected</h3>
+{% if result.connected %}<p>Connected {{ result.connected|length }} account(s):</p><ul>{% for c in result.connected %}<li><b>{{ c.account_id }}</b> — {{ c.platform }} {{ c.handle }} (id {{ c.platform_id }})</li>{% endfor %}</ul>{% else %}<p>No agent account matched what this login manages.</p>{% endif %}
+{% if result.unmatched %}<p class="muted">This login also manages these, which don't match an agent account (not connected):</p><ul>{% for u in result.unmatched %}<li>{{ u.platform }} {{ u.handle or u.name }} (id {{ u.platform_id }})</li>{% endfor %}</ul>{% endif %}
+<p class="muted">Publishing is still off for these accounts until it's authorized separately.</p>{% endif %}
+<p><a class="btn" href="{{ portal }}">Back to Accounts in ops</a></p></div>
+{% endblock %}

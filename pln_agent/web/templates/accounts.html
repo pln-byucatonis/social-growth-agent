@@ -1,9 +1,28 @@
 {% extends "base.html" %}{% block body %}
-<div class="card tablewrap"><h3>Portfolio ({{ rows|length }} rows: user-supplied handles + pending LinkedIn placeholder — none verified by default)</h3>
-<table><tr><th>account id</th><th>handle (as supplied)</th><th>platform</th><th>role</th><th>verification</th><th>live publish</th></tr>
+<div class="card"><h3>Connect accounts</h3>
+<p>Three steps per platform: <b>1</b> register a developer app on the platform and add the redirect URL shown below;
+<b>2</b> paste its client id + secret here (stored in AWS Secrets Manager, never shown again);
+<b>3</b> press <b>Connect</b> and sign in as an admin of the brand account. One Meta sign-in connects every Facebook Page and Instagram account it manages.
+Connecting never turns on publishing — that stays a separate step per account behind the global dry-run switch.</p>
+<form method="post" action="{{ base }}/accounts/confirm-ownership"><button>Confirm PLN owns all unverified accounts</button></form></div>
+<div class="grid">{% for a in apps %}<div class="card"><h3>{{ a.p.label }}</h3>
+<p>{% if a.configured %}<span class="badge ok">app saved {{ a.client_id_hint }}</span>{% else %}<span class="badge warn">app not saved yet</span>{% endif %}
+{% if a.error %}<span class="badge bad">{{ a.error }}</span>{% endif %}</p>
+<p class="muted">Redirect URL to register:<br><code>{{ a.redirect_uri }}</code></p>
+<p class="muted">Scopes: {{ a.p.scopes|join(', ') }}</p>
+<p class="muted">{{ a.p.review_note }} <a href="{{ a.p.console }}" target="_blank" rel="noopener">Developer console ↗</a></p>
+<details><summary>{{ 'Replace' if a.configured else 'Save' }} app credentials</summary>
+<form method="post" action="{{ base }}/oauth/app/{{ a.p.key }}" autocomplete="off">
+<label>Client id <input name="client_id" required></label>
+<label>Client secret <input name="client_secret" type="password" required></label><button>Save</button></form></details>
+<table>{% for r in a.accounts %}<tr><td>{{ r.username_original or r.account_id }}<br><span class="muted">{{ r.platform }} · {{ r.verification_status }}{% if r.stable_platform_id %} · id {{ r.stable_platform_id }}{% endif %}</span></td>
+<td>{% if a.configured %}<a class="btn" target="_top" href="{{ base }}/oauth/start/{{ a.p.key }}?account={{ r.account_id|urlencode }}">{{ 'Reconnect' if r.verification_status == 'oauth_connected' else 'Connect' }}</a>{% else %}<span class="muted">save app first</span>{% endif %}</td></tr>{% endfor %}</table>
+</div>{% endfor %}</div>
+<div class="card tablewrap"><h3>Portfolio ({{ rows|length }} accounts)</h3>
+<table><tr><th>account id</th><th>handle</th><th>platform</th><th>role</th><th>verification</th><th>live publish</th></tr>
 {% for a in rows %}<tr><td>{{ a.account_id }}<br><span class="muted">{{ a.brand_id }} → {{ a.canonical_brand_id }}</span></td><td>{{ a.username_original or '(not supplied)' }}</td><td>{{ a.platform }}</td><td>{{ a.role }}</td>
-<td>{{ a.verification_status }}{% if a.hard_block_reason %}<br><span class="badge bad">{{ a.hard_block_reason }}</span>{% endif %}</td>
+<td>{{ a.verification_status }}{% if a.ownership_owner %}<br><span class="muted">{{ a.ownership_owner }}</span>{% endif %}{% if a.hard_block_reason %}<br><span class="badge bad">{{ a.hard_block_reason }}</span>{% endif %}</td>
 <td>{% if a.live_ok %}<span class="badge ok">yes</span>{% else %}<span class="muted">{{ a.reasons|join(' · ') }}</span>{% endif %}</td></tr>{% endfor %}</table>
-<p class="muted">Verification, credential references and authorization are changed via audited CLI commands (pln accounts verify/connect/authorize) after a human confirms ownership. Raw tokens are never stored.</p></div>
-<div class="grid">{% for p, c in caps.items() %}<div class="card"><h3>{{ p }}</h3><ul>{% for r in c.requirements %}<li>{{ r }}</li>{% endfor %}</ul>{% for b in c.app_review_blockers %}<div class="badge warn">{{ b }}</div>{% endfor %}<p class="muted">profile edits: {{ c.profile_edits }} · delete: {{ c.delete }}</p></div>{% endfor %}</div>
+<p class="muted">Tokens live in AWS Secrets Manager; the database keeps only a reference. Publishing authorization is a separate audited step (pln accounts authorize).</p></div>
+<div class="grid">{% for p, c in caps.items() %}<div class="card"><h3>{{ p }}</h3><ul>{% for r in c.requirements %}<li>{{ r }}</li>{% endfor %}</ul>{% for b in c.app_review_blockers %}<div class="badge warn">{{ b }}</div>{% endfor %}</div>{% endfor %}</div>
 {% endblock %}

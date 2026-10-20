@@ -288,6 +288,16 @@ def do_render(request: Request, vid: str):
     return back(request, f"/variant/{vid}", "Rendering started — this takes about a minute. Refresh to see it.")
 
 
+@app.post("/variant/{vid:path}/public-link")
+def do_public_link(request: Request, vid: str):
+    from ..public_media import PublicMediaError, publish_render
+    try:
+        url = publish_render(db(), vid, request.state.user or "dashboard")
+        return back(request, f"/variant/{vid}", f"Public link ready: {url}")
+    except PublicMediaError as e:
+        return back(request, f"/variant/{vid}", err=str(e))
+
+
 @app.post("/publish/run")
 def do_publish(request: Request):
     res = run_publisher(db(), settings)
@@ -410,13 +420,83 @@ def calendar(request: Request, start: str = ""):
 
 @app.get("/accounts", response_class=HTMLResponse)
 def accounts(request: Request):
+    from .. import oauth
     d = db()
     rows = []
     for a in d.all("accounts", order="canonical_brand_id, platform"):
         ok, reasons = publish_eligibility(a, settings, kill_switch_on(d))
-        rows.append({**a, "live_ok": ok, "reasons": reasons})
+        rows.append({**a, "live_ok": ok, "reasons": reasons, "provider": oauth.PLATFORM_PROVIDER.get(a["platform"], "")})
     caps = {p: get_adapter(p, settings=settings).capabilities() for p in sorted({a["platform"] for a in rows})}
-    return page(request, "accounts.html", rows=rows, caps=caps)
+    apps = []
+    for p in oauth.PROVIDERS.values():
+        try:
+            status = oauth.app_status(p.key)
+        except Exception as e:  # secret store unreachable: show it, don't 500
+            status = {"configured": False, "client_id_hint": "", "error": str(e)[:120]}
+        apps.append({"p": p, "redirect_uri": oauth.redirect_uri(p.key), **status,
+                     "accounts": [r for r in rows if r["provider"] == p.key]})
+    return page(request, "accounts.html", rows=rows, caps=caps, apps=apps)
+
+
+def _admin(request: Request) -> None:
+    if settings.agent_api_key and not request.state.admin:
+        raise HTTPException(403, "ops admin required")
+
+
+@app.post("/oauth/app/{provider}")
+def oauth_save_app(request: Request, provider: str, client_id: str = Form(""), client_secret: str = Form("")):
+    from .. import oauth
+    _admin(request)
+    try:
+        oauth.save_app(provider, client_id, client_secret, db(), request.state.user or "dashboard")
+    except (KeyError, ValueError) as e:
+        return back(request, "/accounts", err=str(e))
+    return back(request, "/accounts", f"Saved the {oauth.PROVIDERS[provider].label} app credentials")
+
+
+@app.get("/oauth/start/{provider}")
+def oauth_start(request: Request, provider: str, account: str = ""):
+    """Top-level navigation (platform consent screens refuse iframes)."""
+    from .. import oauth
+    _admin(request)
+    if provider not in oauth.PROVIDERS:
+        raise HTTPException(404)
+    try:
+        url = oauth.start(db(), provider, account, request.state.user or "dashboard")
+    except (LookupError, ValueError) as e:
+        return page(request, "oauth_result.html", result=None, error=str(e), portal=_portal_accounts())
+    return RedirectResponse(url, status_code=302)
+
+
+@app.get("/oauth/callback/{provider}")
+def oauth_callback(request: Request, provider: str):
+    from .. import oauth
+    _admin(request)
+    if provider not in oauth.PROVIDERS:
+        raise HTTPException(404)
+    try:
+        result = oauth.callback(db(), provider, dict(request.query_params), request.state.user or "dashboard")
+        return page(request, "oauth_result.html", result=result, error="", portal=_portal_accounts(),
+                    label=oauth.PROVIDERS[provider].label)
+    except (PermissionError, LookupError) as e:
+        return page(request, "oauth_result.html", result=None, error=str(e), portal=_portal_accounts())
+
+
+def _portal_accounts() -> str:
+    return os.environ.get("PLN_PORTAL_ACCOUNTS_URL", "https://ops.proleaguenetwork.com/social/growth/accounts")
+
+
+@app.post("/accounts/confirm-ownership")
+def confirm_ownership(request: Request, account_id: str = Form("")):
+    """'These are ours': record PLN ownership (all unverified accounts, or one). Doesn't connect or authorize."""
+    from ..accounts import set_verification
+    _admin(request)
+    d = db()
+    actor = request.state.user or "dashboard"
+    ids = [account_id] if account_id else [a["account_id"] for a in d.all("accounts", "verification_status='unverified'")]
+    for i in ids:
+        set_verification(d, i, "ownership_confirmed", actor, owner=f"Pro League Network (confirmed by {actor})")
+    return back(request, "/accounts", f"Ownership confirmed for {len(ids)} account(s)")
 
 
 @app.get("/migration", response_class=HTMLResponse)

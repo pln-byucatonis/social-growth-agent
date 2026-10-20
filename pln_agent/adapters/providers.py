@@ -79,7 +79,7 @@ class FacebookPageAdapter(BaseAdapter):
 
     def publish(self, v, account, idempotency_key):
         token = resolve_token(account["credential_ref"])
-        req = self.plan_requests(v, account, media_public_url(v["render_path"]), token)[0]
+        req = self.plan_requests(v, account, media_public_url(v), token)[0]
         resp = self._send(req, "facebook page video")
         vid = resp.body.get("id", "")
         return PublishResult("processing", vid, f"https://www.facebook.com/{vid}", resp.body)
@@ -114,7 +114,7 @@ class InstagramAdapter(BaseAdapter):
     def publish(self, v, account, idempotency_key):
         token = resolve_token(account["credential_ref"])
         ver = getattr(self.settings, "meta_graph_version", "v26.0")
-        create, _, pub = self.plan_requests(v, account, media_public_url(v["render_path"]), token)
+        create, _, pub = self.plan_requests(v, account, media_public_url(v), token)
         cid = self._send(create, "instagram create container").body["id"]
         for _ in range(self.poll_max):
             st = self._send(HttpRequest("GET", f"{self._host()}/{ver}/{cid}?fields=status_code&access_token={token}"),
@@ -163,7 +163,7 @@ class TikTokAdapter(BaseAdapter):
 
     def publish(self, v, account, idempotency_key):
         token = resolve_token(account["credential_ref"])
-        info, init, _ = self.plan_requests(v, account, media_public_url(v["render_path"]), token)
+        info, init, _ = self.plan_requests(v, account, media_public_url(v), token)
         opts = self._send(info, "tiktok creator_info").body.get("data", {}).get("privacy_level_options", [])
         want = init.json_body["post_info"]["privacy_level"]
         if want not in opts:

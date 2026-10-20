@@ -189,7 +189,9 @@ def render_variant(db: DB, variant_id: str, settings: Settings, actor: str = "re
                            capture_output=True, timeout=120)
     if status == "rendered" and os.environ.get("PLN_RENDER_BUCKET"):
         path = upload_render(outdir, variant_id, os.environ["PLN_RENDER_BUCKET"])
-    db.update("variants", "variant_id", variant_id, {"render_status": status, "render_path": path, "updated_at": now_iso()})
+    # a new render invalidates any earlier public link (the file it points at is the old cut)
+    db.update("variants", "variant_id", variant_id, {"render_status": status, "render_path": path,
+                                                     "public_media_url": "", "updated_at": now_iso()})
     db.audit(actor, "variant_rendered", "variants", variant_id, {"status": status, "detail": detail[:300]})
     return {"variant_id": variant_id, "status": status, "path": path, "detail": detail, "dir": str(outdir)}
 
