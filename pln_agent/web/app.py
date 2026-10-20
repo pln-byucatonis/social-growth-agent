@@ -496,6 +496,17 @@ def oauth_save_app(request: Request, provider: str, client_id: str = Form(""), c
     return back(request, "/accounts", f"Saved the {oauth.PROVIDERS[provider].label} app credentials")
 
 
+@app.post("/oauth/app/meta/config")
+def oauth_meta_config(request: Request, config_id: str = Form("")):
+    from .. import oauth
+    _admin(request)
+    try:
+        oauth.save_meta_config(config_id, db(), request.state.user or "dashboard")
+    except ValueError as e:
+        return back(request, "/accounts", err=str(e))
+    return back(request, "/accounts", "Saved the Meta login configuration" if config_id.strip() else "Cleared the Meta configuration")
+
+
 @app.get("/oauth/start/{provider}")
 def oauth_start(request: Request, provider: str, account: str = ""):
     """Top-level navigation (platform consent screens refuse iframes)."""

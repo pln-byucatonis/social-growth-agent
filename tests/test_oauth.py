@@ -63,7 +63,7 @@ class OAuthTests(unittest.TestCase):
         return urllib.parse.parse_qs(urllib.parse.urlparse(url).query)
 
     def test_app_secret_is_stored_but_never_audited_or_shown(self):
-        self.assertEqual(oauth.app_status("meta"), {"configured": True, "client_id_hint": "…1234"})
+        self.assertEqual(oauth.app_status("meta"), {"configured": True, "client_id_hint": "…1234", "config_id": ""})
         audit = json.dumps(self.db.all("audit_log"))
         self.assertNotIn("meta-SECRET", audit)
 
@@ -99,6 +99,15 @@ class OAuthTests(unittest.TestCase):
         shared = self.store.get(oauth.META_USER_SECRET)
         self.assertEqual(sorted(shared["tokens"]), ["u1", "u2"])
         self.assertEqual(len(oauth.meta_user_token_status()["logins"]), 2)
+
+    def test_facebook_login_for_business_uses_the_configuration_id(self):
+        oauth.save_meta_config("987654321012345", self.db, "admin@pln")
+        q = self._state(oauth.start(self.db, "meta", "", "admin@pln"))
+        self.assertEqual(q["config_id"], ["987654321012345"])
+        self.assertNotIn("scope", q)
+        self.assertEqual(self.store.get(oauth.APP_SECRET.format(provider="meta"))["client_secret"], "meta-SECRET")
+        with self.assertRaises(ValueError):
+            oauth.save_meta_config("not-a-number", self.db, "admin@pln")
 
     def test_state_is_single_use_and_bound_to_provider(self):
         q = self._state(oauth.start(self.db, "meta", "", "admin@pln"))

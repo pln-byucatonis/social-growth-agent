@@ -162,10 +162,25 @@ def save_app(provider: str, client_id: str, client_secret: str, db: DB, actor: s
     db.audit(actor, "oauth_app_saved", "oauth", provider, {"client_id_suffix": client_id[-4:]})  # never the secret
 
 
+def save_meta_config(config_id: str, db: DB, actor: str) -> None:
+    """Facebook Login for Business: the app's login *configuration* (assets + permissions chosen in the
+    Meta dashboard). When set, the consent URL sends config_id instead of a scope list."""
+    config_id = config_id.strip()
+    if config_id and not re.fullmatch(r"\d{5,25}", config_id):
+        raise ValueError("a Meta configuration ID is a number (Facebook Login for Business → Configurations)")
+    app = store().get(APP_SECRET.format(provider="meta"))
+    if not app:
+        raise ValueError("save the Meta app id and secret first")
+    app["config_id"] = config_id
+    store().put(APP_SECRET.format(provider="meta"), app)
+    db.audit(actor, "oauth_meta_config_saved", "oauth", "meta", {"config_id": config_id})
+
+
 def app_status(provider: str) -> dict:
     app = store().get(APP_SECRET.format(provider=provider)) or {}
     cid = app.get("client_id", "")
-    return {"configured": bool(cid and app.get("client_secret")), "client_id_hint": ("…" + cid[-4:]) if cid else ""}
+    return {"configured": bool(cid and app.get("client_secret")), "client_id_hint": ("…" + cid[-4:]) if cid else "",
+            "config_id": app.get("config_id", "")}
 
 
 def _app(provider: str) -> dict:
@@ -228,6 +243,9 @@ def start(db: DB, provider: str, account_id: str, actor: str) -> str:
         st["verifier"] = verifier
         q["code_challenge"] = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).decode().rstrip("=")
         q["code_challenge_method"] = "S256"
+    if provider == "meta" and app.get("config_id"):  # Facebook Login for Business
+        q.pop("scope")
+        q.update({"config_id": app["config_id"], "override_default_response_type": "true"})
     if provider == "google":
         q.update({"access_type": "offline", "prompt": "consent select_account", "include_granted_scopes": "true"})
     db.insert("settings_kv", {"key": f"oauth_state:{nonce}", "value": json.dumps(st), "updated_at": now_iso(),

@@ -18,6 +18,8 @@ Connecting never turns on publishing — that stays a separate step per account 
 <form method="post" action="{{ base }}/oauth/app/{{ a.p.key }}" autocomplete="off">
 <label>Client id <input name="client_id" required></label>
 <label>Client secret <input name="client_secret" type="password" required></label><button>Save</button></form></details>
+{% if a.p.key == 'meta' and a.configured %}<form method="post" action="{{ base }}/oauth/app/meta/config"><label>Facebook Login for Business configuration ID <input name="config_id" value="{{ a.config_id }}" size="20" placeholder="e.g. 1234567890123456"></label><button>Save</button>
+<span class="muted">From the Meta app → Facebook Login for Business → Configurations. Leave blank to use the classic permission list.</span></form>{% endif %}
 <table>{% for r in a.accounts %}<tr><td>{{ r.username_original or r.account_id }}<br><span class="muted">{{ r.platform }} · {{ r.verification_status }}{% if r.stable_platform_id %} · id {{ r.stable_platform_id }}{% endif %}</span></td>
 <td>{% if a.configured %}<a class="btn" target="_top" href="{{ base }}/oauth/start/{{ a.p.key }}?account={{ r.account_id|urlencode }}">{{ 'Reconnect' if r.verification_status == 'oauth_connected' else 'Connect' }}</a>{% else %}<span class="muted">save app first</span>{% endif %}</td></tr>{% endfor %}</table>
 </div>{% endfor %}</div>
