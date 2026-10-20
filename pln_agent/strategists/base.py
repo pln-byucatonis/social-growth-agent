@@ -149,6 +149,29 @@ def ungrounded_numbers(text: str, corpus: str) -> list[str]:
     return [n for n in found if n not in allowed]
 
 
+_JUNK_NAME = re.compile(r"^(person|face|unknown|cluster)\s*#?\s*\d+$", re.I)
+
+
+def is_junk_name(name: str) -> bool:
+    """Tagger output that isn't a person's name: face-cluster placeholders ("person #2775"),
+    1–2 character fragments and short all-caps codes ("FPS")."""
+    n = (name or "").strip()
+    return (not n or len(n) < 3 or bool(_JUNK_NAME.match(n)) or (n.isupper() and len(n) <= 3 and n.isalpha()))
+
+
+def house_vocabulary(ctx: "CreativeContext") -> set[str]:
+    """Words our own copy legitimately uses: brand names/aliases, network name, platform handles."""
+    from ..accounts import load_brands
+    words = {"pro league network", "pln", "league", "network", ctx.display_brand.lower()}
+    for b in load_brands():
+        words.add(b["name"].lower())
+        words.update(a.lower() for a in b.get("aliases", []))
+        words.update(w.lower() for w in re.findall(r"[A-Za-z0-9]+", b["name"]))
+    if ctx.canonical_handle:
+        words.add(ctx.canonical_handle.lower().lstrip("@"))
+    return words
+
+
 def common_violations(text: str, ctx: CreativeContext) -> list[str]:
     errs = []
     low = text.lower()
@@ -157,9 +180,16 @@ def common_violations(text: str, ctx: CreativeContext) -> list[str]:
             errs.append(f"banned clickbait/unsafe phrase matches /{pat}/")
     if "[verify" in low or "tbd" in low.split():
         errs.append("unresolved VERIFY/TBD placeholder")
+    vocab = house_vocabulary(ctx)
     for p in ctx.asset.get("people") or []:
-        if not (ctx.asset.get("people_verified") and p.get("verified")) and p.get("name") and p["name"].lower() in low:
-            errs.append(f"names unverified person {p['name']!r}")
+        name = (p.get("name") or "").strip()
+        if (ctx.asset.get("people_verified") and p.get("verified")) or is_junk_name(name):
+            continue
+        n = name.lower()
+        if n in vocab:  # e.g. a tagger "person" called "League" vs our own "Pro League Network"
+            continue
+        if re.search(rf"(?<![a-z0-9]){re.escape(n)}(?![a-z0-9])", low):
+            errs.append(f"names unverified person {name!r}")
     bad = ungrounded_numbers(text, ctx.grounding_corpus)
     if bad:
         errs.append(f"numbers not found in verified source material: {bad}")

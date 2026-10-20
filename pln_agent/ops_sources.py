@@ -18,6 +18,7 @@ from datetime import date
 
 from .accounts import _slug, brand_by_name, canonical_brand_id, load_brands, normalize_username
 from .db import DB, now_iso
+from .strategists.base import is_junk_name
 
 OPS_PLATFORMS = {"instagram", "facebook", "tiktok", "youtube", "x", "twitch", "linkedin"}
 
@@ -173,7 +174,8 @@ def import_ops_clips(db: DB, ops: DB, assets_bucket: str, limit: int = 100, min_
         ctags = tags.get(c["id"], [])
         aid = clip_asset_id(c["id"])
         rights = db.get("asset_rights", "asset_id", aid) or rights_default(db, brand["brand_id"])
-        people = talent.get(c["id"], [])
+        raw_people = talent.get(c["id"], [])
+        people = [p for p in raw_people if not is_junk_name(p["name"])]  # drop "person #2775", "FPS"…
         identities_ok = bool(rights.get("people_verified")) or (bool(people) and all(p["verified"] for p in people))
         # Copy is built from the description: never feed it machine text that may name unverified athletes.
         safe_caption = (c["caption"] or "").strip() if identities_ok else neutral_description(ctags, c["id"])
@@ -200,7 +202,7 @@ def import_ops_clips(db: DB, ops: DB, assets_bucket: str, limit: int = 100, min_
             "duration_s": (end - start) if rel else (float(c["source_duration"]) if c["source_duration"] else None),
             "width": 1080 if rel else None, "height": 1920 if rel else None, "has_audio": True,
             "probe": {"ops_clip": {"tags": ctags, "highlight_score": c["highlight_score"],
-                                   "machine_caption": c["caption"],  # for reviewers only; never used in copy unless verified
+                                   "machine_caption": c["caption"], "raw_talent": raw_people,  # for reviewers only; never used in copy unless verified
                                    "transcript": c["transcript"], "source_title": c["source_title"],
                                    "vertical_mode": c["vertical_mode"], "start_sec": start, "end_sec": end}},
             # Transcripts are burned in as captions; commentary names athletes, so only when verified.

@@ -21,6 +21,25 @@ class FakeRdsClient:
         return {"formattedRecords": '[{"n": 1}]'}
 
 
+class JunkNameTests(unittest.TestCase):
+    def test_junk_detection(self):
+        from pln_agent.strategists.base import is_junk_name
+        for junk in ("person #2775", "Person 81", "FPS", "", "Q", "face #3"):
+            self.assertTrue(is_junk_name(junk), junk)
+        for real in ("Black Larry", "Rocky", "CANNON", "Q. Davidson", "Mexicutioner", "OKUMA 915"):
+            self.assertFalse(is_junk_name(real), real)
+
+    def test_house_vocabulary_and_whole_words(self):
+        db, _ = make(packs=False)
+        from pln_agent.strategists import CreativeContext
+        a = dict(db.get("assets", "asset_id", "carjitsu-sample-001"))
+        a["people"] = [{"name": "League", "verified": False}, {"name": "Ram", "verified": False},
+                       {"name": "Rocky", "verified": False}, {"name": "person #12", "verified": False}]
+        ctx = CreativeContext(asset=a, account={}, brand={}, platform="x", route_role="canonical", display_brand="CarJitsu")
+        self.assertEqual(common_violations("New on the Pro League Network: a programmed finish.", ctx), [])
+        self.assertTrue(any("Rocky" in e for e in common_violations("Rocky gets the tap.", ctx)))
+
+
 class ProductionConfigTests(unittest.TestCase):
     def test_shipped_content_calendar_has_no_sample_events(self):
         from pln_agent.config import CONFIG_DIR
