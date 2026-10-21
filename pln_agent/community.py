@@ -31,8 +31,12 @@ PERMISSION_HINT = {
 }
 
 
-def config() -> dict:
-    return json.loads((CONFIG_DIR / "community.json").read_text())
+def config(db: DB | None = None) -> dict:
+    from .team_params import get
+    cfg = json.loads((CONFIG_DIR / "community.json").read_text())
+    for k in ("lookback_days", "faq_min_people", "max_posts_per_account"):
+        cfg[k] = get(db, "community", k, cfg[k])
+    return cfg
 
 
 # ---- triage ---------------------------------------------------------------------------------------
@@ -154,7 +158,7 @@ def _ours(acc: dict, c: dict) -> bool:
 def ingest(db: DB, transport=None, now: datetime | None = None, actor: str = "community", token_for=None) -> dict:
     """Fetch comments for recent posts on every connected Instagram / Facebook account."""
     from .oauth import access_token
-    cfg, names = config(), _brand_names()
+    cfg, names = config(db), _brand_names()
     now = now or datetime.now(timezone.utc)
     token_for = token_for or (lambda ref: access_token(ref))
     api = MetaComments(transport)
@@ -274,7 +278,7 @@ def _words(text: str) -> list[str]:
 
 def faqs(db: DB, days: int = 30, min_people: int | None = None, now: datetime | None = None) -> list[dict]:
     """Questions several different people asked, grouped by brand and their most distinctive shared word pair."""
-    min_people = min_people or config()["faq_min_people"]
+    min_people = min_people or config(db)["faq_min_people"]
     since = ((now or datetime.now(timezone.utc)) - timedelta(days=days)).replace(microsecond=0).isoformat()
     qs = db.query("SELECT comment_id, brand_id, author, text, category FROM comments WHERE created_at >= ? AND is_ours=? "
                   "AND category IN ('question','where_to_watch','athlete_interest')", [since, False])

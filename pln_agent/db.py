@@ -378,6 +378,36 @@ TABLES: dict[str, list[tuple[str, str, str]]] = {
         ("status", "text", ""),  # baseline | unchanged | changed | quote_missing | unreachable
         ("note", "text", ""),
     ],
+    # Agent Team: manager directives, and conversations / team challenges with the agents.
+    "agent_directives": [
+        ("directive_id", "text", "PRIMARY KEY"),
+        ("agent_key", "text", "NOT NULL"),  # an agent key, or 'team' for everyone
+        ("text", "text", "NOT NULL"),
+        ("status", "text", "NOT NULL"),  # active | retired
+        ("source", "text", ""),  # manager | challenge
+        ("thread_id", "text", ""),
+        ("created_by", "text", ""),
+        ("created_at", "ts", ""),
+    ],
+    "team_threads": [
+        ("thread_id", "text", "PRIMARY KEY"),
+        ("kind", "text", "NOT NULL"),  # chat | challenge
+        ("agent_key", "text", ""),
+        ("title", "text", ""),
+        ("status", "text", ""),  # open | running | done | failed
+        ("created_by", "text", ""),
+        ("created_at", "ts", ""),
+        ("result", "json", ""),
+    ],
+    "team_messages": [
+        ("id", "pk", ""),
+        ("thread_id", "text", "NOT NULL"),
+        ("role", "text", "NOT NULL"),  # manager | agent
+        ("agent_key", "text", ""),
+        ("content", "text", ""),
+        ("created_at", "ts", ""),
+        ("meta", "json", ""),
+    ],
     # Competitive Intelligence: public numbers for benchmark accounts, one row per capture.
     "competitor_snapshots": [
         ("snapshot_id", "text", "PRIMARY KEY"),
@@ -443,6 +473,7 @@ INDEXES = [
     "CREATE INDEX IF NOT EXISTS ix_scout_source ON scout_moments(source_id, potential)",
     "CREATE INDEX IF NOT EXISTS ix_scout_brand ON scout_moments(brand_id, potential)",
     "CREATE UNIQUE INDEX IF NOT EXISTS ux_experiment_arms_variant ON experiment_arms(variant_id)",
+    "CREATE INDEX IF NOT EXISTS ix_team_messages_thread ON team_messages(thread_id, id)",
     "CREATE INDEX IF NOT EXISTS ix_competitor_handle ON competitor_snapshots(handle, captured_at)",
     "CREATE INDEX IF NOT EXISTS ix_comments_status ON comments(status, priority)",
     "CREATE INDEX IF NOT EXISTS ix_comments_created ON comments(created_at)",

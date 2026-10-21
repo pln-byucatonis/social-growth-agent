@@ -176,6 +176,7 @@ def _arm_values(db: DB, e: dict) -> dict[str, list[float]]:
 
 def read(db: DB, persist: bool = True, today: date | None = None, actor: str = "growth-lab") -> list[dict]:
     """Read every running experiment; adjust p-values across all comparisons made in this read."""
+    from .team_params import get as _param
     today = today or datetime.now(timezone.utc).date()
     exps = [e for e in db.all("experiments", "status IN ('running','planned') AND variable<>'frequency'") if _res(e).get("mode")]
     comps = []
@@ -214,8 +215,8 @@ def read(db: DB, persist: bool = True, today: date | None = None, actor: str = "
             status, verdict = "running", f"leaning {best['arm'] if (best['lift'] or 0) > 0 else best['control']} (suggestive, keep going)"
         elif all(r["evidence"] == "no_clear_difference" and min(r["n_arm"], r["n_control"]) >= CONCLUSIVE_N for r in rows):
             status, verdict = "concluded", "no clear difference"
-        elif weeks > MAX_WEEKS:
-            status, verdict = "inconclusive", f"not enough posts after {MAX_WEEKS} weeks"
+        elif weeks > (max_weeks := _param(db, "growth_lab", "max_weeks", MAX_WEEKS)):
+            status, verdict = "inconclusive", f"not enough posts after {max_weeks} weeks"
         else:
             status, verdict = "running", "collecting (needs ≥5 measured posts per arm)"
         read_ = {"at": now_iso(), "outcome": outcome_of(e), "rows": rows, "verdict": verdict}

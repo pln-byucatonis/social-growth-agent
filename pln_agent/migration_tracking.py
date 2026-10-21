@@ -131,9 +131,11 @@ def recommend(legacy: dict | None, canon: dict | None, option: str) -> dict:
 
 
 def track(db: DB, today: date | None = None, persist: bool = True, actor: str = "migration-tracker") -> dict:
+    from .team_params import get as _param
     today = today or datetime.now(timezone.utc).date()
     cfg = load_config()
     platforms, alerts = [], []
+    rules = {k: _param(db, "migration", k, v) for k, v in RULES.items()}
     for platform, d in cfg["platforms"].items():
         canon_id = d["canonical_account_id"] if d["canonical_account_id"] != d["legacy_account_id"] else None
         leg, can = account_trend(db, d["legacy_account_id"], today), account_trend(db, canon_id, today)
@@ -145,19 +147,19 @@ def track(db: DB, today: date | None = None, persist: bool = True, actor: str = 
             if not t:
                 continue
             ch, f = t["change_28d"], t["followers"]
-            if ch is not None and f and ch < 0 and -ch / (f - ch) >= RULES["decline_pct_28d"]:
+            if ch is not None and f and ch < 0 and -ch / (f - ch) >= rules["decline_pct_28d"]:
                 alerts.append({"priority": "P0" if who == "Putt Tour" else "P1", "platform": platform,
                                "text": f"{who} {platform} down {ch:+,.0f} followers in 28 days ({-ch / (f - ch):.1%})."})
             elif t.get("unfollows_28d") and t.get("follows_28d") is not None and t["unfollows_28d"] > t["follows_28d"]:
                 alerts.append({"priority": "P1", "platform": platform,
                                "text": f"{who} {platform}: {t['unfollows_28d']:,.0f} unfollows vs {t['follows_28d']:,.0f} follows in 28 days."})
-            if t["days_since_post"] is None or t["days_since_post"] > RULES["silent_days"]:
+            if t["days_since_post"] is None or t["days_since_post"] > rules["silent_days"]:
                 alerts.append({"priority": "P1", "platform": platform,
                                "text": f"{who} {platform} " + (f"silent for {t['days_since_post']} days" if t["days_since_post"] is not None else "has no posts on record")
                                        + " — an inactive account loses reach and followers."})
         if canon_id and d["option"] in ("bridge_to_canonical", "redirect_to_new_account"):
             lb = br.get("last_bridge")
-            if not lb or (today - date.fromisoformat(lb)).days > RULES["bridge_every_days"]:
+            if not lb or (today - date.fromisoformat(lb)).days > rules["bridge_every_days"]:
                 alerts.append({"priority": "P1", "platform": platform,
                                "text": f"No bridge post on WPL {platform} " + (f"since {lb}" if lb else "on record")
                                        + f" — schedule one pointing to {can['handle'] if can else 'Putt Tour'}."})
@@ -169,7 +171,7 @@ def track(db: DB, today: date | None = None, persist: bool = True, actor: str = 
                            "text": f"{platform}: the numbers point to Putt Tour as home but the configured option is {d['option']} — revisit the decision."})
     order = {"P0": 0, "P1": 1, "P2": 2}
     alerts.sort(key=lambda a: order.get(a["priority"], 9))
-    out = {"generated_at": now_iso(), "platforms": platforms, "alerts": alerts, "rules": RULES}
+    out = {"generated_at": now_iso(), "platforms": platforms, "alerts": alerts, "rules": rules}
     if persist:
         db.kv_set("migration:tracking", json.dumps(out, default=str), actor)
     return out

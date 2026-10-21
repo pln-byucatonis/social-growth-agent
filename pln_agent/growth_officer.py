@@ -26,6 +26,14 @@ def goals() -> dict:
     return json.loads((CONFIG_DIR / "growth_goals.json").read_text())
 
 
+def goals_for(db: DB) -> dict:
+    """goals() with the manager's overrides from the Agent Team page applied to the rules."""
+    from .team_params import get
+    g = goals()
+    g["rules"] = {k: get(db, "cgo", k, v) for k, v in g["rules"].items()}
+    return g
+
+
 def tier_of(brand_id: str, g: dict | None = None) -> str:
     g = g or goals()
     for t, spec in g["tiers"].items():
@@ -66,7 +74,7 @@ def scoreboard(db: DB) -> list[dict]:
         lp = db.one("SELECT MAX(published_at) AS t FROM posts WHERE account_id=?", [a["account_id"]])
         if lp and lp["t"] and (b["last_post"] is None or str(lp["t"]) > b["last_post"]):
             b["last_post"] = str(lp["t"])[:10]
-    g = goals()
+    g = goals_for(db)
     out = []
     for b in brands.values():
         b["tier"] = tier_of(b["brand_id"], g)
@@ -95,7 +103,7 @@ def supply(db: DB) -> dict[str, dict]:
 
 def propose_allocation(db: DB, board: list[dict], sup: dict) -> dict:
     """Tier floors, then shift toward measured conversion where footage exists. Never more than the weekly cap."""
-    g = goals()
+    g = goals_for(db)
     cur = current_shares(db)
     cap = g["rules"]["max_shift_per_week"]
     floors = {b: spec["floor_share"] for t, spec in g["tiers"].items() for b in spec["brands"] if b != "*"}
@@ -130,7 +138,7 @@ def propose_allocation(db: DB, board: list[dict], sup: dict) -> dict:
 
 def generate_brief(db: DB, actor: str = "chief-growth-officer", today: date | None = None, persist: bool = True) -> dict:
     from .experiments import recommendations
-    g = goals()
+    g = goals_for(db)
     today = today or datetime.now(timezone.utc).date()
     week = (today - timedelta(days=today.weekday())).isoformat()
     board, sup = scoreboard(db), supply(db)

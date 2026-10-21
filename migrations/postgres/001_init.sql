@@ -367,6 +367,38 @@ CREATE TABLE IF NOT EXISTS knowledge_sources (
   note TEXT
 );
 
+CREATE TABLE IF NOT EXISTS agent_directives (
+  directive_id TEXT PRIMARY KEY,
+  agent_key TEXT NOT NULL,
+  text TEXT NOT NULL,
+  status TEXT NOT NULL,
+  source TEXT,
+  thread_id TEXT,
+  created_by TEXT,
+  created_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS team_threads (
+  thread_id TEXT PRIMARY KEY,
+  kind TEXT NOT NULL,
+  agent_key TEXT,
+  title TEXT,
+  status TEXT,
+  created_by TEXT,
+  created_at TEXT,
+  result JSONB
+);
+
+CREATE TABLE IF NOT EXISTS team_messages (
+  id BIGSERIAL PRIMARY KEY,
+  thread_id TEXT NOT NULL,
+  role TEXT NOT NULL,
+  agent_key TEXT,
+  content TEXT,
+  created_at TEXT,
+  meta JSONB
+);
+
 CREATE TABLE IF NOT EXISTS competitor_snapshots (
   snapshot_id TEXT PRIMARY KEY,
   handle TEXT NOT NULL,
@@ -437,6 +469,8 @@ CREATE INDEX IF NOT EXISTS ix_scout_source ON scout_moments(source_id, potential
 CREATE INDEX IF NOT EXISTS ix_scout_brand ON scout_moments(brand_id, potential);
 
 CREATE UNIQUE INDEX IF NOT EXISTS ux_experiment_arms_variant ON experiment_arms(variant_id);
+
+CREATE INDEX IF NOT EXISTS ix_team_messages_thread ON team_messages(thread_id, id);
 
 CREATE INDEX IF NOT EXISTS ix_competitor_handle ON competitor_snapshots(handle, captured_at);
 

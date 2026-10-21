@@ -78,10 +78,12 @@ def account_slots(db: DB, account_id: str, platform: str, hypotheses: dict) -> t
     if not learned:
         return base, "starting hypothesis (config/slots.json) — no learned windows yet"
     slots = list(dict.fromkeys(learned + base))[:max(len(base), len(learned))]
-    explore = next((f"{h:02d}:00" for h in (9, 15, 21, 12, 18) if f"{h:02d}:00" not in slots), None)
+    from .team_params import get as _param
+    explore = next((f"{h:02d}:00" for h in (9, 15, 21, 12, 18) if f"{h:02d}:00" not in slots), None) \
+        if _param(db, "publishing", "exploration_slot", True) else None
     if explore:
         slots.append(explore)
-    return slots, f"learned windows {', '.join(learned)} + starting slots; exploration slot {explore}"
+    return slots, f"learned windows {', '.join(learned)} + starting slots; " + (f"exploration slot {explore}" if explore else "no exploration slot (manager setting)")
 
 
 def plan_frequency_test(db: DB, account_id: str, start: date | None = None, actor: str = "publishing-strategist") -> list[dict]:

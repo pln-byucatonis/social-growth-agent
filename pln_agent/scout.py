@@ -98,7 +98,8 @@ def score_clip(db: DB, clip: dict, brand_id: str, tags: list[str], people: list[
         safety = taxonomy().get("safety") or {}
         hit = re.search(safety["pattern"], text, re.I) if safety.get("pattern") else None
         if hit or set(t.lower() for t in tags) & INJURY:
-            total *= safety.get("multiplier", 0.6)
+            from .team_params import get as _param
+            total *= _param(db, "scout", "safety_multiplier", float(safety.get("multiplier", 0.6)))
         return round(total, 1), {"parts": {k: {"score": round(v[0], 3), "why": v[1], "weight": w[k]} for k, v in parts.items()},
                                  "categories": cats, "content_type": ctype,
                                  "safety": (f"injury-adjacent ('{hit.group(0) if hit else 'tag'}'): ranked ×"

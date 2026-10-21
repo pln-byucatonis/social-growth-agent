@@ -130,6 +130,7 @@ def _ours(db: DB, now: datetime) -> dict:
 def snapshot(db: DB, transport=None, now: datetime | None = None, actor: str = "competitive-intel", token_for=None) -> dict:
     from .knowledge import add_entry
     from .oauth import access_token
+    from .team_params import get as _param
     cfg, now = config(), now or datetime.now(timezone.utc)
     viewer = _viewer(db)
     out = {"captured": [], "errors": {}}
@@ -155,7 +156,7 @@ def snapshot(db: DB, transport=None, now: datetime | None = None, actor: str = "
                                            "name": d["name"] or b.get("name", ""), "captured_at": now.replace(microsecond=0).isoformat(),
                                            "followers": d["followers"], "media_count": d["media_count"],
                                            "profile": {**prof, "growth": growth}, "compare_to": b.get("compare_to", [])})
-        if prof["posts"] >= cfg["min_posts"] and prof.get("median_er") is not None:
+        if prof["posts"] >= _param(db, "competitive", "min_posts", cfg["min_posts"]) and prof.get("median_er") is not None:
             stmt = (f"Benchmark @{h} ({b.get('name', h)}): {prof['posts_per_week']:g} posts/week, {prof['reels_share']:.0%} Reels, "
                     f"median {prof['median_er']:.2%} engagement per follower across its last {prof['posts']} posts"
                     + (f"; {len(prof['standouts'])} post(s) at 2×+ its median, led by \"{prof['standouts'][0]['hook'][:70]}\"" if prof["standouts"] else "")
@@ -186,7 +187,9 @@ def gaps(db: DB, now: datetime | None = None) -> list[dict]:
     ours = _ours(db, now)
     recs = []
     for aid, o in ours.items():
-        peers = [b["profile"] for b in bench if o["brand_id"] in (b.get("compare_to") or []) and (b["profile"] or {}).get("posts", 0) >= config()["min_posts"]]
+        from .team_params import get as _param
+        min_posts = _param(db, "competitive", "min_posts", config()["min_posts"])
+        peers = [b["profile"] for b in bench if o["brand_id"] in (b.get("compare_to") or []) and (b["profile"] or {}).get("posts", 0) >= min_posts]
         if not peers or not o.get("posts"):
             continue
         ppw = statistics.median(p["posts_per_week"] for p in peers)

@@ -661,6 +661,111 @@ def growth_page(request: Request):
     return page(request, "growth.html", b=brief, shares=cgo.current_shares(d))
 
 
+@app.get("/team", response_class=HTMLResponse)
+def team_page(request: Request):
+    from .. import team
+    d = db()
+    r = team.roster(d)
+    for a in r:
+        a["status"] = team.status_line(d, a["key"])
+    return page(request, "team.html", agents=r, challenges=team.threads(d, "team", 10), llm=team.llm_status(),
+                team_directives=d.all("agent_directives", "status='active' AND agent_key='team'", order="created_at"))
+
+
+@app.get("/team/agent/{key}", response_class=HTMLResponse)
+def team_agent(request: Request, key: str, thread: str = ""):
+    from .. import team
+    d = db()
+    if key not in team.BY_KEY:
+        raise HTTPException(404, "unknown agent")
+    a = next(x for x in team.roster(d) if x["key"] == key)
+    a["status"] = team.status_line(d, key)
+    chats = team.threads(d, key)
+    cur = thread or (chats[0]["thread_id"] if chats else "")
+    return page(request, "team_agent.html", a=a, chats=chats, thread=cur, msgs=team.messages(d, cur) if cur else [], llm=team.llm_status())
+
+
+@app.post("/team/agent/{key}/chat")
+def team_chat(request: Request, key: str, text: str = Form(...), thread: str = Form(""), actor: str = Form("")):
+    from .. import team
+    try:
+        t = team.chat(db(), key, text, who(request, actor), thread)
+    except (KeyError, WorkflowError) as e:
+        return back(request, f"/team/agent/{key}", err=str(e))
+    return back(request, f"/team/agent/{key}?thread={t['thread_id']}")
+
+
+@app.post("/team/agent/{key}/param")
+def team_param(request: Request, key: str, name: str = Form(...), value: str = Form(""), reset: str = Form(""),
+               actor: str = Form("")):
+    from .. import team, team_params
+    _admin(request)
+    try:
+        if reset:
+            team_params.clear(db(), key, name, who(request, actor))
+            return back(request, f"/team/agent/{key}", f"{name} reset to default")
+        v = team.set_param(db(), key, name, value, who(request, actor))
+    except (KeyError, ValueError, WorkflowError) as e:
+        return back(request, f"/team/agent/{key}", err=str(e))
+    return back(request, f"/team/agent/{key}", f"{name} = {v} — used from the agent's next run")
+
+
+@app.post("/team/directive")
+def team_directive(request: Request, agent: str = Form(...), text: str = Form(...), actor: str = Form(""),
+                   back_to: str = Form("/team")):
+    from .. import team
+    try:
+        team.add_directive(db(), agent, text, who(request, actor))
+    except (ValueError, WorkflowError) as e:
+        return back(request, back_to, err=str(e))
+    return back(request, back_to, "Directive added")
+
+
+@app.post("/team/directive/{did}/retire")
+def team_directive_retire(request: Request, did: str, actor: str = Form(""), back_to: str = Form("/team")):
+    from .. import team
+    try:
+        team.retire_directive(db(), did, who(request, actor))
+    except WorkflowError as e:
+        return back(request, back_to, err=str(e))
+    return back(request, back_to, "Directive retired")
+
+
+@app.post("/team/challenge")
+def team_challenge(request: Request, text: str = Form(...), agents: list[str] = Form([]), actor: str = Form("")):
+    from .. import team
+    try:
+        t = team.start_challenge(db(), text, who(request, actor), agents or None,
+                                 db_factory=lambda: DB(settings.database_url, init=False))
+    except WorkflowError as e:
+        return back(request, "/team", err=str(e))
+    return back(request, f"/team/challenge/{t['thread_id']}", "Challenge sent — the team is working on it")
+
+
+@app.get("/team/challenge/{tid}", response_class=HTMLResponse)
+def team_challenge_view(request: Request, tid: str):
+    from .. import team
+    d = db()
+    t = d.get("team_threads", "thread_id", tid)
+    if not t:
+        raise HTTPException(404, "no such challenge")
+    names = {a["key"]: a["name"] for a in team.AGENTS}
+    return page(request, "team_challenge.html", t=t, msgs=team.messages(d, tid), names=names)
+
+
+@app.post("/team/challenge/{tid}/adopt")
+def team_adopt(request: Request, tid: str, index: int = Form(...), apply_param: str = Form(""), actor: str = Form("")):
+    from .. import team
+    try:
+        if apply_param:
+            _admin(request)
+        r = team.adopt(db(), tid, index, who(request, actor), bool(apply_param))
+    except (ValueError, KeyError, WorkflowError) as e:
+        return back(request, f"/team/challenge/{tid}", err=str(e))
+    return back(request, f"/team/challenge/{tid}", f"Adopted as a directive for {r['directive']['agent_key']}"
+                + (f"; parameter set to {r['param']}" if "param" in r else ""))
+
+
 @app.get("/experiments", response_class=HTMLResponse)
 def experiments_page(request: Request):
     from .. import growth_lab as lab

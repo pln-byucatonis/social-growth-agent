@@ -89,8 +89,9 @@ def supply_per_week(db: DB, account_id: str) -> int:
 
 
 def recommend(db: DB, account_id: str, persist: bool = True) -> dict:
+    from .team_params import get as _param
     cfg = config()
-    rules = cfg["rules"]
+    rules = {k: _param(db, "publishing", k, v) for k, v in cfg["rules"].items()}
     acc = db.get("accounts", "account_id", account_id)
     lo, hi, src = starting(acc, cfg)
     hist = weekly_history(db, account_id)
