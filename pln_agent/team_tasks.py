@@ -585,6 +585,8 @@ def pins_for_day(db: DB, day_iso: str, tz: str) -> list[dict]:
 
 
 def needs_compute(db: DB) -> bool:
+    if db.one("SELECT variant_id FROM variants WHERE render_status='queued'"):
+        return True  # dashboard re-renders / overlay edits
     return any(t["kind"] in COMPUTE_KINDS and t["status"] in ("todo", "in_progress") for t in tasks(db, open_only=True))
 
 
@@ -654,7 +656,11 @@ def run_runner(settings, max_minutes: int = 50, pause_s: int = 20, idle_passes: 
     end, idle, passes = time.time() + max_minutes * 60, 0, 0
     while time.time() < end:
         r = poll(own, settings.ops_assets_bucket, settings, render=False)
+        from .media import render_queued
+        queued = render_queued(own, settings)
         out = advance(own, settings, ops)
+        if queued:
+            log.info("runner pass %s: re-rendered %s", passes + 1, queued)
         passes += 1
         log.info("runner pass %s: mediaconvert ready %s; tasks %s", passes, r["ready"], out)
         idle = 0 if needs_compute(own) else idle + 1

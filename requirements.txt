@@ -7,6 +7,8 @@ python-multipart==0.0.20
 httpx==0.28.1
 # AWS (Aurora Data API backend, ops-portal import, S3 media/render storage):
 boto3==1.43.115
+# Designed on-screen text (knockout / pill / kinetic captions):
+pillow==12.3.0
 # Optional:
 # psycopg[binary]==3.3.6   # direct Postgres (PLN_DATABASE_URL=postgresql://...)
 # anthropic                # PLN_LLM_PROVIDER=anthropic (optional caption refinement)

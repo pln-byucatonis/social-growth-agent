@@ -1,0 +1,19 @@
+{
+  "_doc": "On-screen text looks per brand. Fonts are free (SIL Open Font License, see assets/fonts/*-OFL.txt); swap a brand's font or colours here once the official brand kit is in. hook: knockout | pill | outline. captions: kinetic | classic. stamp: word slammed on the payoff moment ('' = none). countdown: progress bar to the payoff under the hook.",
+  "fonts": {
+    "anton": "assets/fonts/Anton-Regular.ttf",
+    "bebas": "assets/fonts/BebasNeue-Regular.ttf",
+    "archivo": "assets/fonts/ArchivoBlack-Regular.ttf"
+  },
+  "default": {"font": "anton", "primary": "#E5202E", "text": "#FFFFFF", "accent": "#FFD400", "ink": "#0B0B0F",
+              "hook": "pill", "captions": "kinetic", "stamp": "", "countdown": false},
+  "brands": {
+    "pln": {"font": "archivo", "primary": "#E5202E", "accent": "#FFFFFF", "hook": "pill", "captions": "kinetic"},
+    "carjitsu": {"font": "anton", "primary": "#D7141A", "accent": "#FFD400", "hook": "knockout", "captions": "kinetic", "stamp": "TAP."},
+    "slapfight": {"font": "anton", "primary": "#FF3B1F", "accent": "#FFE600", "hook": "knockout", "captions": "kinetic", "stamp": "SLAP."},
+    "str33t": {"font": "anton", "primary": "#7B2BFF", "accent": "#39FF14", "hook": "knockout", "captions": "kinetic"},
+    "putt_tour": {"font": "bebas", "primary": "#0B8F4D", "accent": "#F5D90A", "hook": "pill", "captions": "kinetic", "stamp": "ACE.", "countdown": true},
+    "world_putting_league": {"font": "bebas", "primary": "#0B8F4D", "accent": "#F5D90A", "hook": "pill", "captions": "classic", "countdown": true},
+    "pro_carrom_tour": {"font": "bebas", "primary": "#B4161B", "accent": "#F2C14E", "hook": "pill", "captions": "kinetic", "countdown": true}
+  }
+}

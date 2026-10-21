@@ -202,6 +202,7 @@ def render_variant(db: DB, variant_id: str, settings: Settings, actor: str = "re
     segs = v["edl"].get("segments", [])
     out = v["edl"].get("output")
     font = _font()
+    overlay_style = ""
     if not segs or not out:
         status, path, detail = "not_applicable", "", "no video output for this format"
     elif not (asset["media_present"] and shutil.which("ffmpeg")):
@@ -231,29 +232,56 @@ def render_variant(db: DB, variant_id: str, settings: Settings, actor: str = "re
         if out["h"] > out["w"] and not (sw and sh and sh > sw):  # landscape (or unknown) master → vertical
             fx, framing = subject_x(src, segs)
         chain = _reframe(out, sw or out["w"], sh or out["h"], fx)
-        draws = []
-        if font:
-            for j, o in enumerate(v.get("onscreen_text") or []):
-                tf = outdir / f"overlay_{j}.txt"
-                tf.write_text(_wrap(o["text"], 22 if out["w"] <= 1080 else 40))
-                small = o.get("position", "").endswith("small")
-                y = {"upper_third": "h*0.18", "center": "(h-text_h)/2", "top": "h*0.13",
-                     "lower_third": "h*0.62", "lower_left_small": "h*0.74"}.get(o.get("position"), "h*0.15")
-                x = "w*0.05" if small else "(w-text_w)/2"
-                draws.append(f"drawtext=fontfile={font}:textfile={tf}:fontsize={34 if small else 64}:fontcolor=white:"
-                             f"borderw=4:bordercolor=black:line_spacing=10:x={x}:y={y}:"
-                             f"enable='between(t,{o['start']},{o['end']})'")
-            for k, c in enumerate(build_caption_track(v, asset)):
-                tf = outdir / f"cap_{k}.txt"
-                tf.write_text(_wrap(c["text"], 28))
-                draws.append(f"drawtext=fontfile={font}:textfile={tf}:fontsize=48:fontcolor=yellow:borderw=3:"
-                             f"bordercolor=black:x=(w-text_w)/2:y=h*0.66:enable='between(t,{c['start']:.2f},{c['end']:.2f})'")
-        parts.append(f"[cv]{chain}{(',' + ','.join(draws)) if draws else ''}[ov]")
+        final, styled = "ov", None
+        try:  # designed overlays (knockout / pill / kinetic captions / payoff stamp / countdown)
+            from . import overlays
+            label = (v.get("edl") or {}).get("variant_label")
+            dv = cut or next((c for c in (v.get("treatment") or {}).get("duration_variants") or [] if c["label"] == label), None)
+            payoff = (dv or {}).get("payoff_at_s")
+            if payoff is None and segs:  # not on a Creative Director cut: the strongest action moment in the edit
+                hits, t_out = [], 0.0
+                for sg in segs:  # map source time onto the edited timeline
+                    for m in asset.get("moments") or []:
+                        if m.get("kind") != "setup" and sg["source_in"] <= m.get("start", -1) < sg["source_out"]:
+                            hits.append((m.get("intensity") or 0, t_out + m["start"] - sg["source_in"]))
+                    t_out += sg["source_out"] - sg["source_in"]
+                if hits:
+                    payoff = max(hits)[1]
+            duration = sum(x["source_out"] - x["source_in"] for x in segs)
+            styled = overlays.build(v, build_caption_track(v, asset), duration, out["w"], out["h"], outdir, payoff)
+            ins, ps, final = overlays.ffmpeg_graph("base", len(segs), styled["layers"], styled["countdown"], out["w"], out["h"])
+            parts.append(f"[cv]{chain}[base]")
+            parts += ps
+            inputs += ins
+            overlay_style = styled["style_id"]
+        except Exception as e:  # noqa: BLE001 — fall back to plain drawtext rather than fail the render
+            styled = None
+            framing += f"; plain text overlays ({str(e)[:80]})"
+        if styled is None:
+            draws = []
+            if font:
+                for j, o in enumerate(v.get("onscreen_text") or []):
+                    tf = outdir / f"overlay_{j}.txt"
+                    tf.write_text(_wrap(o["text"], 22 if out["w"] <= 1080 else 40))
+                    small = o.get("position", "").endswith("small")
+                    y = {"upper_third": "h*0.18", "center": "(h-text_h)/2", "top": "h*0.13",
+                         "lower_third": "h*0.62", "lower_left_small": "h*0.74"}.get(o.get("position"), "h*0.15")
+                    x = "w*0.05" if small else "(w-text_w)/2"
+                    draws.append(f"drawtext=fontfile={font}:textfile={tf}:fontsize={34 if small else 64}:fontcolor=white:"
+                                 f"borderw=4:bordercolor=black:line_spacing=10:x={x}:y={y}:"
+                                 f"enable='between(t,{o['start']},{o['end']})'")
+                for k, c in enumerate(build_caption_track(v, asset)):
+                    tf = outdir / f"cap_{k}.txt"
+                    tf.write_text(_wrap(c["text"], 28))
+                    draws.append(f"drawtext=fontfile={font}:textfile={tf}:fontsize=48:fontcolor=yellow:borderw=3:"
+                                 f"bordercolor=black:x=(w-text_w)/2:y=h*0.66:enable='between(t,{c['start']:.2f},{c['end']:.2f})'")
+            parts.append(f"[cv]{chain}{(',' + ','.join(draws)) if draws else ''}[ov]")
+            final = "ov"
         if has_audio:  # keep peaks ~1.5 dB under full scale so platform re-encoding doesn't clip (QC: true peak <= -1 dBTP)
             parts.append("[ca]alimiter=limit=0.84:level=false[cal]")
         video = outdir / "video.mp4"
         cmd = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", *inputs,
-               "-filter_complex", ";".join(parts), "-map", "[ov]"]
+               "-filter_complex", ";".join(parts), "-map", f"[{final}]"]
         if has_audio:
             cmd += ["-map", "[cal]", "-c:a", "aac", "-b:a", "128k"]
         cmd += ["-c:v", "libx264", "-preset", "veryfast", "-crf", "28", "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(video)]
@@ -274,6 +302,8 @@ def render_variant(db: DB, variant_id: str, settings: Settings, actor: str = "re
                            capture_output=True, timeout=120)
     qc = qc_render(str(outdir / "video.mp4"), out, (v.get("validation") or {}).get("spec") or {}, v.get("platform", "")) \
         if status == "rendered" else {}
+    if qc and overlay_style:
+        qc["overlay_style"] = overlay_style  # recorded with the post so 'what works' can compare looks
     if status == "rendered" and os.environ.get("PLN_RENDER_BUCKET"):
         path = upload_render(outdir, variant_id + (f"/cut_{cut['label']}" if cut else ""), os.environ["PLN_RENDER_BUCKET"])
     if cut:
@@ -285,6 +315,22 @@ def render_variant(db: DB, variant_id: str, settings: Settings, actor: str = "re
     db.audit(actor, "variant_rendered", "variants", variant_id, {"status": status, "detail": detail[:300],
                                                                   "qc": qc.get("summary")})
     return {"variant_id": variant_id, "status": status, "path": path, "detail": detail, "dir": str(outdir), "qc": qc}
+
+
+def render_queued(db: DB, settings: Settings, limit: int = 12, actor: str = "renderer") -> list[dict]:
+    """Render posts queued from the dashboard (Re-render, on-screen text / style edits). Runs on the task runner:
+    App Runner throttles CPU between requests, so renders there stall."""
+    out = []
+    for v in db.all("variants", "render_status='queued'", order="updated_at")[:limit]:
+        db.update("variants", "variant_id", v["variant_id"], {"render_status": "rendering"})
+        try:
+            r = render_variant(db, v["variant_id"], settings, actor=actor)
+            out.append({"variant_id": v["variant_id"], "status": r["status"], "qc": (r.get("qc") or {}).get("passed")})
+        except Exception as e:  # noqa: BLE001 — never leave a post stuck in "rendering"
+            db.update("variants", "variant_id", v["variant_id"], {"render_status": "render_failed"})
+            db.audit(actor, "variant_render_failed", "variants", v["variant_id"], {"error": str(e)[:300]})
+            out.append({"variant_id": v["variant_id"], "status": "render_failed"})
+    return out
 
 
 def render_cuts(db: DB, variant_id: str, settings: Settings, actor: str = "renderer", only: list[str] | None = None) -> list[dict]:

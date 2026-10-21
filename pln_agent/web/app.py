@@ -285,12 +285,15 @@ def variant(request: Request, vid: str):
     jobs = d.all("publish_jobs", "variant_id=?", [vid])
     planned = d.one("SELECT slot_at FROM schedules WHERE variant_id=? AND state='planned'", [vid])
     render_url = _render_url(request, v)
+    from ..overlays import style_for
+    ov = style_for(v.get("brand_id", ""), (v.get("treatment") or {}).get("overlay"))
+    ov["hook_text"] = next((o["text"] for o in v.get("onscreen_text") or [] if not (o.get("position") or "").endswith("small")), "")
     preview = get_adapter(acc["platform"], settings=settings).simulate(v, acc, "preview")
     from ..media import asset_preview
     source = asset_preview(asset, (v.get("edl") or {}).get("segments"))
     return page(request, "variant.html", v=v, acc=acc, asset=asset, live_ok=ok, reasons=reasons, approvals=approvals,
                 source=source,
-                audit=audit, jobs=jobs, planned=planned, render_url=render_url,
+                audit=audit, jobs=jobs, planned=planned, render_url=render_url, ov=ov,
                 would_send=preview.raw["would_send"], north=NORTH_STAR.get(v["platform"], {}))
 
 
@@ -340,6 +343,48 @@ def do_cancel(request: Request, vid: str, actor: str = Form(""), reason: str = F
     return back(request, f"/variant/{vid}", "Cancelled")
 
 
+@app.post("/variant/{vid:path}/overlay")
+def variant_overlay(request: Request, vid: str, hook_text: str = Form(""), hook: str = Form("pill"), captions: str = Form("kinetic"),
+                    stamp: str = Form(""), countdown: str = Form(""), actor: str = Form("")):
+    """Change the words burned into the video and their look, then re-render. The video changes, so an approval
+    is revoked (approvals bind to what was reviewed)."""
+    d = db()
+    v = d.get("variants", "variant_id", vid)
+    if not v:
+        raise HTTPException(404)
+    if v["state"] in ("scheduled", "publishing", "published", "simulated"):
+        return back(request, f"/variant/{vid}", err=f"can't change the video of a {v['state']} post — unschedule it first")
+    if hook not in ("knockout", "pill", "outline") or captions not in ("kinetic", "classic", "none"):
+        return back(request, f"/variant/{vid}", err="unknown overlay style")
+    name = who(request, actor)
+    ot = [dict(o) for o in (v.get("onscreen_text") or [])]
+    if hook_text.strip():
+        if ot and not (ot[0].get("position") or "").endswith("small"):
+            ot[0]["text"] = hook_text.strip()[:80]
+        else:
+            ot.insert(0, {"start": 0.0, "end": 3.0, "text": hook_text.strip()[:80], "position": "top"})
+    t = dict(v.get("treatment") or {})
+    t["overlay"] = {"hook": hook, "captions": captions, "stamp": stamp.strip()[:12], "countdown": countdown == "on"}
+    changes = {"onscreen_text": ot, "treatment": t, "render_status": "queued", "updated_at": now_iso()}
+    if v["state"] == "approved":
+        changes["state"] = "in_review"
+        d.insert("approvals", {"variant_id": vid, "decision": "revoke", "reviewer": name, "note": "on-screen text/style changed",
+                               "caption_hash": v["caption_hash"], "at": now_iso()})
+    d.update("variants", "variant_id", vid, changes)
+    d.audit(name, "variant_overlay_changed", "variants", vid, {"hook_text": hook_text.strip()[:80], **t["overlay"]})
+    if os.environ.get("PLN_TASK_RUNNER_PROJECT"):
+        _kick_team_tasks()
+    else:  # local / tests: render now
+        from ..media import render_queued
+        if not BACKGROUND:
+            render_queued(d, settings, actor=name)
+        else:
+            import threading
+            threading.Thread(target=lambda: render_queued(DB(settings.database_url, init=False), settings, actor=name),
+                             daemon=True).start()
+    return back(request, f"/variant/{vid}", "Saved — re-rendering with the new on-screen text and style (about two minutes).")
+
+
 @app.post("/variant/{vid:path}/render")
 def do_render(request: Request, vid: str):
     """Renders take longer than the portal proxy's 25s window, so run them in the background."""
@@ -348,10 +393,14 @@ def do_render(request: Request, vid: str):
     v = d.get("variants", "variant_id", vid)
     if not v:
         raise HTTPException(404)
-    if v.get("render_status") == "rendering":
+    if v.get("render_status") in ("rendering", "queued"):
         return back(request, f"/variant/{vid}", "Already rendering — refresh in a minute.")
-    d.update("variants", "variant_id", vid, {"render_status": "rendering"})
     actor = request.state.user or "dashboard"
+    if os.environ.get("PLN_TASK_RUNNER_PROJECT"):  # App Runner throttles background CPU: the runner renders it
+        d.update("variants", "variant_id", vid, {"render_status": "queued", "updated_at": now_iso()})
+        _kick_team_tasks()
+        return back(request, f"/variant/{vid}", "Queued for rendering — about two minutes. Refresh to see it.")
+    d.update("variants", "variant_id", vid, {"render_status": "rendering"})
 
     def work():
         own = DB(settings.database_url, init=False)  # separate connection for the worker thread

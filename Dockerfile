@@ -9,6 +9,7 @@ RUN --mount=type=secret,id=ca,required=false \
     pip install --no-cache-dir -r requirements.txt "psycopg[binary]==3.3.6"
 COPY pln_agent ./pln_agent
 COPY config ./config
+COPY assets ./assets
 COPY migrations ./migrations
 RUN useradd -m pln && mkdir -p /app/data && chown -R pln /app
 USER pln
