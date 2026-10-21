@@ -323,6 +323,8 @@ def build(v: dict, cues: list[dict], duration: float, w: int, h: int, outdir: Pa
         else:
             cands = [z for z in ("middle", "top") if free(z, t0, t1)]
             zone, why = ad.choose(a, cands, (t0, t1)) if a.get("ok") else ((cands or [None])[0], "default position")
+            if "frames show a graphic" in why:  # the broadcast already celebrates this moment: two graphics compete
+                zone, why = None, "the video already has its own graphic for this moment (" + why.split(";")[0] + ")"
             if zone is None:
                 plan.append({"what": f"payoff word “{stamp}”", "zone": "—", "at": f"{t0:.1f}s", "why": f"dropped: {why}"})
             else:
@@ -349,6 +351,8 @@ def build(v: dict, cues: list[dict], duration: float, w: int, h: int, outdir: Pa
             else:
                 cands = [z for z in ("middle", "top", "lower") if free(z, t0, t1)]
                 zone, why = ad.choose(a, cands, (t0, t1)) if a.get("ok") else ((cands or [None])[0], "default position")
+                if "frames show a graphic" in why:
+                    zone, why = None, "the video already has its own graphic here (" + why.split(";")[0] + ")"
                 if zone is None:
                     plan.append({"what": f"reaction word “{word}”", "zone": "—", "at": f"{t0:.1f}s", "why": f"dropped: {why}"})
                 else:

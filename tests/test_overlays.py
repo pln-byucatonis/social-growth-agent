@@ -144,6 +144,11 @@ class ArtDirectorTests(unittest.TestCase):
         zone, why = art_director.choose(a, ["middle", "top"], (3.0, 4.3))
         self.assertEqual(zone, "top")
         self.assertIn("frames show a graphic", why)
+        # the payoff word is dropped rather than competing with the broadcast's own title card
+        v = {"variant_id": "z", "brand_id": "putt_tour", "onscreen_text": [{"start": 0, "end": 2, "text": "WAIT FOR IT", "position": "top"}]}
+        built = overlays.build(v, [], 6.0, 1080, 1920, d, 3.0, [{"kind": "payoff", "t": 3.0, "intensity": 1}], a)
+        self.assertNotIn("payoff", built["words"])
+        self.assertTrue(any("already has its own graphic" in p["why"] for p in built["plan"]))
         # no model access: falls back to measurements without failing
         b = art_director.analyze(str(clip), 6.0, [3.0], llm=lambda *x: (_ for _ in ()).throw(RuntimeError("no access")))
         self.assertEqual(b["seen"], {})
