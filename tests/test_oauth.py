@@ -62,6 +62,11 @@ class OAuthTests(unittest.TestCase):
     def _state(self, url):
         return urllib.parse.parse_qs(urllib.parse.urlparse(url).query)
 
+    def test_non_pln_pages_are_skipped(self):
+        self.assertTrue(oauth._ignored({"platform": "instagram", "handle": "foxborolacrosse", "name": "", "platform_id": "9"}))
+        self.assertTrue(oauth._ignored({"platform": "facebook", "handle": "", "name": "Foxboro Lacrosse", "platform_id": "8"}))
+        self.assertFalse(oauth._ignored({"platform": "instagram", "handle": "putttour", "name": "Putt Tour", "platform_id": "7"}))
+
     def test_app_secret_is_stored_but_never_audited_or_shown(self):
         self.assertEqual(oauth.app_status("meta"), {"configured": True, "client_id_hint": "…1234", "config_id": ""})
         audit = json.dumps(self.db.all("audit_log"))

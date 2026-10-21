@@ -1,0 +1,7 @@
+{
+  "_note": "Pages / accounts a connected login manages that are NOT PLN brands. They are skipped when connecting (not bound, not reported as unmatched) so nothing is read from or posted to them. Match is case-insensitive on handle, name or platform id.",
+  "ignore": [
+    {"match": "foxborolacrosse", "why": "Foxboro Lacrosse is not a PLN property (removed 2026-10-21)"},
+    {"match": "foxboro lacrosse", "why": "Foxboro Lacrosse is not a PLN property (removed 2026-10-21)"}
+  ]
+}

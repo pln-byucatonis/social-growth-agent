@@ -389,8 +389,11 @@ def callback(db: DB, provider: str, params: dict, actor: str) -> dict:
     body = _token_request(p, app, form)
     idents = discover(provider, body, app)
     accounts = db.all("accounts")
-    connected, unmatched = [], []
+    connected, unmatched, ignored = [], [], []
     for ident in idents:
+        if _ignored(ident):
+            ignored.append({k: ident[k] for k in ("platform", "platform_id", "handle", "name")})
+            continue
         acc = match_account(ident, accounts)
         if acc is None and st.get("account_id") and len(idents) == 1:
             acc = db.get("accounts", "account_id", st["account_id"])  # single identity: the account you clicked
@@ -401,12 +404,23 @@ def callback(db: DB, provider: str, params: dict, actor: str) -> dict:
         connected.append({"account_id": acc["account_id"], "platform": ident["platform"], "handle": ident["handle"],
                           "platform_id": ident["platform_id"]})
     db.audit(actor, "oauth_completed", "accounts", st.get("account_id") or provider,
-             {"provider": provider, "connected": connected, "unmatched": unmatched})
-    return {"provider": provider, "connected": connected, "unmatched": unmatched,
+             {"provider": provider, "connected": connected, "unmatched": unmatched, "ignored": ignored})
+    return {"provider": provider, "connected": connected, "unmatched": unmatched, "ignored": ignored,
             "requested": st.get("account_id", "")}
 
 
 # ---- token use ----------------------------------------------------------------------------------
+
+def _ignored(ident: dict) -> bool:
+    """Pages a login manages that aren't PLN brands (config/ignored_pages.json) are skipped entirely."""
+    from .config import CONFIG_DIR
+    try:
+        rules = json.loads((CONFIG_DIR / "ignored_pages.json").read_text()).get("ignore", [])
+    except FileNotFoundError:
+        return False
+    vals = {str(ident.get(k) or "").lower().lstrip("@") for k in ("handle", "name", "platform_id")} - {""}
+    return any(r["match"].lower() in vals for r in rules)
+
 
 def access_token(secret_name: str) -> str:
     """Current access token for a connected account, refreshing it when it expires within 5 minutes."""
