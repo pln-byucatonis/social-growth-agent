@@ -249,11 +249,13 @@ def render_variant(db: DB, variant_id: str, settings: Settings, actor: str = "re
                 draws.append(f"drawtext=fontfile={font}:textfile={tf}:fontsize=48:fontcolor=yellow:borderw=3:"
                              f"bordercolor=black:x=(w-text_w)/2:y=h*0.66:enable='between(t,{c['start']:.2f},{c['end']:.2f})'")
         parts.append(f"[cv]{chain}{(',' + ','.join(draws)) if draws else ''}[ov]")
+        if has_audio:  # keep peaks ~1.5 dB under full scale so platform re-encoding doesn't clip (QC: true peak <= -1 dBTP)
+            parts.append("[ca]alimiter=limit=0.84:level=false[cal]")
         video = outdir / "video.mp4"
         cmd = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", *inputs,
                "-filter_complex", ";".join(parts), "-map", "[ov]"]
         if has_audio:
-            cmd += ["-map", "[ca]", "-c:a", "aac", "-b:a", "128k"]
+            cmd += ["-map", "[cal]", "-c:a", "aac", "-b:a", "128k"]
         cmd += ["-c:v", "libx264", "-preset", "veryfast", "-crf", "28", "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(video)]
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
         if proc.returncode != 0:
