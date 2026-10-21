@@ -164,8 +164,16 @@ def generate_brief(db: DB, actor: str = "chief-growth-officer", today: date | No
             if b["tier"] == "P0" and stock.get("scout_unused", 0) < 10 and not stock.get("drafts", {}).get("in_review"):
                 actions.append({"priority": "P1", "area": "supply",
                                 "text": f"{b['brand_id']}: fewer than 10 strong unused moments — tag more footage in ops."})
+    from .migration_tracking import track as _track
+    mt = _track(db, today, persist=persist)
+    migration["tracking"] = [{"platform": r["platform"], "recommendation": r["recommendation"],
+                              "legacy": {k: (r["legacy"] or {}).get(k) for k in ("handle", "followers", "change_28d")},
+                              "canonical": {k: (r["canonical"] or {}).get(k) for k in ("handle", "followers", "change_28d")} if r["canonical"] else None,
+                              "bridge_posts": r["bridge"]["bridge_posts"]} for r in mt["platforms"]]
     for m in migration["alerts"]:
         actions.append({"priority": "P1", "area": "migration", "text": m})
+    for a in mt["alerts"][:6]:
+        actions.append({"priority": a["priority"], "area": "migration", "text": a["text"]})
     if alloc["changes"]:
         actions.append({"priority": "P1", "area": "allocation",
                         "text": "Review the creative-effort reallocation: " + "; ".join(

@@ -914,7 +914,8 @@ def migration(request: Request):
     return page(request, "migration.html", sheets=mig.decision_sheet(d),
                 proposals=d.all("profile_change_proposals", order="account_id, field"),
                 plan=[t for t in mig.ninety_day_plan() if t["phase"] != "report"],
-                ann=mig.announcement_variants("instagram"), report=mig.weekly_report(d))
+                ann=mig.announcement_variants("instagram"), report=mig.weekly_report(d),
+                tracking=__import__("pln_agent.migration_tracking", fromlist=["track"]).track(d, persist=False))
 
 
 @app.post("/migration/approve")

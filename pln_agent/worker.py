@@ -104,7 +104,7 @@ def start_intelligence(settings: Settings) -> str:
 def refresh_intelligence(db: DB, settings: Settings, ops: DB | None) -> dict:
     """Phase 1 loop: real performance in → creative evidence → cadence → knowledge review.
     Each step is isolated so one failure (e.g. a platform page timing out) doesn't stop the rest."""
-    from . import audience, cadence, community, competitive, growth_lab, growth_officer, insights, knowledge, publishing, scout
+    from . import audience, cadence, community, competitive, growth_lab, growth_officer, migration_tracking, insights, knowledge, publishing, scout
     steps = [("knowledge_seed", lambda: knowledge.seed(db, "worker")),
              ("social", lambda: audience.import_ops_social(db, ops, settings.timezone, "worker") if ops else None),
              ("instagram", lambda: insights.collect_instagram(db, actor="worker")),
@@ -116,6 +116,7 @@ def refresh_intelligence(db: DB, settings: Settings, ops: DB | None) -> dict:
              ("cadence", lambda: len(cadence.recommend_all(db))),
              ("slots", lambda: publishing.learn_all(db, settings.timezone)),
              ("experiments", lambda: growth_lab.refresh(db, "worker")),
+             ("migration", lambda: len(migration_tracking.track(db, actor="worker")["alerts"])),
              ("growth_brief", lambda: growth_officer.generate_brief(db, "worker")["brief_id"] if growth_officer.due(db) else "current"),
              ("knowledge_review", lambda: {k: v for k, v in knowledge.review_sources(db).items() if k != "ok"})]
     out = {}
