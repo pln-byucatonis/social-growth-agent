@@ -309,12 +309,33 @@ def messages(db: DB, thread_id: str) -> list[dict]:
     return db.all("team_messages", "thread_id=?", [thread_id], order="id")
 
 
-def chat(db: DB, agent: str, text: str, actor: str, thread_id: str = "") -> dict:
-    a = BY_KEY[agent]
+def ask(db: DB, agent: str, text: str, actor: str, thread_id: str = "") -> dict:
+    """Record the manager's message; the reply comes from `answer` (run it in the background on the web)."""
+    BY_KEY[agent]  # KeyError for an unknown agent
     t = db.get("team_threads", "thread_id", thread_id) if thread_id else None
     if not t:
         t = _thread(db, "chat", agent, text, actor)
     _msg(db, t["thread_id"], "manager", agent, text, {"by": actor})
+    db.update("team_threads", "thread_id", t["thread_id"], {"status": "thinking"})
+    return t
+
+
+def answer(db: DB, agent: str, thread_id: str, actor: str = "") -> None:
+    a = BY_KEY[agent]
+    try:
+        _answer(db, a, agent, thread_id, actor)
+    finally:
+        db.update("team_threads", "thread_id", thread_id, {"status": "open"})
+
+
+def chat(db: DB, agent: str, text: str, actor: str, thread_id: str = "") -> dict:
+    t = ask(db, agent, text, actor, thread_id)
+    answer(db, agent, t["thread_id"], actor)
+    return t
+
+
+def _answer(db: DB, a: dict, agent: str, thread_id: str, actor: str) -> None:
+    t = {"thread_id": thread_id}
     hist = [{"role": "user" if m["role"] == "manager" else "assistant", "content": m["content"]}
             for m in messages(db, t["thread_id"]) if m["agent_key"] == agent][-12:]
     try:
@@ -323,8 +344,7 @@ def chat(db: DB, agent: str, text: str, actor: str, thread_id: str = "") -> dict
     except TeamLLMError as e:
         answer, meta = _fallback_answer(db, a, str(e)), {"fallback": True}
     _msg(db, t["thread_id"], "agent", agent, answer, meta)
-    db.audit(actor, "agent_chat", "team_threads", t["thread_id"], {"agent": agent})
-    return t
+    db.audit(actor or "dashboard", "agent_chat", "team_threads", t["thread_id"], {"agent": agent})
 
 
 PERSPECTIVE = ("The manager has put this challenge to the whole team:\n\n{challenge}\n\nAnswer from your own role and data. Return JSON only: "

@@ -30,7 +30,7 @@ from ..accounts import publish_eligibility
 from ..adapters import get_adapter
 from ..calendar_planner import plan_week
 from ..config import load_settings
-from ..db import DB
+from ..db import DB, now_iso
 from ..editorial import generate_pack
 from ..experiments import recommendations
 from ..media import render_variant
@@ -121,6 +121,34 @@ def who(request: Request, typed: str) -> str:
     if not name:
         raise WorkflowError("Enter your name (reviewer identity is recorded in the audit log).")
     return name
+
+
+BACKGROUND = True  # tests set False to run slow actions inline on the injected database
+
+
+def run_later(name: str, fn, actor: str = "") -> None:
+    """Run fn(db) after the response: the ops proxy gives a request 25 seconds. Progress lands in
+    settings_kv bg:<name> so the page can show it."""
+    import json as _json
+    import threading
+
+    def work(d):
+        d.kv_set(f"bg:{name}", _json.dumps({"state": "running", "started": now_iso()}), actor or "dashboard")
+        try:
+            msg = fn(d)
+            d.kv_set(f"bg:{name}", _json.dumps({"state": "done", "finished": now_iso(), "msg": msg or ""}), actor or "dashboard")
+        except Exception as e:  # noqa: BLE001 — surfaced on the page
+            d.kv_set(f"bg:{name}", _json.dumps({"state": "failed", "finished": now_iso(), "msg": str(e)[:300]}), actor or "dashboard")
+    if not BACKGROUND:
+        work(db())
+        return
+    threading.Thread(target=lambda: work(DB(settings.database_url, init=False)), daemon=True, name=f"bg-{name}").start()
+
+
+def bg_status(name: str) -> dict | None:
+    import json as _json
+    raw = db().kv_get(f"bg:{name}")
+    return _json.loads(raw) if raw else None
 
 
 def ctx(request: Request, **kw) -> dict:
@@ -658,7 +686,7 @@ def growth_page(request: Request):
     from .. import growth_officer as cgo
     d = db()
     brief = cgo.latest_brief(d) or cgo.generate_brief(d, request.state.user or "dashboard")
-    return page(request, "growth.html", b=brief, shares=cgo.current_shares(d))
+    return page(request, "growth.html", b=brief, shares=cgo.current_shares(d), bg=bg_status("growth_brief"))
 
 
 @app.get("/team", response_class=HTMLResponse)
@@ -682,16 +710,20 @@ def team_agent(request: Request, key: str, thread: str = ""):
     a["status"] = team.status_line(d, key)
     chats = team.threads(d, key)
     cur = thread or (chats[0]["thread_id"] if chats else "")
-    return page(request, "team_agent.html", a=a, chats=chats, thread=cur, msgs=team.messages(d, cur) if cur else [], llm=team.llm_status())
+    th = d.get("team_threads", "thread_id", cur) if cur and cur != "new" else None
+    return page(request, "team_agent.html", a=a, chats=chats, thread=cur, msgs=team.messages(d, cur) if th else [], llm=team.llm_status(),
+                bg={"state": "running", "label": f"{a['name']} is thinking"} if th and th["status"] == "thinking" else bg_status(f"chat-{cur}"))
 
 
 @app.post("/team/agent/{key}/chat")
 def team_chat(request: Request, key: str, text: str = Form(...), thread: str = Form(""), actor: str = Form("")):
     from .. import team
     try:
-        t = team.chat(db(), key, text, who(request, actor), thread)
+        name = who(request, actor)
+        t = team.ask(db(), key, text, name, thread)
     except (KeyError, WorkflowError) as e:
         return back(request, f"/team/agent/{key}", err=str(e))
+    run_later(f"chat-{t['thread_id']}", lambda d: team.answer(d, key, t["thread_id"], name), name)
     return back(request, f"/team/agent/{key}?thread={t['thread_id']}")
 
 
@@ -775,7 +807,7 @@ def experiments_page(request: Request):
     for r in d.query("SELECT experiment_id, arm, COUNT(*) AS n FROM experiment_arms GROUP BY experiment_id, arm"):
         counts.setdefault(r["experiment_id"], {})[r["arm"]] = r["n"]
     accs = [a for a in d.all("accounts", order="account_id") if not a.get("hard_block_reason")]
-    return page(request, "experiments.html", exps=exps, counts=counts, proposals=lab.propose(d), accs=accs,
+    return page(request, "experiments.html", exps=exps, counts=counts, proposals=lab.propose(d), accs=accs, bg=bg_status("experiments"),
                 outcomes=lab.RATE_OUTCOMES)
 
 
@@ -800,8 +832,13 @@ def experiments_new(request: Request, account_id: str = Form(...), variable: str
 @app.post("/experiments/read")
 def experiments_read(request: Request):
     from .. import growth_lab as lab
-    r = lab.refresh(db(), actor=request.state.user or "dashboard")
-    return back(request, "/experiments", f"Read {r['read']} experiment(s); {r['concluded']} concluded; {r['assigned']} new draft(s) assigned")
+    actor = request.state.user or "dashboard"
+
+    def work(d):
+        r = lab.refresh(d, actor=actor)
+        return f"Read {r['read']} experiment(s); {r['concluded']} concluded; {r['assigned']} new draft(s) assigned"
+    run_later("experiments", work, actor)
+    return back(request, "/experiments", "Reading experiments in the background — this page updates when it's done.")
 
 
 @app.post("/experiments/{eid}/stop")
@@ -821,7 +858,7 @@ def competitors_page(request: Request, brand: str = ""):
     hist = {}
     for r in d.all("competitor_snapshots", order="captured_at"):
         hist.setdefault(r["handle"], []).append(r)
-    return page(request, "competitors.html", rows=ci.latest(d), hist=hist, gaps=ci.gaps(d), standouts=ci.standouts(d, brand),
+    return page(request, "competitors.html", bg=bg_status("competitors"), rows=ci.latest(d), hist=hist, gaps=ci.gaps(d), standouts=ci.standouts(d, brand),
                 cfg=ci.config(), brand=brand)
 
 
@@ -829,9 +866,14 @@ def competitors_page(request: Request, brand: str = ""):
 def competitors_refresh(request: Request):
     from .. import competitive as ci
     _admin(request)
-    r = ci.snapshot(db(), actor=request.state.user or "dashboard")
-    return back(request, "/competitors", f"Captured {len(r['captured'])} benchmark account(s)",
-                "; ".join(f"@{k}: {v}" for k, v in list(r["errors"].items())[:4]))
+    actor = request.state.user or "dashboard"
+
+    def work(d):
+        r = ci.snapshot(d, actor=actor)
+        errs = "; ".join(f"@{k}: {v}" for k, v in list(r["errors"].items())[:4])
+        return f"Captured {len(r['captured'])} benchmark account(s)" + (f". Problems: {errs}" if errs else "")
+    run_later("competitors", work, actor)
+    return back(request, "/competitors", "Capturing benchmarks in the background — this page updates when it's done.")
 
 
 @app.get("/community", response_class=HTMLResponse)
@@ -843,7 +885,7 @@ def community_page(request: Request, status: str = ""):
     rows = cm.queue(d, sts)
     accs = {a["account_id"]: a for a in d.all("accounts")}
     raw = d.kv_get("community:faqs")
-    return page(request, "community.html", rows=rows, accs=accs, s=cm.summary(d), faqs=_json.loads(raw) if raw else cm.faqs(d),
+    return page(request, "community.html", bg=bg_status("community"), rows=rows, accs=accs, s=cm.summary(d), faqs=_json.loads(raw) if raw else cm.faqs(d),
                 status=",".join(sts), cfg=cm.config())
 
 
@@ -851,9 +893,14 @@ def community_page(request: Request, status: str = ""):
 def community_refresh(request: Request):
     from .. import community as cm
     _admin(request)
-    r = cm.refresh(db(), settings, actor=request.state.user or "dashboard")
-    errs = "; ".join(f"{k}: {v}" for k, v in list(r["errors"].items())[:3])
-    return back(request, "/community", f"Fetched {r['new']} new comment(s)", errs)
+    actor = request.state.user or "dashboard"
+
+    def work(d):
+        r = cm.refresh(d, settings, actor=actor)
+        errs = "; ".join(f"{k}: {v}" for k, v in list(r["errors"].items())[:3])
+        return f"Fetched {r['new']} new comment(s)" + (f". Problems: {errs}" if errs else "")
+    run_later("community", work, actor)
+    return back(request, "/community", "Fetching comments in the background — this page updates when it's done.")
 
 
 @app.post("/community/{comment_id:path}/decide")
@@ -871,8 +918,9 @@ def community_decide(request: Request, comment_id: str, action: str = Form(...),
 def growth_generate(request: Request):
     from .. import growth_officer as cgo
     _admin(request)
-    cgo.generate_brief(db(), request.state.user or "dashboard")
-    return back(request, "/growth", "Brief regenerated from the latest data")
+    actor = request.state.user or "dashboard"
+    run_later("growth_brief", lambda d: (cgo.generate_brief(d, actor), "Brief regenerated from the latest data")[1], actor)
+    return back(request, "/growth", "Regenerating the brief in the background — this page updates when it's done.")
 
 
 @app.post("/growth/{brief_id}/apply-allocation")

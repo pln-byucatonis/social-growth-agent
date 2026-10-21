@@ -94,10 +94,22 @@ class TeamTests(unittest.TestCase):
         c = team.start_challenge(self.db, "x", "bill", background=False)
         self.assertEqual(self.db.get("team_threads", "thread_id", c["thread_id"])["result"]["error"], "AccessDenied")
 
+    def test_slow_actions_report_through_background_status(self):
+        from pln_agent.web import app as web
+        web._db = self.db
+        web.BACKGROUND = False
+        self.addCleanup(setattr, web, "BACKGROUND", True)
+        web.run_later("x", lambda d: "did it")
+        self.assertEqual(web.bg_status("x")["msg"], "did it")
+        web.run_later("y", lambda d: 1 / 0)
+        self.assertEqual(web.bg_status("y")["state"], "failed")
+
     def test_pages_render(self):
         from fastapi.testclient import TestClient
         from pln_agent.web import app as web
         web._db = self.db
+        web.BACKGROUND = False
+        self.addCleanup(setattr, web, "BACKGROUND", True)
         c = TestClient(web.app)
         t = team.start_challenge(self.db, "How do we grow Putt Tour?", "bill", background=False)
         for path, needle in (("/team", "Challenge the team"), ("/team/agent/migration", "Decline alert threshold"),
