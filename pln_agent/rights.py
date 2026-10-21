@@ -8,7 +8,25 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
-SENSITIVE = {"gambling", "paid_partnership", "combat", "injury", "minors", "ai_generated_person", "likeness_unreleased"}
+def _policy() -> dict:
+    """config/rights_policy.json: management's standing rights decisions (versioned with the code)."""
+    import json
+
+    from .config import CONFIG_DIR
+    try:
+        return json.loads((CONFIG_DIR / "rights_policy.json").read_text())
+    except FileNotFoundError:
+        return {}
+
+
+# flags that need two different approvers; combat is flagged and labelled but takes one (rights_policy.json)
+SENSITIVE = set(_policy().get("two_person_flags") or
+                {"gambling", "paid_partnership", "combat", "injury", "minors", "ai_generated_person", "likeness_unreleased"})
+
+
+def likeness_releases_on_file() -> bool:
+    return bool(_policy().get("likeness_releases_on_file"))
+
 
 def identity_policy() -> str:
     """block (default): unverified identities block the asset.
@@ -86,7 +104,7 @@ def evaluate(asset: dict, at: datetime | None = None, territory: str = "US", req
         if flags.get(f):
             r.review_flags.append(f)
     for p in asset.get("people") or []:
-        if not p.get("likeness_release", False):
+        if not p.get("likeness_release", False) and not likeness_releases_on_file():
             if "likeness_unreleased" not in r.review_flags:
                 r.review_flags.append("likeness_unreleased")
     sponsors = asset.get("sponsors") or []
