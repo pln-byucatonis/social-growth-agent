@@ -55,6 +55,8 @@ def _tick(db: DB, settings: Settings, do_ops: bool) -> dict:
         out["intelligence"] = start_intelligence(settings)
     out["planned"] = plan_new_clear_assets(db, settings)
     out["video"] = start_video_poll(settings)
+    from .team_tasks import start as start_team_tasks
+    out["team_tasks"] = start_team_tasks(settings)
     return out
 
 

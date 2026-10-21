@@ -1,0 +1,25 @@
+{# Team tasks: adopted challenge actions the system works on. `names` maps agent keys to names. #}
+{% macro task_list(tasks, names, base, user, full=False) %}
+{% if tasks %}<ul class="list">{% for t in tasks %}{% set d = t.detail or {} %}<li id="{{ t.task_id }}" style="display:block">
+<div class="fbar"><div class="grow">{{ chip(t.status) }} {% if t.priority %}{{ chip(t.priority) }}{% endif %} <b>{{ names.get(t.owner, t.owner|label) }}</b> <span class="faint small">· {{ t.kind|label }} · updated {{ t.updated_at|ago }}</span></div>
+{% if t.status in ('blocked','failed','needs_you','waiting','in_progress','todo') %}<form method="post" action="{{ base }}/team/task/{{ t.task_id }}/mark" class="fbar">{% if not user %}<input name="actor" placeholder="Name" style="width:80px">{% endif %}
+{% if t.status in ('blocked','failed') %}<button class="sm" name="status" value="todo">Retry</button>{% endif %}<button class="sm ghost" name="status" value="done">Mark done</button></form>{% endif %}</div>
+<div class="{{ '' if full else 'clip2' }}" style="margin:4px 0">{{ t.title }}</div>
+<div class="small"><b>{{ t.progress }}</b>{% if t.blocked_reason and t.status in ('blocked','failed') %}<span class="sub" style="color:#fca5a5">{{ t.blocked_reason }}</span>{% endif %}</div>
+{% if full %}
+{% if d.answer %}<ul class="small" style="margin:6px 0 0;padding-left:18px">{% for l in d.answer %}<li>{{ l }}</li>{% endfor %}</ul>{% endif %}
+{% if d.targets %}<div class="tw" style="margin-top:6px"><table class="stack"><thead><tr><th>Post</th><th>Cut</th><th>Step</th></tr></thead><tbody>{% for x in d.targets %}<tr>
+<td>{% if x.variant_id %}<a href="{{ base }}/variant/{{ x.variant_id }}">{{ x.account_id|acct }}</a>{% else %}—{% endif %}<span class="sub">{{ (d.clips|selectattr('clip_id','equalto',x.clip_id)|map(attribute='caption')|first) or x.clip_id }}</span></td>
+<td>{{ x.cut or '—' }}</td><td>{{ chip(x.state or 'todo') }}<span class="sub">{{ x.note }}</span></td></tr>{% endfor %}</tbody></table></div>
+{% elif d.clips and t.kind != 'decision' %}<p class="small faint">Clips: {% for c in d.clips %}{{ c.caption }} ({{ c.potential }}){{ '; ' if not loop.last }}{% endfor %}</p>{% endif %}
+{% if d.drafts %}<div class="tw" style="margin-top:6px"><table class="stack"><thead><tr><th>Draft</th><th>Sentences</th><th>Hashtags</th><th>Question</th><th>State</th></tr></thead><tbody>{% for x in d.drafts %}<tr>
+<td><a href="{{ base }}/variant/{{ x.variant_id }}">{{ x.account_id|acct }}</a><span class="sub">{{ (d.clips|selectattr('clip_id','equalto',x.clip_id)|map(attribute='caption')|first) or '' }}</span></td>
+<td>{{ x.sentences }}</td><td>{{ x.hashtags }}</td><td>{{ 'yes' if x.question else 'no' }}</td><td>{{ chip(x.state) }}</td></tr>{% endfor %}</tbody></table></div>{% endif %}
+{% if d.slots %}<div class="tw" style="margin-top:6px"><table class="stack"><thead><tr><th>#</th><th>Time</th><th>Post</th><th>State</th></tr></thead><tbody>{% for s in d.slots %}<tr>
+<td>{{ s.n }}</td><td class="nowrap">{% if s.slot_at %}<b>{{ s.slot_at|when(True) }}</b>{% else %}{{ '%d:%02d %s'|format(s.hour % 12 or 12, s.minute, 'PM' if s.hour >= 12 else 'AM') }}{% endif %}{% if s.moved %}<span class="sub">{{ s.moved }}</span>{% endif %}</td>
+<td>{% if s.variant_id %}<a href="{{ base }}/variant/{{ s.variant_id }}">{{ s.account_id|acct }}</a>{% else %}{{ s.brands|map('brand')|join(' or ') }}{% endif %}<span class="sub">{{ s.label }}</span></td>
+<td>{{ chip(s.state if s.state in ('scheduled','simulated','published','in_review','approved') else 'waiting', None, (s.state|label) if s.state else 'Waiting') }}</td></tr>{% endfor %}</tbody></table></div>
+{% if d.day and t.status == 'needs_you' %}<p style="margin-top:6px"><a class="btn primary sm" href="{{ base }}/runsheet?day={{ d.day }}">Open the run sheet for {{ d.day|when(True) }}</a></p>{% endif %}{% endif %}
+{% endif %}
+</li>{% endfor %}</ul>{% else %}<div class="empty">No tasks. Adopt an action from a team challenge and it shows up here.</div>{% endif %}
+{% endmacro %}

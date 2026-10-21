@@ -48,10 +48,32 @@ def day_sheet(db: DB, settings: Settings, day: date) -> dict:
                      "brand_id": acc.get("brand_id", ""), "hook": v.get("hook", ""), "state": v.get("state", ""),
                      "job": job.get("state"), "mode": "live" if live else "simulated", "why_not_live": why_not,
                      "error": job.get("last_error"), "qc": (v.get("render_qc") or {}).get("passed")})
+    # posts a team challenge's schedule task pinned to this day (you lock them like any proposal)
+    from .team_tasks import pins_for_day
+    pinned = set()
+    for p in pins_for_day(db, day.isoformat(), settings.timezone):
+        v = db.get("variants", "variant_id", p["variant_id"]) or {}
+        if v.get("state") in ("scheduled", "publishing", "published", "simulated"):
+            continue
+        acc = accs.get(p["account_id"], {})
+        live, why_not = publish_eligibility(acc, settings, ks) if acc else (False, [])
+        t = _local(p["slot_at"], tz)
+        pinned.add(p["variant_id"])
+        taken.setdefault(p["account_id"], []).append(t)
+        flags = (v.get("risk_flags") or {})
+        rows.append({"kind": "proposed", "pinned": True, "task_id": p["task_id"], "thread_id": p["thread_id"], "time": t,
+                     "variant_id": p["variant_id"], "account_id": p["account_id"], "handle": acc.get("username_original") or p["account_id"],
+                     "platform": acc.get("platform", ""), "brand_id": acc.get("brand_id", ""), "hook": v.get("hook", ""),
+                     "state": v.get("state", ""), "route_role": v.get("route_role", ""),
+                     "why_time": f"Team challenge, post {p['n']}" + (f" — {p['moved']}" if p.get("moved") else ""),
+                     "mode": "live" if live else "simulated", "why_not_live": why_not, "two_person": bool(flags.get("two_person_signoff")),
+                     "qc": (v.get("render_qc") or {}).get("passed"), "render": v.get("render_status")})
     plan = plan_week(db, settings, day, days=1, states=("in_review", "approved"), persist=False)
     hyp = slot_hypotheses()
     for p in plan["placed"]:
         t = p["slot"].astimezone(tz)
+        if p["variant_id"] in pinned:
+            continue
         if any(abs((t - x).total_seconds()) < 3600 for x in taken.get(p["account_id"], [])):
             continue  # an already-scheduled post holds that hour
         v = db.get("variants", "variant_id", p["variant_id"]) or {}
@@ -67,7 +89,8 @@ def day_sheet(db: DB, settings: Settings, day: date) -> dict:
                      "qc": (v.get("render_qc") or {}).get("passed"), "render": v.get("render_status")})
     rows.sort(key=lambda r: (r["time"], r["handle"]))
     return {"day": day.isoformat(), "timezone": settings.timezone, "rows": rows, "unplaced": plan["unplaced"][:40],
-            "counts": {"scheduled": sum(r["kind"] == "scheduled" for r in rows), "proposed": sum(r["kind"] == "proposed" for r in rows)}}
+            "counts": {"scheduled": sum(r["kind"] == "scheduled" for r in rows), "proposed": sum(r["kind"] == "proposed" for r in rows),
+                       "pinned": len(pinned)}}
 
 
 def lock(db: DB, picks: list[tuple[str, str]], reviewer: str) -> dict:

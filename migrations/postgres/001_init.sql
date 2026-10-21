@@ -389,6 +389,23 @@ CREATE TABLE IF NOT EXISTS team_threads (
   result JSONB
 );
 
+CREATE TABLE IF NOT EXISTS team_tasks (
+  task_id TEXT PRIMARY KEY,
+  thread_id TEXT NOT NULL,
+  action_index INTEGER,
+  owner TEXT,
+  kind TEXT,
+  title TEXT,
+  priority TEXT,
+  status TEXT,
+  progress TEXT,
+  blocked_reason TEXT,
+  detail JSONB,
+  created_by TEXT,
+  created_at TEXT,
+  updated_at TEXT
+);
+
 CREATE TABLE IF NOT EXISTS team_messages (
   id BIGSERIAL PRIMARY KEY,
   thread_id TEXT NOT NULL,
@@ -471,6 +488,8 @@ CREATE INDEX IF NOT EXISTS ix_scout_brand ON scout_moments(brand_id, potential);
 CREATE UNIQUE INDEX IF NOT EXISTS ux_experiment_arms_variant ON experiment_arms(variant_id);
 
 CREATE INDEX IF NOT EXISTS ix_team_messages_thread ON team_messages(thread_id, id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS ux_team_tasks_action ON team_tasks(thread_id, action_index);
 
 CREATE INDEX IF NOT EXISTS ix_competitor_handle ON competitor_snapshots(handle, captured_at);
 

@@ -163,27 +163,39 @@ def build_caption_track(variant: dict, asset: dict) -> list[dict]:
     return cues
 
 
+def _on_ops_vertical(asset: dict, v: dict, cut: dict, settings: Settings) -> tuple[dict, dict]:
+    """ops already made a subject-tracked 9:16 of exactly this cut's window: use it as the source (times from 0),
+    shift captions to match, and don't crop again."""
+    ov = cut["ops_vertical"]
+    start, end = ov["window"]
+    bucket = os.environ.get("PLN_OPS_ASSETS_BUCKET", settings.ops_assets_bucket)
+    asset = {**asset, "media_path": f"s3://{bucket}/{ov['key']}", "media_present": True, "width": 1080, "height": 1920,
+             "transcript": [{**c, "start": c["start"] - start, "end": c["end"] - start}
+                            for c in (asset.get("transcript") or []) if c["end"] > start and c["start"] < end]}
+    seg = dict(cut["segments"][0])
+    seg.update({"source_in": 0.0, "source_out": round(end - start, 2)})
+    v = {**v, "edl": {**(v.get("edl") or {}), "segments": [seg]},
+         "thumbnail": {**(v.get("thumbnail") or {}), "source_time": max(0.0, cut.get("payoff_at_s") or 0)}}
+    return asset, v
+
+
 def render_variant(db: DB, variant_id: str, settings: Settings, actor: str = "renderer", cut: dict | None = None) -> dict:
     """Render the post's EDL — or, with `cut` (a Creative Director duration variant), that cut into its own
     folder without touching the post's main render. Every render gets quality checks."""
     v = db.get("variants", "variant_id", variant_id)
     asset = db.get("assets", "asset_id", v["asset_id"])
     outdir = settings.render_dir / _safe(variant_id) / (f"cut_{cut['label']}" if cut else "")
+    if not cut:
+        # the post's own render: when it is on a Creative Director cut that MediaConvert already cropped, use that
+        # 9:16 (same window) instead of the agent's crop
+        label = (v.get("edl") or {}).get("variant_label")
+        mine = next((c for c in (v.get("treatment") or {}).get("duration_variants") or [] if c["label"] == label), None)
+        if mine and (mine.get("ops_vertical") or {}).get("status") == "ready" and mine.get("segments") == (v.get("edl") or {}).get("segments"):
+            asset, v = _on_ops_vertical(asset, v, mine, settings)
     if cut:
         v = {**v, "edl": {**(v.get("edl") or {}), "segments": cut["segments"]}}
-        ov = cut.get("ops_vertical") or {}
-        if ov.get("status") == "ready" and ov.get("key"):
-            # ops already made a subject-tracked 9:16 of exactly this window: use it as the source (times from
-            # 0), shift captions to match, and don't crop again
-            start, end = ov["window"]
-            bucket = os.environ.get("PLN_OPS_ASSETS_BUCKET", settings.ops_assets_bucket)
-            asset = {**asset, "media_path": f"s3://{bucket}/{ov['key']}", "media_present": True, "width": 1080, "height": 1920,
-                     "transcript": [{**c, "start": c["start"] - start, "end": c["end"] - start}
-                                    for c in (asset.get("transcript") or []) if c["end"] > start and c["start"] < end]}
-            seg = dict(cut["segments"][0])
-            seg.update({"source_in": 0.0, "source_out": round(end - start, 2)})
-            v = {**v, "edl": {**v["edl"], "segments": [seg]}, "thumbnail": {**(v.get("thumbnail") or {}),
-                                                                             "source_time": max(0.0, cut.get("payoff_at_s") or 0)}}
+        if (cut.get("ops_vertical") or {}).get("status") == "ready":
+            asset, v = _on_ops_vertical(asset, v, cut, settings)
     outdir.mkdir(parents=True, exist_ok=True)
     (outdir / "edl.json").write_text(json.dumps({"variant_id": variant_id, "source": asset["media_path"],
                                                  "source_sha256": asset["sha256"], **v["edl"]}, indent=2))

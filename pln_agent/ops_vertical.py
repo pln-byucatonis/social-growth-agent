@@ -44,8 +44,8 @@ def _master(asset: dict) -> tuple[str, str] | None:
     return b, k
 
 
-def request_cuts(db: DB, variant_id: str, actor: str, invoke=None) -> dict:
-    """Ask ops for a subject-tracked 9:16 of every available cut that doesn't have one yet."""
+def request_cuts(db: DB, variant_id: str, actor: str, invoke=None, only: list[str] | None = None) -> dict:
+    """Ask ops for a subject-tracked 9:16 of every available cut (or just `only`) that doesn't have one yet."""
     v = db.get("variants", "variant_id", variant_id)
     asset = db.get("assets", "asset_id", v["asset_id"])
     t = dict(v.get("treatment") or {})
@@ -58,7 +58,8 @@ def request_cuts(db: DB, variant_id: str, actor: str, invoke=None) -> dict:
     for c in t.get("duration_variants") or []:
         c = dict(c)
         ov = c.get("ops_vertical") or {}
-        if c.get("available") and c.get("segments") and ov.get("status") not in ("requested", "ready"):
+        if c.get("available") and c.get("segments") and ov.get("status") not in ("requested", "ready") \
+                and (only is None or c["label"] in only):
             seg = c["segments"][0]
             label = label_for(variant_id, c["label"])
             invoke({"source_bucket": m[0], "source_key": m[1], "start_sec": seg["source_in"], "end_sec": seg["source_out"],

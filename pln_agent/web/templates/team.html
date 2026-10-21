@@ -1,6 +1,6 @@
-{% extends "base.html" %}{% block title %}Agent Team{% endblock %}{% block body %}
+{% extends "base.html" %}{% from "_tasks.html" import task_list %}{% block title %}Agent Team{% endblock %}{% block body %}
 <div class="ph"><div class="t"><div class="eyebrow">Team</div><h1>Agent Team</h1>
-<p>The ten agents, what each one is doing, and two ways to steer them: <b>settings</b> (numbers the agent's code uses on its next run) and <b>directives</b> (written guidance it follows when you talk to it). Conversations use {{ llm.model.split('.')[-1] }} on Amazon Bedrock, grounded in each agent's own data. Nothing an agent suggests happens until you adopt it.</p></div></div>
+<p>The ten agents, what each one is doing, and two ways to steer them: <b>settings</b> (numbers the agent's code uses on its next run) and <b>directives</b> (written guidance it follows when you talk to it). Conversations use {{ llm.model.split('.')[-1] }} on Amazon Bedrock, grounded in each agent's own data. Nothing an agent suggests happens until you adopt it — then it becomes a tracked task below, which the system works on where it can.</p></div></div>
 <div class="split"><div>
 <div class="card"><div class="ch"><h2>Challenge the team</h2></div>
 <form method="post" action="{{ base }}/team/challenge"><textarea name="text" rows="3" placeholder="e.g. Putt Tour hasn't posted in 90 days and WPL is losing followers. What should we do in the next two weeks to grow Putt Tour on Instagram?" required></textarea>
@@ -11,6 +11,9 @@
 <p class="small muted" style="margin:6px 0">{{ a.mission }}</p><p class="small"><b>{{ a.status or '—' }}</b></p>
 <div>{% set changed = a.params|selectattr('overridden')|list %}{% if changed %}{{ chip('x','warn', changed|length ~ ' setting' ~ ('s' if changed|length != 1) ~ ' changed') }}{% endif %}{% if a.directives %}{{ chip('x','info', a.directives|length ~ ' directive' ~ ('s' if a.directives|length != 1)) }}{% endif %}</div></a>{% endfor %}</div>
 </div><div>
+<div class="card" id="tasks"><div class="ch"><h2>What the team is working on</h2><div class="acts"><form method="post" action="{{ base }}/team/tasks/run" class="inline"><button class="sm">Check now</button></form></div></div>
+<p class="faint small" style="margin-top:0">Status comes from what actually happened — renders, drafts, schedules — re-checked every minute.</p>
+{{ task_list(open_tasks, names, base, user) }}{% if done_tasks %}<details style="margin-top:8px"><summary class="small">Done ({{ done_tasks|length }})</summary>{{ task_list(done_tasks, names, base, user) }}</details>{% endif %}</div>
 <div class="card"><div class="ch"><h2>Recent challenges</h2></div>{% if challenges %}<ul class="list">{% for c in challenges %}<li><div class="body"><a href="{{ base }}/team/challenge/{{ c.thread_id }}" class="clip2">{{ c.title }}</a><span class="sub">{{ c.created_by }} · {{ c.created_at|ago }}</span></div>{{ chip(c.status) }}</li>{% endfor %}</ul>{% else %}<div class="empty">None yet.</div>{% endif %}</div>
 <div class="card"><div class="ch"><h2>Directives for everyone</h2></div>
 {% if team_directives %}<ul class="list">{% for d in team_directives %}<li><div class="body">{{ d.text }}<span class="sub">{{ d.created_by }} · {{ d.created_at|ago }}</span></div><form method="post" action="{{ base }}/team/directive/{{ d.directive_id }}/retire" class="fbar">{% if not user %}<input name="actor" placeholder="Name" style="width:80px">{% endif %}<button class="sm ghost">Retire</button></form></li>{% endfor %}</ul>{% else %}<p class="faint small">None.</p>{% endif %}

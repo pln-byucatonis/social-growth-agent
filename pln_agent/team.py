@@ -11,7 +11,8 @@ a snapshot of its own data and rules, and is told to say when the data doesn't s
 challenge runs in three steps: every agent answers from its own data, agents answer questions other agents
 asked them (the liaison round), then the Chief Growth Officer synthesises one recommendation with owners.
 Nothing an agent says is executed: the manager adopts an action, which becomes a directive (and, when it
-names a parameter, a proposed parameter change that still needs its own click).
+names a parameter, a proposed parameter change that still needs its own click) and a tracked task that the
+worker carries out where it can (see team_tasks).
 """
 from __future__ import annotations
 
@@ -457,6 +458,8 @@ def adopt(db: DB, thread_id: str, index: int, actor: str, apply_param: bool = Fa
     res = dict(t["result"])
     res.setdefault("adopted", []).append(index)
     db.update("team_threads", "thread_id", thread_id, {"result": res})
+    from .team_tasks import create
+    out["task"] = create(db, thread_id, index, act, actor)
     return out
 
 

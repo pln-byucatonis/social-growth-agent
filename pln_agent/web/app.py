@@ -757,8 +757,12 @@ def team_page(request: Request):
     r = team.roster(d)
     for a in r:
         a["status"] = team.status_line(d, a["key"])
+    from .. import team_tasks
+    all_tasks = team_tasks.tasks(d)
     return page(request, "team.html", agents=r, challenges=team.threads(d, "team", 10), llm=team.llm_status(),
-                team_directives=d.all("agent_directives", "status='active' AND agent_key='team'", order="created_at"))
+                team_directives=d.all("agent_directives", "status='active' AND agent_key='team'", order="created_at"),
+                open_tasks=[t for t in all_tasks if t["status"] in team_tasks.OPEN or t["status"] == "failed"],
+                done_tasks=[t for t in all_tasks if t["status"] == "done"][-20:], names={a["key"]: a["name"] for a in team.AGENTS})
 
 
 @app.get("/team/agent/{key}", response_class=HTMLResponse)
@@ -772,7 +776,9 @@ def team_agent(request: Request, key: str, thread: str = ""):
     chats = team.threads(d, key)
     cur = thread or (chats[0]["thread_id"] if chats else "")
     th = d.get("team_threads", "thread_id", cur) if cur and cur != "new" else None
+    from .. import team_tasks
     return page(request, "team_agent.html", a=a, chats=chats, thread=cur, msgs=team.messages(d, cur) if th else [], llm=team.llm_status(),
+                tasks=[t for t in team_tasks.tasks(d, owner=key) if t["status"] != "done"][-8:], names={x["key"]: x["name"] for x in team.AGENTS},
                 bg={"state": "running", "label": f"{a['name']} is thinking"} if th and th["status"] == "thinking" else bg_status(f"chat-{cur}"))
 
 
@@ -842,8 +848,11 @@ def team_challenge_view(request: Request, tid: str):
     t = d.get("team_threads", "thread_id", tid)
     if not t:
         raise HTTPException(404, "no such challenge")
+    from .. import team_tasks
     names = {a["key"]: a["name"] for a in team.AGENTS}
-    return page(request, "team_challenge.html", t=t, msgs=team.messages(d, tid), names=names)
+    tk = team_tasks.tasks(d, tid)
+    return page(request, "team_challenge.html", t=t, msgs=team.messages(d, tid), names=names, tasks=tk,
+                tasks_by_index={x["action_index"]: x for x in tk}, has_open=any(x["status"] in team_tasks.OPEN for x in tk))
 
 
 @app.post("/team/challenge/{tid}/adopt")
@@ -855,8 +864,42 @@ def team_adopt(request: Request, tid: str, index: int = Form(...), apply_param: 
         r = team.adopt(db(), tid, index, who(request, actor), bool(apply_param))
     except (ValueError, KeyError, WorkflowError) as e:
         return back(request, f"/team/challenge/{tid}", err=str(e))
-    return back(request, f"/team/challenge/{tid}", f"Adopted as a directive for {r['directive']['agent_key']}"
-                + (f"; parameter set to {r['param']}" if "param" in r else ""))
+    _kick_team_tasks()
+    return back(request, f"/team/challenge/{tid}", f"Adopted: a directive for {r['directive']['agent_key']} and a tracked task "
+                f"({r['task']['kind']}) — progress shows below" + (f"; parameter set to {r['param']}" if "param" in r else ""))
+
+
+def _kick_team_tasks() -> None:
+    from .. import team_tasks
+    if BACKGROUND:
+        team_tasks.start(settings)
+    else:
+        team_tasks.advance(db(), settings, _ops_db() if settings.ops_database_url else None, hooks=TEAM_TASK_HOOKS)
+
+
+TEAM_TASK_HOOKS = None  # tests inject fakes for promote / MediaConvert / render
+
+
+@app.post("/team/tasks/run")
+def team_tasks_run(request: Request, back_to: str = Form("/team")):
+    _kick_team_tasks()
+    return back(request, (back_to if back_to.startswith("/team") else "/team") + "#tasks",
+                "Checking every open task now — refresh in a minute for renders.")
+
+
+@app.post("/team/task/{task_id}/mark")
+def team_task_mark(request: Request, task_id: str, status: str = Form(...), note: str = Form(""), actor: str = Form("")):
+    from .. import team_tasks
+    t = db().get("team_tasks", "task_id", task_id)
+    if not t:
+        raise HTTPException(404, "no such task")
+    try:
+        team_tasks.mark(db(), task_id, status, who(request, actor), note)
+    except (ValueError, WorkflowError) as e:
+        return back(request, f"/team/challenge/{t['thread_id']}#tasks", err=str(e))
+    if status == "todo":
+        _kick_team_tasks()
+    return back(request, f"/team/challenge/{t['thread_id']}#{task_id}", {"done": "Marked done", "todo": "Retrying", "blocked": "Marked blocked"}[status])
 
 
 @app.get("/experiments", response_class=HTMLResponse)

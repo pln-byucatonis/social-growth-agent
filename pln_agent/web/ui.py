@@ -38,6 +38,8 @@ STATUS = {
     "no_clear_difference": ("No clear difference", "muted"), "unstable": ("Unstable", "warn"),
     "measured": ("Measured", "ok"), "derived": ("Derived", "info"), "unavailable": ("Unavailable", "muted"),
     "rendered": ("Rendered", "ok"), "not_rendered": ("Not rendered", "muted"), "render_failed": ("Render failed", "bad"),
+    "todo": ("To do", "muted"), "in_progress": ("In progress", "info"), "waiting": ("Waiting", "muted"),
+    "needs_you": ("Needs you", "warn"), "working": ("Working", "info"),
     "P0": ("P0", "bad"), "P1": ("P1", "warn"), "P2": ("P2", "muted"), "P3": ("P3", "muted"),
 }
 WORDS = {"pln": "PLN", "wpl": "WPL", "ig": "IG", "yt": "YouTube", "utm": "UTM", "qc": "QC", "cta": "CTA", "faq": "FAQ",
