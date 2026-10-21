@@ -539,13 +539,16 @@ def run_manual(db: DB, t: dict) -> None:
 ORDER = {"render": 0, "decision": 1, "creative": 2, "schedule": 3, "post_on": 4, "measure": 5, "manual": 6}
 
 
-def advance(db: DB, settings, ops: DB | None = None, hooks: Hooks | None = None) -> dict:
+COMPUTE_KINDS = ("render", "creative")  # FFmpeg renders and draft generation: real CPU, minutes of work
+
+
+def advance(db: DB, settings, ops: DB | None = None, hooks: Hooks | None = None, kinds: tuple | None = None) -> dict:
     """One pass over open tasks (render before schedule so pins follow finished renders)."""
     hooks = hooks or Hooks(settings, ops)
     ensure_for_adopted(db)
     out = {}
     for t in sorted(tasks(db, open_only=True), key=lambda x: ORDER.get(x["kind"], 9)):
-        if (t.get("detail") or {}).get("manual"):
+        if (t.get("detail") or {}).get("manual") or (kinds is not None and t["kind"] not in kinds):
             continue
         try:
             fn = {"render": lambda: run_render(db, t, hooks), "creative": lambda: run_creative(db, t, hooks),
@@ -572,13 +575,42 @@ def pins_for_day(db: DB, day_iso: str, tz: str) -> list[dict]:
     return out
 
 
+def needs_compute(db: DB) -> bool:
+    return any(t["kind"] in COMPUTE_KINDS and t["status"] in ("todo", "in_progress") for t in tasks(db, open_only=True))
+
+
 _lock = threading.Lock()
+_runner_checked = [0.0, ""]
+
+
+def _runner_project() -> str:
+    import os
+    return os.environ.get("PLN_TASK_RUNNER_PROJECT", "")
+
+
+def _start_runner(project: str) -> str:
+    """App Runner throttles CPU between requests, so background renders stall there. Heavy steps run in a
+    CodeBuild job on the agent's own image instead; at most one at a time."""
+    import time
+
+    import boto3
+    if time.time() - _runner_checked[0] < 60:
+        return _runner_checked[1]
+    cb = boto3.client("codebuild", region_name="us-east-1")
+    ids = cb.list_builds_for_project(projectName=project, sortOrder="DESCENDING").get("ids", [])[:3]
+    running = [b for b in (cb.batch_get_builds(ids=ids)["builds"] if ids else []) if b["buildStatus"] == "IN_PROGRESS"]
+    state = f"runner {running[0]['id'].split(':')[-1][:8]} running" if running else \
+        f"runner {cb.start_build(projectName=project)['build']['id'].split(':')[-1][:8]} started"
+    _runner_checked[:] = [time.time(), state]
+    return state
 
 
 def start(settings) -> str:
-    """Advance tasks off the request path (renders take minutes)."""
+    """Advance tasks off the request path. With a runner project configured, only the light kinds run here and
+    renders go to the runner; otherwise everything runs in this thread (local / dev)."""
     if _lock.locked():
         return "already running"
+    project = _runner_project()
 
     def work():
         import logging
@@ -586,9 +618,38 @@ def start(settings) -> str:
             try:
                 own = DB(settings.database_url, init=False)
                 ops = DB(settings.ops_database_url, init=False) if settings.ops_database_url else None
-                advance(own, settings, ops)
+                if project:
+                    advance(own, settings, ops, kinds=tuple(k for k in ORDER if k not in COMPUTE_KINDS))
+                    ensure_for_adopted(own)
+                    if needs_compute(own):
+                        _start_runner(project)
+                else:
+                    advance(own, settings, ops)
             except Exception:  # noqa: BLE001
                 logging.getLogger("pln_agent.team_tasks").exception("team task pass failed")
 
     threading.Thread(target=work, daemon=True, name="pln-team-tasks").start()
     return "started"
+
+
+def run_runner(settings, max_minutes: int = 50, pause_s: int = 20, idle_passes: int = 3) -> dict:
+    """The CodeBuild job: pick up finished MediaConvert crops, advance every task, repeat until nothing needs
+    compute for a few passes (or time runs out)."""
+    import logging
+    import time
+
+    from .ops_vertical import poll
+    log = logging.getLogger("pln_agent.team_tasks")
+    own = DB(settings.database_url, init=False)
+    ops = DB(settings.ops_database_url, init=False) if settings.ops_database_url else None
+    end, idle, passes = time.time() + max_minutes * 60, 0, 0
+    while time.time() < end:
+        r = poll(own, settings.ops_assets_bucket, settings, render=False)
+        out = advance(own, settings, ops)
+        passes += 1
+        log.info("runner pass %s: mediaconvert ready %s; tasks %s", passes, r["ready"], out)
+        idle = 0 if needs_compute(own) else idle + 1
+        if idle >= idle_passes:
+            break
+        time.sleep(pause_s)
+    return {"passes": passes, "open": len(tasks(own, open_only=True))}

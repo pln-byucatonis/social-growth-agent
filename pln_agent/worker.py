@@ -73,7 +73,9 @@ def start_video_poll(settings: Settings) -> str:
             try:
                 from .ops_vertical import poll
                 own = DB(settings.database_url, init=False)
-                r = poll(own, settings.ops_assets_bucket, settings)
+                import os
+                # with a task runner, renders happen there (App Runner throttles CPU between requests)
+                r = poll(own, settings.ops_assets_bucket, settings, render=not os.environ.get("PLN_TASK_RUNNER_PROJECT"))
                 if r["ready"]:
                     log.info("ops verticals ready: %s", r["ready"])
             except Exception:  # noqa: BLE001

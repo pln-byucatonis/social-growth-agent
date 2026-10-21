@@ -282,6 +282,14 @@ def cmd_worker(args):
     worker.run(_db(args), s, interval_s=args.interval, ops_every_s=args.ops_every)
 
 
+def cmd_team_tasks(args):
+    import json
+    import logging
+    from .team_tasks import run_runner
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
+    print(json.dumps(run_runner(load_settings(), max_minutes=args.minutes)))
+
+
 def cmd_serve(args):
     import os
     import uvicorn
@@ -376,6 +384,9 @@ def main(argv=None):
     w = sp.add_parser("worker", help="publisher loop + periodic ops refresh")
     w.add_argument("--interval", type=int, default=60), w.add_argument("--ops-every", dest="ops_every", type=int, default=6 * 3600)
     w.set_defaults(fn=cmd_worker)
+    tt = sp.add_parser("team-tasks", help="task runner: advance adopted team tasks until no render work is left")
+    tt.add_argument("--minutes", type=int, default=50)
+    tt.set_defaults(fn=cmd_team_tasks)
     sv = sp.add_parser("serve")
     sv.add_argument("--host", default="127.0.0.1"), sv.add_argument("--port", type=int, default=8000)
     sv.set_defaults(fn=cmd_serve)

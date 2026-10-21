@@ -154,6 +154,16 @@ class TeamTaskTests(unittest.TestCase):
         self.advance()
         self.assertIn(CJ, self.hooks.regenerated)
 
+    def test_light_pass_leaves_renders_to_the_runner(self):
+        self.adopt_all()
+        team_tasks.advance(self.db, self.s, None, hooks=self.hooks,
+                           kinds=tuple(k for k in team_tasks.ORDER if k not in team_tasks.COMPUTE_KINDS))
+        t = {x["action_index"]: x for x in team_tasks.tasks(self.db, "th-test")}
+        self.assertEqual(t[0]["status"], "todo")  # render untouched
+        self.assertEqual(self.hooks.requested, [])
+        self.assertEqual(t[1]["status"], "done")  # scout decision ran
+        self.assertTrue(team_tasks.needs_compute(self.db))
+
     def test_mark_retry_and_pages(self):
         from fastapi.testclient import TestClient
         from pln_agent.web import app as web
