@@ -369,6 +369,34 @@ TABLES: dict[str, list[tuple[str, str, str]]] = {
         ("status", "text", ""),  # baseline | unchanged | changed | quote_missing | unreachable
         ("note", "text", ""),
     ],
+    # Community Manager: every fetched comment, its triage and the human decision on it.
+    "comments": [
+        ("comment_id", "text", "PRIMARY KEY"),  # <platform>:<platform comment id>
+        ("account_id", "text", "NOT NULL"),
+        ("brand_id", "text", ""),
+        ("platform", "text", "NOT NULL"),
+        ("platform_post_id", "text", ""),
+        ("platform_comment_id", "text", ""),
+        ("parent_id", "text", ""),
+        ("author", "text", ""),
+        ("text", "text", ""),
+        ("created_at", "ts", ""),
+        ("like_count", "int", ""),
+        ("is_ours", "bool", "NOT NULL DEFAULT 0"),
+        ("category", "text", ""),
+        ("sentiment", "text", ""),
+        ("priority", "int", ""),
+        ("status", "text", ""),  # drafted | needs_answer | escalated | flagged_spam | no_action | approved | ignored | replied | simulated_reply | own
+        ("escalation", "text", ""),
+        ("draft_reply", "text", ""),
+        ("draft_gaps", "json", ""),
+        ("reply_text", "text", ""),
+        ("decided_by", "text", ""),
+        ("decided_at", "ts", ""),
+        ("replied_at", "ts", ""),
+        ("send_result", "json", ""),
+        ("fetched_at", "ts", ""),
+    ],
     # Publishing Strategist: configurable starting cadence + the current measured recommendation.
     "cadence": [
         ("account_id", "text", "PRIMARY KEY"),
@@ -393,6 +421,8 @@ INDEXES = [
     "CREATE INDEX IF NOT EXISTS ix_posts_account ON posts(account_id, published_at)",
     "CREATE INDEX IF NOT EXISTS ix_scout_source ON scout_moments(source_id, potential)",
     "CREATE INDEX IF NOT EXISTS ix_scout_brand ON scout_moments(brand_id, potential)",
+    "CREATE INDEX IF NOT EXISTS ix_comments_status ON comments(status, priority)",
+    "CREATE INDEX IF NOT EXISTS ix_comments_created ON comments(created_at)",
     "CREATE INDEX IF NOT EXISTS ix_jobs_state ON publish_jobs(state, next_attempt_at)",
     "CREATE INDEX IF NOT EXISTS ix_sched_slot ON schedules(slot_at)",
 ]

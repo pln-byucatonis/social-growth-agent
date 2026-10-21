@@ -174,6 +174,15 @@ def generate_brief(db: DB, actor: str = "chief-growth-officer", today: date | No
         if c["action"] in ("increase", "decrease"):
             actions.append({"priority": "P2", "area": "cadence", "text": f"{c['account_id']}: {c['action']} to "
                                                                        f"{c['recommended_per_week']:g}/week — {c['rationale']}"})
+    from .community import faqs as _faqs, summary as _community
+    cm = _community(db)
+    if cm["open_escalations"]:
+        actions.append({"priority": "P0", "area": "community",
+                        "text": f"{cm['open_escalations']} escalated comment(s) (safety / legal / threats / sponsors) need a person — see Community."})
+    if cm["awaiting_approval"]:
+        actions.append({"priority": "P2", "area": "community", "text": f"{cm['awaiting_approval']} drafted comment replies are waiting for approval."})
+    for f in _faqs(db)[:3]:
+        actions.append({"priority": "P2", "area": "community", "text": f"{f['brand_id']}: {f['idea']}"})
     if not exps:
         actions.append({"priority": "P2", "area": "experiments",
                         "text": "No experiments planned — plan this week's hook / duration tests once posting resumes."})
@@ -183,7 +192,7 @@ def generate_brief(db: DB, actor: str = "chief-growth-officer", today: date | No
              "cadence": [{k: c[k] for k in ("account_id", "action", "recommended_per_week", "confidence", "rationale")}
                          for c in cadence], "experiments": exps,
              "evidence": [{k: e[k] for k in ("entry_id", "statement", "applicability")} for e in evidence],
-             "migration": migration, "actions": actions,
+             "migration": migration, "actions": actions, "community": cm,
              "other_recommendations": [r for r in recommendations(db) if r["type"] not in ("posting_gap",)][:15]}
     if persist:
         bid = f"brief-{week}-{uuid.uuid4().hex[:6]}"

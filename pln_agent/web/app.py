@@ -661,6 +661,39 @@ def growth_page(request: Request):
     return page(request, "growth.html", b=brief, shares=cgo.current_shares(d))
 
 
+@app.get("/community", response_class=HTMLResponse)
+def community_page(request: Request, status: str = ""):
+    import json as _json
+    from .. import community as cm
+    d = db()
+    sts = tuple(x for x in status.split(",") if x) or ("escalated", "needs_answer", "drafted", "approved")
+    rows = cm.queue(d, sts)
+    accs = {a["account_id"]: a for a in d.all("accounts")}
+    raw = d.kv_get("community:faqs")
+    return page(request, "community.html", rows=rows, accs=accs, s=cm.summary(d), faqs=_json.loads(raw) if raw else cm.faqs(d),
+                status=",".join(sts), cfg=cm.config())
+
+
+@app.post("/community/refresh")
+def community_refresh(request: Request):
+    from .. import community as cm
+    _admin(request)
+    r = cm.refresh(db(), settings, actor=request.state.user or "dashboard")
+    errs = "; ".join(f"{k}: {v}" for k, v in list(r["errors"].items())[:3])
+    return back(request, "/community", f"Fetched {r['new']} new comment(s)", errs)
+
+
+@app.post("/community/{comment_id:path}/decide")
+def community_decide(request: Request, comment_id: str, action: str = Form(...), text: str = Form(None),
+                     note: str = Form(""), actor: str = Form("")):
+    from .. import community as cm
+    try:
+        cm.decide(db(), comment_id, action, who(request, actor), text, note)
+    except (KeyError, ValueError, WorkflowError) as e:
+        return back(request, "/community", err=str(e))
+    return back(request, "/community", f"{action}: done" + (" — it sends on the next tick (simulated unless live publishing is on)" if action == "approve" else ""))
+
+
 @app.post("/growth/generate")
 def growth_generate(request: Request):
     from .. import growth_officer as cgo

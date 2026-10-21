@@ -1,0 +1,45 @@
+{
+  "_note": "Community Manager rules. Categories are checked top to bottom; the first match wins. escalate=true means the agent never drafts a public reply: a person handles it. Reply templates may only use the links set here; with no link the draft is marked needs_answer instead of inventing one.",
+  "lookback_days": 14,
+  "max_posts_per_account": 30,
+  "faq_min_people": 3,
+  "categories": [
+    {"key": "threat", "label": "Threat / harassment", "escalate": true, "priority": 0, "route": "safety lead",
+     "patterns": ["kill you", "kys", "i will find you", "doxx", "your address", "rape", "\\bshoot (you|him|her|them)\\b"]},
+    {"key": "safety", "label": "Athlete safety / injury concern", "escalate": true, "priority": 0, "route": "event ops + medical",
+     "patterns": ["injur", "concussion", "is (he|she|they) ok", "hospital", "bleed", "knocked out cold", "medic", "broke (his|her) (arm|leg|neck)", "seizure"]},
+    {"key": "legal", "label": "Legal / rights", "escalate": true, "priority": 0, "route": "legal",
+     "patterns": ["copyright", "lawyer", "lawsuit", "sue you", "my footage", "stole my", "without permission", "dmca"]},
+    {"key": "business", "label": "Sponsor / partnership / press", "escalate": true, "priority": 1, "route": "partnerships",
+     "patterns": ["sponsor", "partnership", "brand deal", "advertis", "media inquiry", "press inquiry", "collab with (us|our brand)", "business inquiry", "license"]},
+    {"key": "spam", "label": "Spam / scam", "escalate": false, "priority": 3, "reply": false,
+     "patterns": ["check my (page|profile|bio)", "dm (me|us) for", "promo", "buy followers", "crypto", "forex", "onlyfans", "giveaway winner", "whatsapp", "telegram", "https?://"]},
+    {"key": "athlete_interest", "label": "Wants to compete", "escalate": false, "priority": 1,
+     "patterns": ["how (do|can) i (join|sign up|compete|enter|try out|fight)", "tryout", "sign me up", "i want to (compete|fight|play|join)", "how to (enter|apply)", "apply to"]},
+    {"key": "where_to_watch", "label": "Where to watch / tickets / next event", "escalate": false, "priority": 1,
+     "patterns": ["where (can|do) i watch", "full (fight|match|video|event)", "stream", "what channel", "tickets", "when is the next", "next event", "where is this", "live on"]},
+    {"key": "question", "label": "Other question", "escalate": false, "priority": 1,
+     "patterns": ["\\?\\s*$", "^(who|what|when|where|why|how|is|are|can|does|do)\\b"]},
+    {"key": "complaint", "label": "Criticism / complaint", "escalate": false, "priority": 2,
+     "patterns": ["rigged", "boring", "scam", "refund", "worst", "fake", "staged", "trash", "cringe", "unfollow"]},
+    {"key": "praise", "label": "Praise / hype", "escalate": false, "priority": 3,
+     "patterns": ["🔥", "goat", "love (this|it)", "amazing", "let'?s go", "insane", "legend", "so good", "hilarious", "😂", "🤣", "👏", "need more"]}
+  ],
+  "sentiment": {
+    "positive": ["love", "great", "amazing", "awesome", "fire", "🔥", "goat", "legend", "best", "funny", "hilarious", "😂", "🤣", "👏", "❤", "let's go", "lets go"],
+    "negative": ["hate", "boring", "worst", "trash", "fake", "rigged", "scam", "cringe", "stupid", "dumb", "awful", "unfollow"]
+  },
+  "links": {
+    "_note": "Fill these in to let drafts answer with a link. Empty = the draft says what's missing.",
+    "pln": {"watch": "", "compete": "", "tickets": ""},
+    "carjitsu": {"watch": "", "compete": "", "tickets": ""},
+    "putt_tour": {"watch": "", "compete": "", "tickets": ""}
+  },
+  "templates": {
+    "athlete_interest": "Love the energy. Here's how to get in: {compete}",
+    "where_to_watch": "Full {brand} action: {watch}",
+    "question": "Good question, we'll get you an answer.",
+    "complaint": "Appreciate you watching and telling us straight. We read every one of these.",
+    "praise": "Glad you're here. More coming. 🙌"
+  }
+}

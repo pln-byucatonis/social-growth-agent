@@ -358,6 +358,34 @@ CREATE TABLE IF NOT EXISTS knowledge_sources (
   note TEXT
 );
 
+CREATE TABLE IF NOT EXISTS comments (
+  comment_id TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL,
+  brand_id TEXT,
+  platform TEXT NOT NULL,
+  platform_post_id TEXT,
+  platform_comment_id TEXT,
+  parent_id TEXT,
+  author TEXT,
+  text TEXT,
+  created_at TEXT,
+  like_count INTEGER,
+  is_ours BOOLEAN NOT NULL DEFAULT FALSE,
+  category TEXT,
+  sentiment TEXT,
+  priority INTEGER,
+  status TEXT,
+  escalation TEXT,
+  draft_reply TEXT,
+  draft_gaps JSONB,
+  reply_text TEXT,
+  decided_by TEXT,
+  decided_at TEXT,
+  replied_at TEXT,
+  send_result JSONB,
+  fetched_at TEXT
+);
+
 CREATE TABLE IF NOT EXISTS cadence (
   account_id TEXT PRIMARY KEY,
   start_min DOUBLE PRECISION,
@@ -386,6 +414,10 @@ CREATE INDEX IF NOT EXISTS ix_posts_account ON posts(account_id, published_at);
 CREATE INDEX IF NOT EXISTS ix_scout_source ON scout_moments(source_id, potential);
 
 CREATE INDEX IF NOT EXISTS ix_scout_brand ON scout_moments(brand_id, potential);
+
+CREATE INDEX IF NOT EXISTS ix_comments_status ON comments(status, priority);
+
+CREATE INDEX IF NOT EXISTS ix_comments_created ON comments(created_at);
 
 CREATE INDEX IF NOT EXISTS ix_jobs_state ON publish_jobs(state, next_attempt_at);
 

@@ -60,7 +60,8 @@ PROVIDERS: dict[str, Provider] = {p.key: p for p in [
              f"https://www.facebook.com/{META_VERSION}/dialog/oauth",
              f"https://graph.facebook.com/{META_VERSION}/oauth/access_token",
              ("pages_show_list", "pages_read_engagement", "pages_manage_posts", "read_insights", "business_management",
-              "instagram_basic", "instagram_content_publish", "instagram_manage_insights"), scope_sep=",",
+              "instagram_basic", "instagram_content_publish", "instagram_manage_insights", "instagram_manage_comments",
+              "pages_read_user_content", "pages_manage_engagement"), scope_sep=",",
              console="https://developers.facebook.com/apps",
              review_note="Admins/testers of the app can connect right away; Meta App Review (Advanced Access) "
                          "is needed before the app works for anyone else."),
