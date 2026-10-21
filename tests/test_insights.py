@@ -123,3 +123,69 @@ class YouTubeCollectorTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+IG = "carjitsu.instagram.carjitsu_championship"
+
+
+class FakeGraph:
+    def __call__(self, req):
+        u = urllib.parse.urlparse(req.url)
+        q = {k: v[0] for k, v in urllib.parse.parse_qs(u.query).items()}
+        assert q["access_token"] == "PAGE-TOKEN"
+        path = u.path.split("/", 2)[-1]
+        if path == "1784/insights":
+            if q["metric"] == "reach":
+                assert q["breakdown"] == "follow_type" and q["metric_type"] == "total_value"
+                return HttpResponse(200, {"data": [{"name": "reach", "total_value": {"value": 100000, "breakdowns": [
+                    {"dimension_keys": ["follow_type"], "results": [{"dimension_values": ["FOLLOWER"], "value": 30000},
+                                                                    {"dimension_values": ["NON_FOLLOWER"], "value": 70000}]}]}}]})
+            if q["metric"] == "follows_and_unfollows":
+                return HttpResponse(200, {"data": [{"name": "follows_and_unfollows", "total_value": {"breakdowns": [
+                    {"results": [{"dimension_values": ["FOLLOWER"], "value": 2630},
+                                 {"dimension_values": ["NON_FOLLOWER"], "value": 6800}]}]}}]})
+            return HttpResponse(200, {"data": [{"name": "accounts_engaged", "total_value": {"value": 5100}},
+                                               {"name": "profile_links_taps", "total_value": {"value": 220}}]})
+        if path == "reel1/insights":
+            return HttpResponse(200, {"data": [{"name": "ig_reels_avg_watch_time", "values": [{"value": 8400}]}]})
+        if path == "feed1/insights":
+            assert q["metric"] == "follows,profile_visits"
+            return HttpResponse(200, {"data": [{"name": "follows", "values": [{"value": 12}]},
+                                               {"name": "profile_visits", "values": [{"value": 90}]}]})
+        return HttpResponse(400, {"error": {"message": "bad " + path}})
+
+
+class InstagramCollectorTests(unittest.TestCase):
+    def setUp(self):
+        self.db, self.s = make(packs=False)
+        self.store = oauth.MemorySecretStore()
+        oauth.set_store(self.store)
+        self.addCleanup(oauth.set_store, None)
+        name = f"pln/growth-agent/tokens/{IG}"
+        self.store.put(name, {"provider": "meta", "access_token": "PAGE-TOKEN"})
+        self.db.update("accounts", "account_id", IG, {"verification_status": "oauth_connected",
+                                                      "credential_ref": f"vault:{name}", "stable_platform_id": "1784"})
+        from pln_agent.creative_db import upsert_ingested_post
+        acc = self.db.get("accounts", "account_id", IG)
+        for pid, kind in (("reel1", "reels"), ("feed1", "feed")):
+            upsert_ingested_post(self.db, acc, {"platform_post_id": pid, "published_at": D(10), "text": "x",
+                                                "post_type": kind}, self.s.timezone)
+            self.db.insert("metrics", {"account_id": IG, "platform_post_id": pid, "platform": "instagram", "metric": "views",
+                                       "canonical_metric": "views", "value": 4000.0, "checkpoint": "7d",
+                                       "source": "ops_social", "captured_at": NOW.replace(microsecond=0).isoformat(),
+                                       "metric_key": f"t:{pid}"})
+
+    def test_non_follower_reach_follows_and_reel_watch_time(self):
+        from pln_agent.insights import collect_instagram
+        r = collect_instagram(self.db, transport=FakeGraph())
+        self.assertEqual(r["errors"], {})
+        self.assertEqual(r["collected"][0]["posts_checked"], 2)
+        a = audience.account_kpis(self.db, IG, days=28, end=NOW.date())
+        k = a["kpis"]
+        self.assertEqual(k["non_follower_reach"]["basis"], "measured")
+        self.assertAlmostEqual(k["non_follower_reach"]["value"], 0.7)
+        self.assertEqual(k["avg_watch_time_s"]["value"], 8.4)  # milliseconds converted
+        self.assertEqual(k["follows_per_1k_views"]["basis"], "measured")
+        self.assertIn("feed posts only", k["follows_per_1k_views"]["how"])
+        self.assertAlmostEqual(k["follows_per_1k_views"]["value"], 3.0)  # 12 follows / 4,000 views
+        self.assertEqual((a["follows_28d"], a["unfollows_28d"], a["accounts_engaged_28d"]), (2630, 6800, 5100))

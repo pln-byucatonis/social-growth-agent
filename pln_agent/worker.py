@@ -81,6 +81,7 @@ def refresh_intelligence(db: DB, settings: Settings, ops: DB | None) -> dict:
     from . import audience, cadence, insights, knowledge, scout
     steps = [("knowledge_seed", lambda: knowledge.seed(db, "worker")),
              ("social", lambda: audience.import_ops_social(db, ops, settings.timezone, "worker") if ops else None),
+             ("instagram", lambda: insights.collect_instagram(db, actor="worker")),
              ("youtube", lambda: insights.collect_youtube(db, settings.timezone, actor="worker")),
              ("pln_evidence", lambda: len(knowledge.derive_pln_evidence(db)["written"])),
              ("scout", lambda: scout.scan(db, ops, actor="worker") if ops else None),

@@ -636,15 +636,21 @@ def knowledge_review(request: Request):
     return back(request, "/knowledge", "Source review started — refresh in a minute.")
 
 
-@app.post("/insights/youtube")
-def insights_youtube(request: Request):
-    """Collect YouTube analytics for every connected channel now (background; also runs every refresh)."""
+@app.post("/insights/collect")
+def insights_collect(request: Request):
+    """Collect Instagram + YouTube insights for every connected account now (background; also every refresh)."""
     import threading
-    from ..insights import collect_youtube
+    from ..insights import collect_instagram, collect_youtube
     _admin(request)
-    threading.Thread(target=lambda: collect_youtube(DB(settings.database_url, init=False), settings.timezone,
-                                                    actor=request.state.user or "dashboard"), daemon=True).start()
-    return back(request, "/intelligence", "Collecting YouTube analytics — refresh in a minute.")
+    actor = request.state.user or "dashboard"
+
+    def work():
+        own = DB(settings.database_url, init=False)
+        collect_instagram(own, actor=actor)
+        collect_youtube(own, settings.timezone, actor=actor)
+
+    threading.Thread(target=work, daemon=True).start()
+    return back(request, "/intelligence", "Collecting insights — refresh in a minute.")
 
 
 @app.get("/cadence", response_class=HTMLResponse)

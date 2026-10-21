@@ -307,7 +307,13 @@ def account_kpis(db: DB, account_id: str, days: int = 28, end: date | None = Non
     k = {}
     nf = [v for d, v in _account_series(db, account_id, "non_follower_views") if d <= end.isoformat()]
     fv = [v for d, v in _account_series(db, account_id, "follower_views") if d <= end.isoformat()]
-    if nf and fv and (nf[-1] + fv[-1]):
+    nfr = [v for d, v in _account_series(db, account_id, "non_follower_reach") if d <= end.isoformat()]
+    fr = [v for d, v in _account_series(db, account_id, "follower_reach") if d <= end.isoformat()]
+    if nfr and fr and (nfr[-1] + fr[-1]):
+        k["non_follower_reach"] = _k(nfr[-1] / (nfr[-1] + fr[-1]), "measured",
+                                     f"share of accounts reached who don't follow ({nfr[-1]:,.0f} of {nfr[-1] + fr[-1]:,.0f}; "
+                                     "platform-reported, last 28 days)")
+    elif nf and fv and (nf[-1] + fv[-1]):
         k["non_follower_reach"] = _k(nf[-1] / (nf[-1] + fv[-1]), "measured",
                                      "share of views from non-subscribers (platform-reported, last collected window)")
     else:
@@ -317,8 +323,10 @@ def account_kpis(db: DB, account_id: str, days: int = 28, end: date | None = Non
     post_follows = [p for p in measured if p["metrics"].get("follows") is not None]
     if post_follows and views:
         pv_views = sum(p["outcomes"]["views"] for p in post_follows)
+        what = ("feed posts only — Instagram doesn't report follows for Reels" if acc["platform"] == "instagram"
+                else "per video")
         k["follows_per_1k_views"] = _k(sum(p["metrics"]["follows"] for p in post_follows) / pv_views * 1000, "measured",
-                                       f"Σ subscribers gained ÷ Σ views, per video ({len(post_follows)} posts)", len(post_follows))
+                                       f"Σ follows ÷ Σ views, {what} ({len(post_follows)} posts)", len(post_follows))
     elif fw and views:
         k["follows_per_1k_views"] = _k(sum(fw) / views * 1000, "derived",
                                        "platform-reported daily follows ÷ views of posts published in the window "
@@ -349,6 +357,9 @@ def account_kpis(db: DB, account_id: str, days: int = 28, end: date | None = Non
     # account-level numbers that don't depend on recent posts (all platform-reported)
     fol = [(d, v) for d, v in follows_daily if start.isoformat() <= d <= end.isoformat()]
     reach = [(d, v) for d, v in _account_series(db, account_id, "reach") if start.isoformat() <= d <= end.isoformat()]
+    def latest(fam):
+        v = [x for d, x in _account_series(db, account_id, fam) if d <= end.isoformat()]
+        return v[-1] if v else None
     last = db.one("SELECT MAX(published_at) AS t FROM posts WHERE account_id=?", [account_id])
     last_at = _dt(last["t"]) if last and last["t"] else None
     days_since = (datetime.now(timezone.utc) - last_at).days if last_at else None
@@ -357,6 +368,8 @@ def account_kpis(db: DB, account_id: str, days: int = 28, end: date | None = Non
             "new_follows": sum(v for _, v in fol) if fol else None, "new_follows_days": len(fol),
             "daily_reach_sum": sum(v for _, v in reach) if reach else None, "reach_days": len(reach),
             "last_post_at": last_at.date().isoformat() if last_at else None, "days_since_post": days_since,
+            "follows_28d": latest("follows_window"), "unfollows_28d": latest("unfollows_window"),
+            "accounts_engaged_28d": latest("accounts_engaged"),
             "followers_start": win[0][1] if win else None, "followers_end": win[-1][1] if win else None,
             "net_follower_change": (win[-1][1] - win[0][1]) if len(win) >= 2 else None,
             "posts": len(posts), "posts_measured": len(measured), "views": views or None, "kpis": k}

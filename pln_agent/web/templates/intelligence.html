@@ -3,7 +3,7 @@
 {% macro fmt(v) %}{% if v is none %}—{% elif v >= 1000 %}{{ '{:,.0f}'.format(v) }}{% else %}{{ '%.2f'|format(v) }}{% endif %}{% endmacro %}
 <div class="card"><h3>Audience intelligence — last {{ days }} days of data per account</h3>
 <p class="muted">Views are not the goal. Each number says how it was obtained: <b>measured</b> (reported by the platform), <b>derived</b> (computed from measured numbers with a stated attribution assumption) or <b>unavailable</b> (no current integration exposes it — never estimated). Source: platform APIs via the ops portal ingest. <a href="?days=7">7d</a> · <a href="?days=28">28d</a> · <a href="?days=90">90d</a></p>
-<form method="post" action="{{ base }}/insights/youtube"><button>Collect YouTube analytics now</button> <span class="muted">for channels connected on the Accounts page (also runs every refresh)</span></form>
+<form method="post" action="{{ base }}/insights/collect"><button>Collect Instagram + YouTube insights now</button> <span class="muted">for accounts connected on the Accounts page (also runs every refresh)</span></form>
 {% if not rows %}<p><b>No performance data yet.</b> It arrives from the ops portal's platform ingest on the next refresh, and from accounts connected under Accounts.</p>{% endif %}
 </div>
 <div class="grid">{% for r in rows %}<div class="card"><h3>{{ r.handle or r.account_id }} <span class="muted">{{ r.platform }} · {{ r.brand_id }}</span></h3>
@@ -11,6 +11,7 @@
 <p>{% if r.last_post_at %}Last post <b>{{ r.last_post_at }}</b> <span class="badge {{ 'bad' if r.days_since_post > 14 else 'warn' if r.days_since_post > 3 else 'ok' }}">{{ r.days_since_post }} days ago</span>{% else %}<span class="badge bad">no posts on record</span>{% endif %}
 {% if r.new_follows is not none %} · <b>{{ '{:,.0f}'.format(r.new_follows) }}</b> new followers over {{ r.new_follows_days }} days <span class="badge ok">measured</span>{% endif %}
 {% if r.daily_reach_sum is not none %} · daily reach summed {{ '{:,.0f}'.format(r.daily_reach_sum) }} ({{ r.reach_days }} days) <span class="badge ok">measured</span>{% endif %}</p>
+{% if r.follows_28d is not none %}<p>Last 28 days: <b>{{ '{:,.0f}'.format(r.follows_28d) }}</b> follows · <b>{{ '{:,.0f}'.format(r.unfollows_28d or 0) }}</b> unfollows · net <b>{{ '{:+,.0f}'.format(r.follows_28d - (r.unfollows_28d or 0)) }}</b>{% if r.accounts_engaged_28d is not none %} · {{ '{:,.0f}'.format(r.accounts_engaged_28d) }} accounts engaged{% endif %} <span class="badge ok">measured</span></p>{% endif %}
 {% if r.posts == 0 %}<p class="muted">The per-post rates below need posts published in this window — there weren't any.</p>{% endif %}
 {% set t = trends[r.account_id] %}{% if t|length > 1 %}{% set lo = t|map(attribute=1)|min %}{% set hi = t|map(attribute=1)|max %}
 <svg viewBox="0 0 300 40" width="100%" height="40" role="img" aria-label="follower trend"><polyline fill="none" stroke="currentColor" stroke-width="1.5" points="{% for d, v in t %}{{ (loop.index0 / (t|length - 1) * 300)|round(1) }},{{ (38 - ((v - lo) / ((hi - lo) or 1)) * 36)|round(1) }} {% endfor %}"/></svg>{% endif %}

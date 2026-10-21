@@ -181,3 +181,117 @@ def collect_youtube(db: DB, tz: str = "America/New_York", transport=None, actor:
             out["errors"][acc["account_id"]] = str(e)
     db.audit(actor, "youtube_insights_collected", "metrics", "", out)
     return out
+
+
+# ---- Instagram (Instagram API with Facebook Login; instagram_manage_insights) -------------------------
+
+IG_WINDOW_DAYS = 28
+IG_MEDIA_LOOKBACK_DAYS = 60
+IG_MEDIA_MAX = 100
+
+
+class InstagramCollector:
+    """What the ops ingest doesn't request: the follower / non-follower split of account reach, follows vs
+    unfollows, accounts engaged and link taps over the window, Reels average watch time, and follows /
+    profile visits on feed posts (Instagram doesn't report those two for Reels)."""
+
+    def __init__(self, db: DB, transport=None, now: datetime | None = None):
+        from .oauth import META_VERSION
+        self.db, self.transport = db, transport or urllib_transport
+        self.now = now or datetime.now(timezone.utc)
+        self.base = f"https://graph.facebook.com/{META_VERSION}"
+
+    def _get(self, path: str, params: dict, token: str) -> dict:
+        resp = self.transport(HttpRequest("GET", f"{self.base}/{path}?" + urllib.parse.urlencode({**params, "access_token": token}),
+                                          {"Accept": "application/json"}, purpose="instagram insights"))
+        if resp.status >= 300:
+            err = (resp.body or {}).get("error") or {}
+            raise CollectorError(f"{path.split('/')[-1]}: HTTP {resp.status} {err.get('message') or resp.body}"[:300])
+        return resp.body or {}
+
+    def _totals(self, ig: str, metric: str, token: str, since: int, until: int, breakdown: str = "") -> dict:
+        params = {"metric": metric, "period": "day", "metric_type": "total_value", "since": since, "until": until}
+        if breakdown:
+            params["breakdown"] = breakdown
+        out = {}
+        for d in self._get(f"{ig}/insights", params, token).get("data") or []:
+            tv = d.get("total_value") or {}
+            out[d["name"]] = {"value": tv.get("value"), "split": {
+                r["dimension_values"][0]: r.get("value") for b in tv.get("breakdowns") or [] for r in b.get("results") or []}}
+        return out
+
+    def collect(self, acc: dict, token: str) -> dict:
+        ig, aid, rows, notes = acc["stable_platform_id"], acc["account_id"], [], []
+        end = self.now.date()
+        start = end - timedelta(days=IG_WINDOW_DAYS)
+        since, until = int(datetime.combine(start, datetime.min.time(), timezone.utc).timestamp()), int(self.now.timestamp())
+
+        def m(metric, fam, value, post_id=None, ckpt="snapshot"):
+            if value is None:
+                return
+            d = end.isoformat()
+            key = f"ig:{'post:' + post_id if post_id else 'acct:' + ig}:{d}:{metric}"
+            rows.append({"account_id": aid, "variant_id": None, "platform_post_id": post_id, "platform": "instagram",
+                         "metric": metric, "canonical_metric": fam, "value": float(value), "checkpoint": ckpt,
+                         "period_start": start.isoformat() if not post_id else d, "period_end": d,
+                         "source": "platform_api", "captured_at": now_iso(), "metric_key": key})
+
+        reach = self._totals(ig, "reach", token, since, until, "follow_type").get("reach", {})
+        m("reach_follower", "follower_reach", reach.get("split", {}).get("FOLLOWER"))
+        m("reach_non_follower", "non_follower_reach", reach.get("split", {}).get("NON_FOLLOWER"))
+        m("reach_window_total", "reach_window", reach.get("value"))
+        try:  # not returned below 100 followers
+            fu = self._totals(ig, "follows_and_unfollows", token, since, until, "follow_type").get("follows_and_unfollows", {})
+            m("follows_window", "follows_window", fu.get("split", {}).get("FOLLOWER"))
+            m("unfollows_window", "unfollows_window", fu.get("split", {}).get("NON_FOLLOWER"))
+        except CollectorError as e:
+            notes.append(f"follows_and_unfollows: {e}")
+        try:
+            other = self._totals(ig, "accounts_engaged,profile_links_taps", token, since, until)
+            m("accounts_engaged", "accounts_engaged", (other.get("accounts_engaged") or {}).get("value"))
+            m("profile_links_taps", "clicks_window", (other.get("profile_links_taps") or {}).get("value"))
+        except CollectorError as e:
+            notes.append(f"accounts_engaged/profile_links_taps: {e}")
+
+        # per-post extras for posts we already know (ops ingest / Creative DB), newest first
+        cutoff = (self.now - timedelta(days=IG_MEDIA_LOOKBACK_DAYS)).replace(microsecond=0).isoformat()
+        posts = self.db.query("SELECT platform_post_id, post_type, published_at FROM posts WHERE account_id=? AND published_at >= ? "
+                              "ORDER BY published_at DESC", [aid, cutoff])[:IG_MEDIA_MAX]
+        done = 0
+        for p in posts:
+            reel = (p["post_type"] or "").lower() in ("reels", "reel", "clips")
+            metrics = "ig_reels_avg_watch_time" if reel else "follows,profile_visits"
+            try:
+                data = self._get(f"{p['platform_post_id']}/insights", {"metric": metrics}, token).get("data") or []
+            except CollectorError as e:
+                notes.append(f"{p['platform_post_id']}: {e}")
+                continue
+            pub = datetime.fromisoformat(str(p["published_at"]).replace("Z", "+00:00"))
+            ck = checkpoint_for(pub if pub.tzinfo else pub.replace(tzinfo=timezone.utc), self.now)
+            for d in data:
+                v = (d.get("values") or [{}])[0].get("value")
+                if d["name"] == "ig_reels_avg_watch_time" and v is not None:
+                    m("ig_reels_avg_watch_time", "avg_watch_time_s", float(v) / 1000, p["platform_post_id"], ck)  # ms → s
+                elif d["name"] == "follows":
+                    m("follows", "follows", v, p["platform_post_id"], ck)
+                elif d["name"] == "profile_visits":
+                    m("profile_visits", "profile_visits", v, p["platform_post_id"], ck)
+            done += 1
+        n = self.db.insert_many("metrics", rows, upsert_key="metric_key")
+        return {"account_id": aid, "metric_rows": n, "posts_checked": done, "notes": notes[:5]}
+
+
+def collect_instagram(db: DB, transport=None, actor: str = "insights") -> dict:
+    from .oauth import access_token
+    out = {"collected": [], "errors": {}}
+    for acc in db.all("accounts", "platform='instagram' AND verification_status='oauth_connected'"):
+        ref = acc.get("credential_ref") or ""
+        if not ref.startswith("vault:") or not acc.get("stable_platform_id"):
+            out["errors"][acc["account_id"]] = "not connected through the Accounts page"
+            continue
+        try:
+            out["collected"].append(InstagramCollector(db, transport).collect(acc, access_token(ref[len("vault:"):])))
+        except (CollectorError, LookupError, PermissionError) as e:
+            out["errors"][acc["account_id"]] = str(e)
+    db.audit(actor, "instagram_insights_collected", "metrics", "", out)
+    return out
