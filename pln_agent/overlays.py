@@ -37,7 +37,33 @@ def style_for(brand_id: str, override: dict | None = None) -> dict:
 
 def style_id(s: dict) -> str:
     """Compact label recorded on the post so 'what works' can compare looks."""
-    return f"{s['hook']}+{s['captions']}" + ("+stamp" if s.get("stamp") else "") + ("+countdown" if s.get("countdown") else "")
+    return (f"{s['hook']}+{s['captions']}" + ("+stamp" if s.get("stamp") != "none" else "")
+            + ("+reaction" if s.get("reaction") else "") + ("+countdown" if s.get("countdown") else ""))
+
+
+def _pick(options: list[str], seed: str) -> str:
+    """Stable but varied choice: the same post always gets the same word, different posts get different ones."""
+    import hashlib
+    return options[int(hashlib.sha1(seed.encode()).hexdigest(), 16) % len(options)] if options else ""
+
+
+def words_for(s: dict) -> dict:
+    w = config().get("words") or {}
+    return w.get(s.get("family") or "default") or w.get("default") or {}
+
+
+def _brand_terms() -> set[str]:
+    from .accounts import load_brands
+    out = set()
+    for b in load_brands():
+        out |= {b["name"].lower(), b["brand_id"].replace("_", " ").lower(), *[a.lower() for a in b.get("aliases") or []]}
+    return {t for t in out if len(t) > 2}
+
+
+def is_generic(text: str) -> bool:
+    """Brand-name filler ("CarJitsu Championship: Highlight skill") — not a hook."""
+    t = (text or "").lower()
+    return not t.strip() or any(b in t for b in _brand_terms())
 
 
 # ---- drawing -------------------------------------------------------------------------------------
@@ -138,34 +164,17 @@ def render_hook(text: str, s: dict, w: int, h: int, out: Path) -> int:
     return bottom
 
 
-def render_tag(text: str, s: dict, w: int, h: int, out: Path) -> Path:
-    """Small brand chip, bottom-left, inside the safe zone."""
+def render_stamp(word: str, s: dict, w: int, h: int, out: Path, scale: float = 1.0, tilt: float = -7) -> Path:
     from PIL import ImageDraw
     img = _canvas(w, h)
-    d = ImageDraw.Draw(img)
-    f = _font(s["font_path"], int(w * 0.042))
-    t = text.upper()
-    asc, desc = f.getmetrics()
-    pad = int(w * 0.018)
-    x0, y1 = int(w * 0.05), int(h * (1 - SAFE_BOTTOM) - h * 0.01)
-    y0 = y1 - (asc + desc) - 2 * pad
-    d.rounded_rectangle([x0, y0, x0 + f.getlength(t) + 2 * pad, y1], radius=pad, fill=_rgba(s["primary"], 225))
-    d.text((x0 + pad, y0 + pad), t, font=f, fill=_rgba(s["text"]))
-    img.save(out)
-    return out
-
-
-def render_stamp(word: str, s: dict, w: int, h: int, out: Path, scale: float = 1.0) -> Path:
-    from PIL import ImageDraw
-    img = _canvas(w, h)
-    f = _font(s["font_path"], int(w * 0.30 * scale))
+    f, _ = _fit(word, s["font_path"], int(w * 0.86 * scale), int(w * 0.30 * scale), 60, max_lines=1)
     tmp = _canvas(w, h)
     td = ImageDraw.Draw(tmp)
     tw = f.getlength(word)
     asc, desc = f.getmetrics()
     td.text(((w - tw) / 2, h * 0.42 - (asc + desc) / 2), word, font=f, fill=_rgba(s["accent"]),
             stroke_width=max(6, int(w * 0.012)), stroke_fill=_rgba(s["ink"]))
-    img.alpha_composite(tmp.rotate(-7, center=(w / 2, h * 0.42)))
+    img.alpha_composite(tmp.rotate(tilt, center=(w / 2, h * 0.42)))
     img.save(out)
     return out
 
@@ -208,18 +217,28 @@ def render_caption(words: list[str], lit: int | None, s: dict, w: int, h: int, o
     return out
 
 
-def build(v: dict, cues: list[dict], duration: float, w: int, h: int, outdir: Path, payoff_at: float | None) -> dict:
-    """All overlay layers for one render: [{png, start, end}] plus an optional countdown bar spec."""
-    s = style_for(v.get("brand_id", ""), ((v.get("treatment") or {}).get("overlay") or {}))
-    layers, hook_bottom = [], int(h * 0.20)
+def build(v: dict, cues: list[dict], duration: float, w: int, h: int, outdir: Path, payoff_at: float | None,
+          beats: list[dict] | None = None) -> dict:
+    """All overlay layers for one render: [{png, start, end}] plus an optional countdown bar spec.
+    `beats` are the clip's moments on the edited timeline ({kind, t, intensity}). Brand names never go on screen:
+    brand-name filler hooks and brand tags are replaced by bold words for what actually happens."""
+    ov = (v.get("treatment") or {}).get("overlay") or {}
+    s = style_for(v.get("brand_id", ""), ov)
+    bank, seed = words_for(s), v.get("variant_id", "")
+    beats = beats or []
+    payoff_kind = next((b["kind"] for b in beats if payoff_at is not None and abs(b["t"] - payoff_at) < 0.6), "payoff")
+    layers, hook_bottom, words = [], int(h * 0.20), {}
     for j, o in enumerate(v.get("onscreen_text") or []):
-        if not (o.get("text") or "").strip():
+        text = (o.get("text") or "").strip()
+        if (o.get("position") or "").endswith("small"):
+            continue  # brand tags: cheap-looking, and the account already says who posted it
+        if is_generic(text) and not ov.get("hook_custom"):
+            text = _pick(bank.get("hook") or [], seed + ":hook")
+        if not text:
             continue
         p = outdir / f"ov_text_{j}.png"
-        if (o.get("position") or "").endswith("small"):
-            render_tag(o["text"], s, w, h, p)
-        else:
-            hook_bottom = render_hook(o["text"], s, w, h, p)
+        hook_bottom = render_hook(text, s, w, h, p)
+        words.setdefault("hook", text)
         layers.append({"png": p, "start": float(o.get("start", 0)), "end": float(o.get("end", 3))})
     if s["captions"] in ("kinetic", "classic"):
         n = 0
@@ -238,12 +257,19 @@ def build(v: dict, cues: list[dict], duration: float, w: int, h: int, outdir: Pa
                 n += 1
             if n >= 120:  # cap the number of FFmpeg inputs
                 break
-    if s.get("stamp") and payoff_at is not None and 0 < payoff_at < duration:
-        big, norm = outdir / "ov_stamp_pop.png", outdir / "ov_stamp.png"
-        render_stamp(s["stamp"], s, w, h, big, 1.18)
-        render_stamp(s["stamp"], s, w, h, norm, 1.0)
-        layers.append({"png": big, "start": payoff_at, "end": payoff_at + 0.08})
-        layers.append({"png": norm, "start": payoff_at + 0.08, "end": min(duration, payoff_at + 1.4)})
+    stamp = (s.get("stamp") or "").strip()
+    if stamp != "none" and payoff_at is not None and 0 < payoff_at < duration:
+        stamp = stamp or _pick(bank.get("reversal" if payoff_kind == "reversal" else "payoff") or bank.get("payoff") or [],
+                               seed + ":payoff")
+        if stamp:
+            words["payoff"] = stamp
+            _slam(layers, stamp, s, w, h, outdir, "stamp", payoff_at, min(duration, payoff_at + 1.4))
+    if s.get("reaction") and payoff_at is not None:
+        r = next((b for b in beats if b["kind"] == "reaction" and b["t"] >= payoff_at + 1.4 and b["t"] < duration - 0.8), None)
+        word = _pick(bank.get("reaction") or [], seed + ":reaction") if r else ""
+        if word:
+            words["reaction"] = word
+            _slam(layers, word, {**s, "accent": s["text"]}, w, h, outdir, "reaction", r["t"], min(duration, r["t"] + 1.3), tilt=6)
     countdown = None
     if s.get("countdown") and payoff_at and payoff_at > 1.5:
         from PIL import Image, ImageDraw
@@ -252,7 +278,16 @@ def build(v: dict, cues: list[dict], duration: float, w: int, h: int, outdir: Pa
         ImageDraw.Draw(bar).rectangle([0, 0, bw, bh], fill=_rgba(s["accent"]))
         bar.save(outdir / "ov_countdown.png")
         countdown = {"end": payoff_at, "png": outdir / "ov_countdown.png", "x": int(w * 0.10), "y": hook_bottom + int(h * 0.015), "w": bw, "h": bh}
-    return {"style": s, "style_id": style_id(s), "layers": layers, "countdown": countdown}
+    return {"style": s, "style_id": style_id(s), "layers": layers, "countdown": countdown, "words": words}
+
+
+def _slam(layers: list, word: str, s: dict, w: int, h: int, outdir: Path, name: str, t0: float, t1: float, tilt: float = -7) -> None:
+    """A bold word that pops in (two oversized frames) and holds."""
+    big, norm = outdir / f"ov_{name}_pop.png", outdir / f"ov_{name}.png"
+    render_stamp(word, s, w, h, big, 1.18, tilt)
+    render_stamp(word, s, w, h, norm, 1.0, tilt)
+    layers.append({"png": big, "start": t0, "end": t0 + 0.08})
+    layers.append({"png": norm, "start": t0 + 0.08, "end": t1})
 
 
 def ffmpeg_graph(base_label: str, first_input: int, layers: list[dict], countdown: dict | None, w: int, h: int) -> tuple[list[str], list[str], str]:

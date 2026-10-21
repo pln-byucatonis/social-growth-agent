@@ -1,19 +1,193 @@
 {
-  "_doc": "On-screen text looks per brand. Fonts are free (SIL Open Font License, see assets/fonts/*-OFL.txt); swap a brand's font or colours here once the official brand kit is in. hook: knockout | pill | outline. captions: kinetic | classic. stamp: word slammed on the payoff moment ('' = none). countdown: progress bar to the payoff under the hook.",
+  "_doc": "On-screen text looks per brand. Fonts are free (SIL Open Font License, see assets/fonts/*-OFL.txt); swap a brand's font or colours here once the official brand kit is in. hook: knockout | pill | outline. captions: kinetic | classic. stamp: word slammed on the payoff moment ('' = none). countdown: progress bar to the payoff under the hook. family: which word bank (words.*) a brand draws its bold hook / payoff / reaction words from. Brand names never go on screen.",
   "fonts": {
     "anton": "assets/fonts/Anton-Regular.ttf",
     "bebas": "assets/fonts/BebasNeue-Regular.ttf",
     "archivo": "assets/fonts/ArchivoBlack-Regular.ttf"
   },
-  "default": {"font": "anton", "primary": "#E5202E", "text": "#FFFFFF", "accent": "#FFD400", "ink": "#0B0B0F",
-              "hook": "pill", "captions": "kinetic", "stamp": "", "countdown": false},
+  "default": {
+    "font": "anton",
+    "primary": "#E5202E",
+    "text": "#FFFFFF",
+    "accent": "#FFD400",
+    "ink": "#0B0B0F",
+    "hook": "pill",
+    "captions": "kinetic",
+    "stamp": "",
+    "countdown": false,
+    "family": "default",
+    "reaction": true
+  },
   "brands": {
-    "pln": {"font": "archivo", "primary": "#E5202E", "accent": "#FFFFFF", "hook": "pill", "captions": "kinetic"},
-    "carjitsu": {"font": "anton", "primary": "#D7141A", "accent": "#FFD400", "hook": "knockout", "captions": "kinetic", "stamp": "TAP."},
-    "slapfight": {"font": "anton", "primary": "#FF3B1F", "accent": "#FFE600", "hook": "knockout", "captions": "kinetic", "stamp": "SLAP."},
-    "str33t": {"font": "anton", "primary": "#7B2BFF", "accent": "#39FF14", "hook": "knockout", "captions": "kinetic"},
-    "putt_tour": {"font": "bebas", "primary": "#0B8F4D", "accent": "#F5D90A", "hook": "pill", "captions": "kinetic", "stamp": "ACE.", "countdown": true},
-    "world_putting_league": {"font": "bebas", "primary": "#0B8F4D", "accent": "#F5D90A", "hook": "pill", "captions": "classic", "countdown": true},
-    "pro_carrom_tour": {"font": "bebas", "primary": "#B4161B", "accent": "#F2C14E", "hook": "pill", "captions": "kinetic", "countdown": true}
+    "pln": {
+      "font": "archivo",
+      "primary": "#E5202E",
+      "accent": "#FFFFFF",
+      "hook": "pill",
+      "captions": "kinetic",
+      "family": "combat"
+    },
+    "carjitsu": {
+      "font": "anton",
+      "primary": "#D7141A",
+      "accent": "#FFD400",
+      "hook": "knockout",
+      "captions": "kinetic",
+      "family": "combat"
+    },
+    "slapfight": {
+      "font": "anton",
+      "primary": "#FF3B1F",
+      "accent": "#FFE600",
+      "hook": "knockout",
+      "captions": "kinetic",
+      "family": "slap"
+    },
+    "str33t": {
+      "font": "anton",
+      "primary": "#7B2BFF",
+      "accent": "#39FF14",
+      "hook": "knockout",
+      "captions": "kinetic",
+      "family": "street"
+    },
+    "putt_tour": {
+      "font": "bebas",
+      "primary": "#0B8F4D",
+      "accent": "#F5D90A",
+      "hook": "pill",
+      "captions": "kinetic",
+      "countdown": true,
+      "family": "putt"
+    },
+    "world_putting_league": {
+      "font": "bebas",
+      "primary": "#0B8F4D",
+      "accent": "#F5D90A",
+      "hook": "pill",
+      "captions": "classic",
+      "countdown": true,
+      "family": "putt"
+    },
+    "pro_carrom_tour": {
+      "font": "bebas",
+      "primary": "#B4161B",
+      "accent": "#F2C14E",
+      "hook": "pill",
+      "captions": "kinetic",
+      "countdown": true,
+      "family": "carrom"
+    }
+  },
+  "words": {
+    "combat": {
+      "hook": [
+        "NO WAY OUT",
+        "WATCH THE SEATBELT",
+        "HE'S TRAPPED",
+        "NOWHERE TO GO",
+        "THIS ENDS FAST"
+      ],
+      "payoff": [
+        "TAP.",
+        "LOCKED.",
+        "OVER.",
+        "CHOKED OUT.",
+        "DONE."
+      ],
+      "reversal": [
+        "FLIPPED.",
+        "REVERSAL.",
+        "SWITCH."
+      ],
+      "reaction": [
+        "NO WAY.",
+        "UNREAL.",
+        "BRUTAL.",
+        "CRAZY."
+      ]
+    },
+    "slap": {
+      "hook": [
+        "WAIT FOR THE SWING",
+        "DON'T BLINK",
+        "HE ISN'T READY"
+      ],
+      "payoff": [
+        "SLAP.",
+        "LIGHTS OUT.",
+        "DOWN."
+      ],
+      "reaction": [
+        "NO WAY.",
+        "UNREAL.",
+        "OUCH."
+      ]
+    },
+    "street": {
+      "hook": [
+        "WATCH THIS",
+        "DON'T BLINK",
+        "NO WAY HE LANDS IT"
+      ],
+      "payoff": [
+        "CLEAN.",
+        "NAILED IT.",
+        "SICK."
+      ],
+      "reaction": [
+        "NO WAY.",
+        "UNREAL."
+      ]
+    },
+    "putt": {
+      "hook": [
+        "WAIT FOR IT",
+        "NO CHANCE... RIGHT?",
+        "WATCH THE LINE",
+        "ONE SHOT."
+      ],
+      "payoff": [
+        "ACE.",
+        "DRAINED.",
+        "BANKED.",
+        "IN."
+      ],
+      "reaction": [
+        "NO WAY.",
+        "UNREAL.",
+        "CALLED IT."
+      ]
+    },
+    "carrom": {
+      "hook": [
+        "WATCH THE ANGLE",
+        "ONE FLICK",
+        "WAIT FOR IT"
+      ],
+      "payoff": [
+        "SUNK.",
+        "CLEARED.",
+        "PERFECT."
+      ],
+      "reaction": [
+        "NO WAY.",
+        "UNREAL."
+      ]
+    },
+    "default": {
+      "hook": [
+        "WATCH THIS",
+        "WAIT FOR IT",
+        "DON'T BLINK"
+      ],
+      "payoff": [
+        "NO WAY.",
+        "BOOM."
+      ],
+      "reaction": [
+        "UNREAL."
+      ]
+    }
   }
 }

@@ -364,7 +364,8 @@ def variant_overlay(request: Request, vid: str, hook_text: str = Form(""), hook:
         else:
             ot.insert(0, {"start": 0.0, "end": 3.0, "text": hook_text.strip()[:80], "position": "top"})
     t = dict(v.get("treatment") or {})
-    t["overlay"] = {"hook": hook, "captions": captions, "stamp": stamp.strip()[:12], "countdown": countdown == "on"}
+    t["overlay"] = {"hook": hook, "captions": captions, "stamp": stamp.strip()[:16], "countdown": countdown == "on",
+                    "hook_custom": bool(hook_text.strip())}  # a typed hook is used as written
     changes = {"onscreen_text": ot, "treatment": t, "render_status": "queued", "updated_at": now_iso()}
     if v["state"] == "approved":
         changes["state"] = "in_review"

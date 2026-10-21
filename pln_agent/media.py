@@ -171,7 +171,9 @@ def _on_ops_vertical(asset: dict, v: dict, cut: dict, settings: Settings) -> tup
     bucket = os.environ.get("PLN_OPS_ASSETS_BUCKET", settings.ops_assets_bucket)
     asset = {**asset, "media_path": f"s3://{bucket}/{ov['key']}", "media_present": True, "width": 1080, "height": 1920,
              "transcript": [{**c, "start": c["start"] - start, "end": c["end"] - start}
-                            for c in (asset.get("transcript") or []) if c["end"] > start and c["start"] < end]}
+                            for c in (asset.get("transcript") or []) if c["end"] > start and c["start"] < end],
+             "moments": [{**m, "start": m["start"] - start, "end": m["end"] - start}
+                         for m in (asset.get("moments") or []) if m["end"] > start and m["start"] < end]}
     seg = dict(cut["segments"][0])
     seg.update({"source_in": 0.0, "source_out": round(end - start, 2)})
     v = {**v, "edl": {**(v.get("edl") or {}), "segments": [seg]},
@@ -202,7 +204,7 @@ def render_variant(db: DB, variant_id: str, settings: Settings, actor: str = "re
     segs = v["edl"].get("segments", [])
     out = v["edl"].get("output")
     font = _font()
-    overlay_style = ""
+    overlay_style, overlay_words = "", {}
     if not segs or not out:
         status, path, detail = "not_applicable", "", "no video output for this format"
     elif not (asset["media_present"] and shutil.which("ffmpeg")):
@@ -238,22 +240,23 @@ def render_variant(db: DB, variant_id: str, settings: Settings, actor: str = "re
             label = (v.get("edl") or {}).get("variant_label")
             dv = cut or next((c for c in (v.get("treatment") or {}).get("duration_variants") or [] if c["label"] == label), None)
             payoff = (dv or {}).get("payoff_at_s")
-            if payoff is None and segs:  # not on a Creative Director cut: the strongest action moment in the edit
-                hits, t_out = [], 0.0
-                for sg in segs:  # map source time onto the edited timeline
-                    for m in asset.get("moments") or []:
-                        if m.get("kind") != "setup" and sg["source_in"] <= m.get("start", -1) < sg["source_out"]:
-                            hits.append((m.get("intensity") or 0, t_out + m["start"] - sg["source_in"]))
-                    t_out += sg["source_out"] - sg["source_in"]
-                if hits:
-                    payoff = max(hits)[1]
+            beats, t_out = [], 0.0
+            for sg in segs:  # the clip's moments mapped onto the edited timeline
+                for m in asset.get("moments") or []:
+                    if m.get("kind") != "setup" and sg["source_in"] <= m.get("start", -1) < sg["source_out"]:
+                        beats.append({"kind": m.get("kind"), "t": t_out + m["start"] - sg["source_in"], "intensity": m.get("intensity") or 0})
+                t_out += sg["source_out"] - sg["source_in"]
+            hits = [b for b in beats if b["kind"] != "reaction"]
+            if payoff is None and hits:  # not on a Creative Director cut: the strongest action moment in the edit
+                payoff = max(hits, key=lambda b: b["intensity"])["t"]
             duration = sum(x["source_out"] - x["source_in"] for x in segs)
-            styled = overlays.build(v, build_caption_track(v, asset), duration, out["w"], out["h"], outdir, payoff)
+            styled = overlays.build(v, build_caption_track(v, asset), duration, out["w"], out["h"], outdir, payoff, beats)
             ins, ps, final = overlays.ffmpeg_graph("base", len(segs), styled["layers"], styled["countdown"], out["w"], out["h"])
             parts.append(f"[cv]{chain}[base]")
             parts += ps
             inputs += ins
             overlay_style = styled["style_id"]
+            overlay_words = styled.get("words") or {}
         except Exception as e:  # noqa: BLE001 — fall back to plain drawtext rather than fail the render
             styled = None
             framing += f"; plain text overlays ({str(e)[:80]})"
@@ -304,6 +307,7 @@ def render_variant(db: DB, variant_id: str, settings: Settings, actor: str = "re
         if status == "rendered" else {}
     if qc and overlay_style:
         qc["overlay_style"] = overlay_style  # recorded with the post so 'what works' can compare looks
+        qc["overlay_words"] = overlay_words
     if status == "rendered" and os.environ.get("PLN_RENDER_BUCKET"):
         path = upload_render(outdir, variant_id + (f"/cut_{cut['label']}" if cut else ""), os.environ["PLN_RENDER_BUCKET"])
     if cut:

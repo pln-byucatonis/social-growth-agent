@@ -17,7 +17,7 @@
 <label class="small muted">Opening text (first 3 seconds, burned into the video)</label><input name="hook_text" value="{{ ov.hook_text }}" maxlength="80" style="width:100%">
 <div class="fbar" style="margin-top:8px;flex-wrap:wrap"><label class="small">Hook <select name="hook">{% for o, l in [('knockout','Knockout (letters cut out)'),('pill','Pill block'),('outline','Bold outline')] %}<option value="{{ o }}" {{ 'selected' if ov.hook == o }}>{{ l }}</option>{% endfor %}</select></label>
 <label class="small">Captions <select name="captions">{% for o, l in [('kinetic','Kinetic (word by word)'),('classic','Classic'),('none','None')] %}<option value="{{ o }}" {{ 'selected' if ov.captions == o }}>{{ l }}</option>{% endfor %}</select></label>
-<label class="small">Payoff stamp <input name="stamp" value="{{ ov.stamp }}" maxlength="12" placeholder="e.g. TAP." style="width:90px"></label>
+<label class="small">Payoff word <input name="stamp" value="{{ ov.stamp }}" maxlength="16" placeholder="auto (e.g. TAP.)" style="width:120px"></label><span class="faint small">blank = picked for the clip · "none" = no word</span>
 <label class="small"><input type="checkbox" name="countdown" value="on" {{ 'checked' if ov.countdown }}> Countdown bar</label></div>
 <div class="fbar" style="margin-top:8px">{% if not user %}<input name="actor" placeholder="Your name">{% endif %}<button class="sm primary">Save &amp; re-render</button><span class="faint small">Changing the video resets its approval.</span></div></form></details>
 {% if v.public_media_url %}<p class="small">Public link: <a href="{{ v.public_media_url }}" target="_blank" rel="noopener">{{ v.public_media_url }}</a></p>

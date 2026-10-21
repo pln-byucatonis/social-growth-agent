@@ -15,10 +15,10 @@ class OverlayDrawingTests(unittest.TestCase):
 
     def test_brand_styles(self):
         self.assertEqual(overlays.style_for("carjitsu")["hook"], "knockout")
-        self.assertEqual(overlays.style_for("putt_tour")["stamp"], "ACE.")
+        self.assertIn("ACE.", overlays.words_for(overlays.style_for("putt_tour"))["payoff"])
         self.assertTrue(Path(overlays.style_for("pln")["font_path"]).exists())
         self.assertEqual(overlays.style_for("carjitsu", {"hook": "pill"})["hook"], "pill")  # a post can override
-        self.assertEqual(overlays.style_id(overlays.style_for("putt_tour")), "pill+kinetic+stamp+countdown")
+        self.assertEqual(overlays.style_id(overlays.style_for("putt_tour")), "pill+kinetic+stamp+reaction+countdown")
 
     def test_knockout_letters_are_transparent_holes(self):
         from PIL import Image
@@ -37,11 +37,25 @@ class OverlayDrawingTests(unittest.TestCase):
         self.assertAlmostEqual(ph[0]["times"][1], 1.5)
 
     def test_build_layers_and_graph(self):
-        v = {"brand_id": "putt_tour", "onscreen_text": [{"start": 0, "end": 3, "text": "WAIT FOR IT", "position": "top"},
-                                                         {"start": 3, "end": 12, "text": "Putt Tour", "position": "lower_left_small"}]}
-        b = overlays.build(v, [{"start": 0.5, "end": 2.0, "text": "here it comes"}], 12.0, 1080, 1920, self.dir, payoff_at=6.0)
-        self.assertEqual(b["style_id"], "pill+kinetic+stamp+countdown")
+        v = {"variant_id": "x:1", "brand_id": "putt_tour",
+             "onscreen_text": [{"start": 0, "end": 3, "text": "Putt Tour: Putt drops", "position": "top"},
+                               {"start": 3, "end": 12, "text": "Putt Tour", "position": "lower_left_small"}]}
+        beats = [{"kind": "payoff", "t": 6.0, "intensity": 0.9}, {"kind": "reaction", "t": 8.0, "intensity": 0.5}]
+        b = overlays.build(v, [{"start": 0.5, "end": 2.0, "text": "here it comes"}], 12.0, 1080, 1920, self.dir, 6.0, beats)
+        self.assertEqual(b["style_id"], "pill+kinetic+stamp+reaction+countdown")
+        bank = overlays.words_for(b["style"])
+        self.assertIn(b["words"]["hook"], bank["hook"])  # brand-name filler replaced by a bold hook
+        self.assertIn(b["words"]["payoff"], bank["payoff"])
+        self.assertIn(b["words"]["reaction"], bank["reaction"])
+        self.assertFalse(any("tag" in str(L["png"]) for L in b["layers"]))  # no brand chip
         self.assertTrue(any("stamp" in str(L["png"]) for L in b["layers"]))
+        self.assertTrue(any("reaction" in str(L["png"]) for L in b["layers"]))
+        # a hook someone typed is kept as written; "none" turns the payoff word off
+        v2 = {**v, "treatment": {"overlay": {"hook_custom": True, "stamp": "none"}},
+              "onscreen_text": [{"start": 0, "end": 3, "text": "Putt Tour's best ace", "position": "top"}]}
+        b2 = overlays.build(v2, [], 12.0, 1080, 1920, self.dir, 6.0, beats)
+        self.assertEqual(b2["words"]["hook"], "Putt Tour's best ace")
+        self.assertNotIn("payoff", b2["words"])
         self.assertIsNotNone(b["countdown"])
         ins, parts, final = overlays.ffmpeg_graph("base", 1, b["layers"], b["countdown"], 1080, 1920)
         self.assertEqual(final, "olcd")
@@ -58,7 +72,8 @@ class OverlayRenderTests(unittest.TestCase):
         v = [x for x in db.all("variants", "asset_id=?", [CJ]) if x["platform"] == "instagram"][0]
         r = render_variant(db, v["variant_id"], s)
         self.assertEqual(r["status"], "rendered")
-        self.assertEqual(r["qc"]["overlay_style"], "knockout+kinetic+stamp")
+        self.assertEqual(r["qc"]["overlay_style"], "knockout+kinetic+stamp+reaction")
+        self.assertTrue(r["qc"]["overlay_words"].get("payoff"))
         web._db, web.BACKGROUND = db, False
         self.addCleanup(setattr, web, "BACKGROUND", True)
         self.addCleanup(setattr, web, "settings", web.settings)
@@ -71,7 +86,8 @@ class OverlayRenderTests(unittest.TestCase):
         after = db.get("variants", "variant_id", v["variant_id"])
         self.assertEqual(after["onscreen_text"][0]["text"], "2 SECONDS LEFT.")
         self.assertEqual(after["render_status"], "rendered")
-        self.assertEqual(after["render_qc"]["overlay_style"], "pill+classic")
+        self.assertEqual(after["render_qc"]["overlay_style"], "pill+classic+stamp+reaction")
+        self.assertEqual(after["render_qc"]["overlay_words"]["hook"], "2 SECONDS LEFT.")
 
 
 class RenderQueueTests(unittest.TestCase):
