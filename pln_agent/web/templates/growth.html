@@ -1,0 +1,26 @@
+{% extends "base.html" %}{% block body %}
+{% macro n(v) %}{% if v is none %}—{% else %}{{ '{:,.0f}'.format(v) }}{% endif %}{% endmacro %}
+<div class="card"><h3>Chief Growth Officer — week of {{ b.week_start }}</h3>
+<p class="muted">Built from measured data only (platform APIs, the Creative Intelligence DB, Scout, cadence and knowledge engines). Generated {{ b.generated_at[:16] }}. Regenerates automatically each week.</p>
+<form method="post" action="{{ base }}/growth/generate"><button>Regenerate now</button></form></div>
+<div class="card"><h3>This week</h3><table>{% for a in b.actions %}<tr><td><span class="badge {{ 'bad' if a.priority == 'P0' else 'warn' if a.priority == 'P1' else '' }}">{{ a.priority }}</span></td><td class="muted">{{ a.area }}</td><td>{{ a.text }}</td></tr>{% else %}<tr><td class="muted">Nothing urgent.</td></tr>{% endfor %}</table></div>
+<div class="card tablewrap"><h3>Brand scoreboard (last 28 days, platform-reported)</h3>
+<table><tr><th>brand</th><th>tier</th><th>followers</th><th>reached</th><th>non-followers</th><th>follows</th><th>unfollows</th><th>net</th><th>follows / 1k reached</th><th>last post</th></tr>
+{% for r in b.scoreboard %}<tr><td>{{ r.brand_id }}</td><td><span class="badge">{{ r.tier }}</span></td><td>{{ n(r.followers if r.followers else none) }}</td><td>{{ n(r.reach if r.measured else none) }}</td>
+<td>{{ '%.1f'|format(r.non_follower_share * 100) ~ '%' if r.non_follower_share is not none else '—' }}</td><td>{{ n(r.follows if r.measured else none) }}</td><td>{{ n(r.unfollows if r.measured else none) }}</td>
+<td>{% if r.net is not none %}<b class="{{ 'bad' if r.net < 0 }}">{{ '{:+,.0f}'.format(r.net) }}</b>{% else %}—{% endif %}</td>
+<td>{{ r.follows_per_1k_reach if r.follows_per_1k_reach is not none else '—' }}{% if r.efficiency_note %}<br><span class="muted">{{ r.efficiency_note }}</span>{% endif %}</td><td>{{ r.last_post or '—' }}</td></tr>{% endfor %}</table>
+<p class="muted">Instagram today (Facebook, YouTube, TikTok join as they're connected). "Follows / 1k reached" is the conversion measure used to compare brands; brands with too little reach aren't compared.</p></div>
+<div class="grid"><div class="card"><h3>Creative-effort split</h3>
+<table><tr><th>brand</th><th>now</th><th>proposed</th></tr>{% for k, v in b.allocation.proposed.items()|sort(attribute='1', reverse=True) %}<tr><td>{{ k }}</td><td>{{ '%.0f'|format((shares.get(k, 0)) * 100) }}%</td><td><b>{{ '%.0f'|format(v * 100) }}%</b></td></tr>{% endfor %}</table>
+<ul class="muted">{% for r in b.allocation.reasons %}<li>{{ r }}</li>{% endfor %}</ul>
+{% if b.allocation.changes and b.brief_id %}<form method="post" action="{{ base }}/growth/{{ b.brief_id }}/apply-allocation"><button class="primary">Approve this split</button> <span class="muted">Changes how new drafts are prioritised; tier floors always hold.</span></form>{% else %}<p class="muted">No change proposed.</p>{% endif %}</div>
+<div class="card"><h3>Supply</h3><table><tr><th>brand</th><th>in review</th><th>approved</th><th>strong unused moments</th></tr>{% for k, v in b.supply.items() %}<tr><td>{{ k }}</td><td>{{ v.drafts.get('in_review', 0) }}</td><td>{{ v.drafts.get('approved', 0) }}</td><td>{{ v.scout_unused }}</td></tr>{% endfor %}</table></div></div>
+<div class="grid"><div class="card"><h3>WPL → Putt Tour</h3>{% set w = b.migration.wpl %}{% set p = b.migration.putt_tour %}
+<table><tr><th></th><th>follows</th><th>unfollows</th><th>net</th></tr>
+{% for label, r in (('WPL', w), ('Putt Tour', p)) %}{% if r %}<tr><td>{{ label }}</td><td>{{ n(r.follows if r.measured else none) }}</td><td>{{ n(r.unfollows if r.measured else none) }}</td><td>{{ '{:+,.0f}'.format(r.net) if r.net is not none else '—' }}</td></tr>{% endif %}{% endfor %}</table>
+{% for a in b.migration.alerts %}<p class="badge warn">{{ a }}</p>{% endfor %}<p><a href="{{ base }}/migration">Migration plan →</a></p></div>
+<div class="card"><h3>Strongest PLN evidence</h3><ul>{% for e in b.evidence %}<li>{{ e.statement }} <span class="muted">({{ e.applicability }})</span></li>{% else %}<li class="muted">None yet.</li>{% endfor %}</ul><p><a href="{{ base }}/knowledge?level=pln_evidence">All evidence →</a></p></div></div>
+<div class="grid"><div class="card"><h3>Cadence</h3><table>{% for c in b.cadence %}{% if c.action != 'collect_baseline' %}<tr><td>{{ c.account_id }}</td><td>{{ c.action }}</td><td>{{ c.recommended_per_week }}/wk</td></tr>{% endif %}{% else %}<tr><td class="muted">No cadence records.</td></tr>{% endfor %}</table><p class="muted">{{ b.cadence|selectattr('action', 'equalto', 'collect_baseline')|list|length }} accounts still collecting a baseline. <a href="{{ base }}/cadence">Cadence →</a></p></div>
+<div class="card"><h3>Experiments</h3><table>{% for e in b.experiments %}<tr><td>{{ e.platform }}</td><td>{{ e.variable }}</td><td class="muted">{{ e.hypothesis }}</td></tr>{% else %}<tr><td class="muted">None planned.</td></tr>{% endfor %}</table></div></div>
+{% endblock %}

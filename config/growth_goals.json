@@ -1,0 +1,20 @@
+{
+  "_note": "Chief Growth Officer inputs (PLN Social Growth Engine 2.0 brief, section 1). Tiers decide floors and order; numeric goals stay null until baselines exist — set them here, the brief tracks them. Reallocation moves at most max_shift_per_week of creative effort and never below a tier floor.",
+  "tiers": {
+    "P0": {"brands": ["pln", "carjitsu", "putt_tour"], "floor_share": 0.15},
+    "P1": {"brands": ["world_putting_league"], "floor_share": 0.03, "note": "audience consolidation into Putt Tour"},
+    "P2": {"brands": ["slapfight", "str33t", "pro_carrom_tour"], "floor_share": 0.02},
+    "P3": {"brands": ["*"], "floor_share": 0.0}
+  },
+  "goals": {
+    "pln": {"net_follows_28d": null, "posts_per_week_min": 3},
+    "carjitsu": {"net_follows_28d": null, "posts_per_week_min": 5},
+    "putt_tour": {"net_follows_28d": null, "posts_per_week_min": 3}
+  },
+  "rules": {
+    "max_shift_per_week": 0.05,
+    "min_reach_for_efficiency": 5000,
+    "posting_gap_days": 7,
+    "experiment_budget_per_platform_per_week": 2
+  }
+}

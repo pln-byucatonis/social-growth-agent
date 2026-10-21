@@ -324,6 +324,15 @@ TABLES: dict[str, list[tuple[str, str, str]]] = {
         ("created_by", "text", ""),
         ("created_at", "ts", ""),
     ],
+    # Chief Growth Officer: one current brief per week (older ones superseded, kept for history).
+    "growth_briefs": [
+        ("brief_id", "text", "PRIMARY KEY"),
+        ("week_start", "text", ""),
+        ("created_at", "ts", ""),
+        ("created_by", "text", ""),
+        ("content", "json", ""),
+        ("status", "text", ""),  # current | superseded
+    ],
     # Knowledge Engine: every piece of guidance is attributed, dated and classified.
     "knowledge": [
         ("entry_id", "text", "PRIMARY KEY"),

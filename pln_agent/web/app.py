@@ -653,6 +653,33 @@ def insights_collect(request: Request):
     return back(request, "/intelligence", "Collecting insights — refresh in a minute.")
 
 
+@app.get("/growth", response_class=HTMLResponse)
+def growth_page(request: Request):
+    from .. import growth_officer as cgo
+    d = db()
+    brief = cgo.latest_brief(d) or cgo.generate_brief(d, request.state.user or "dashboard")
+    return page(request, "growth.html", b=brief, shares=cgo.current_shares(d))
+
+
+@app.post("/growth/generate")
+def growth_generate(request: Request):
+    from .. import growth_officer as cgo
+    _admin(request)
+    cgo.generate_brief(db(), request.state.user or "dashboard")
+    return back(request, "/growth", "Brief regenerated from the latest data")
+
+
+@app.post("/growth/{brief_id}/apply-allocation")
+def growth_apply(request: Request, brief_id: str):
+    from .. import growth_officer as cgo
+    _admin(request)
+    try:
+        cgo.apply_allocation(db(), brief_id, request.state.user or "dashboard")
+    except KeyError:
+        return back(request, "/growth", err="That brief no longer exists — regenerate it")
+    return back(request, "/growth", "Applied: new drafts are scored with the approved creative-effort split")
+
+
 @app.get("/cadence", response_class=HTMLResponse)
 def cadence_page(request: Request):
     d = db()

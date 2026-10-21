@@ -263,3 +263,49 @@ class DashboardTests(Base):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class GrowthOfficerTests(Base):
+    def _ig_window(self, acc, follows, unfollows, reach):
+        for metric, fam, v in (("follows_window", "follows_window", follows), ("unfollows_window", "unfollows_window", unfollows),
+                               ("reach_window_total", "reach_window", reach), ("reach_non_follower", "non_follower_reach", reach * 0.9)):
+            self.db.insert("metrics", {"account_id": acc, "platform": "instagram", "metric": metric, "canonical_metric": fam,
+                                       "value": float(v), "checkpoint": "snapshot", "period_start": "2026-09-23",
+                                       "period_end": "2026-10-21", "source": "platform_api", "metric_key": f"t:{acc}:{metric}"})
+
+    def test_brief_scoreboard_actions_and_floors(self):
+        from pln_agent import growth_officer as cgo
+        self._ig_window(CJ_IG, 2374, 3908, 774927)
+        self._ig_window(PLN_IG, 502, 804, 80381)
+        self._ig_window("world_putting_league.instagram.worldputtingleague", 3, 110, 5)
+        b = cgo.generate_brief(self.db, "t")
+        board = {r["brand_id"]: r for r in b["scoreboard"]}
+        self.assertEqual(board["carjitsu"]["net"], -1534)
+        self.assertEqual(board["carjitsu"]["tier"], "P0")
+        self.assertIsNone(board["world_putting_league"]["follows_per_1k_reach"])  # 5 reached: too small to compare
+        self.assertTrue(any("WPL is losing followers" in a["text"] for a in b["actions"]))
+        self.assertTrue(any(a["area"] == "publishing" and a["text"].startswith("carjitsu") for a in b["actions"]))
+        self.assertEqual(b["actions"][0]["priority"], "P0")
+        prop = b["allocation"]["proposed"]
+        self.assertAlmostEqual(sum(prop.values()), 1.0, places=2)
+        for brand in ("pln", "carjitsu", "putt_tour"):
+            self.assertGreaterEqual(prop[brand], 0.15 - 0.01)  # P0 floor
+        moved = max(abs(prop[k] - b["allocation"]["current"].get(k, 0)) for k in prop)
+        self.assertLessEqual(moved, 0.06)  # weekly cap (after renormalising)
+        self.assertFalse(cgo.due(self.db))
+
+    def test_allocation_applies_only_when_approved(self):
+        from pln_agent import growth_officer as cgo
+        before = cgo.current_shares(self.db)
+        b = cgo.generate_brief(self.db, "t")
+        self.assertEqual(cgo.current_shares(self.db), before)
+        cgo.apply_allocation(self.db, b["brief_id"], "by@pln")
+        self.assertEqual(cgo.current_shares(self.db), {**before, **b["allocation"]["proposed"]})
+
+    def test_growth_page_renders(self):
+        from fastapi.testclient import TestClient
+        from pln_agent.web import app as web
+        web._db = self.db
+        r = TestClient(web.app).get("/growth")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("Brand scoreboard", r.text)

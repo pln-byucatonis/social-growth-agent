@@ -312,6 +312,15 @@ CREATE TABLE IF NOT EXISTS creative_packages (
   created_at TEXT
 );
 
+CREATE TABLE IF NOT EXISTS growth_briefs (
+  brief_id TEXT PRIMARY KEY,
+  week_start TEXT,
+  created_at TEXT,
+  created_by TEXT,
+  content JSONB,
+  status TEXT
+);
+
 CREATE TABLE IF NOT EXISTS knowledge (
   entry_id TEXT PRIMARY KEY,
   level TEXT NOT NULL,

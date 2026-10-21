@@ -106,7 +106,8 @@ def score_variant(db: DB, asset: dict, variant: dict, rights: dict, calendar: li
              "empirical": _empirical(db, variant["account_id"], variant.get("series", ""), variant["platform"]),
              "rights": _rights(rights)}
     total = sum(WEIGHTS[k] * v[0] for k, v in parts.items())
-    share = allocation()["creative_effort_share"].get(variant["brand_id"], 0.05)
+    from .growth_officer import current_shares  # approved Chief Growth Officer split overrides the config
+    share = current_shares(db).get(variant["brand_id"], 0.05)
     total = round(total * (0.85 + share), 4)  # editable planning weight nudges, never dominates
     return {"total": total, "allocation_weight": share,
             "parts": {k: {"score": v[0], "why": v[1], "weight": WEIGHTS[k]} for k, v in parts.items()}}
