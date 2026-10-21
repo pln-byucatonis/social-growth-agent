@@ -108,7 +108,7 @@ def start_intelligence(settings: Settings) -> str:
 def refresh_intelligence(db: DB, settings: Settings, ops: DB | None) -> dict:
     """Phase 1 loop: real performance in → creative evidence → cadence → knowledge review.
     Each step is isolated so one failure (e.g. a platform page timing out) doesn't stop the rest."""
-    from . import audience, cadence, community, competitive, growth_lab, growth_officer, migration_tracking, insights, knowledge, publishing, scout
+    from . import audience, cadence, community, competitive, growth_lab, growth_officer, migration_tracking, insights, knowledge, publishing, scout, trend_scout
     def retire_verticals():  # one-off: move assets off the retired VerticalFn renditions (runs off the request path)
         if not ops or db.kv_get("migr:verticalfn_retired") == "done":
             return "done"
@@ -126,6 +126,7 @@ def refresh_intelligence(db: DB, settings: Settings, ops: DB | None) -> dict:
              ("competitors", lambda: {"captured": len((r := competitive.snapshot(db, actor="worker"))["captured"]), "errors": r["errors"]}),
              ("pln_evidence", lambda: len(knowledge.derive_pln_evidence(db)["written"])),
              ("scout", lambda: scout.scan(db, ops, actor="worker") if ops else None),
+             ("trends", lambda: trend_scout.refresh(db, actor="worker")),
              ("cadence", lambda: len(cadence.recommend_all(db))),
              ("slots", lambda: publishing.learn_all(db, settings.timezone)),
              ("experiments", lambda: growth_lab.refresh(db, "worker")),

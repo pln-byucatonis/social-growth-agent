@@ -1152,6 +1152,57 @@ def _ops_db() -> DB:
     return DB(settings.ops_database_url, init=False)
 
 
+@app.get("/trends", response_class=HTMLResponse)
+def trends_page(request: Request, show: str = ""):
+    from .. import trend_scout
+    from ..accounts import load_brands
+    d = db()
+    cards = trend_scout.active(d) if show != "all" else d.all("trend_cards", order="updated_at DESC")
+    brands = {b["brand_id"]: b["name"] for b in load_brands()}
+    recent = d.all("trend_signals", order="seen_at DESC")[:30]
+    import json as _json
+    return page(request, "trends.html", cards=cards, brands=brands, recent=recent, show=show,
+                sources=_json.loads(d.kv_get("trend_scout:sources") or "{}"), bg=bg_status("trends"))
+
+
+@app.post("/trends/refresh")
+def trends_refresh(request: Request):
+    from .. import trend_scout
+    _admin(request)
+    run_later("trends", lambda d: "Trend scan: " + ", ".join(f"{k} {v}" for k, v in trend_scout.refresh(d)["sources"].items()),
+              request.state.user or "dashboard")
+    return back(request, "/trends", "Scanning sources — refresh in a minute.")
+
+
+@app.post("/trends/manual")
+def trends_manual(request: Request, lines: str = Form(...), actor: str = Form("")):
+    from .. import trend_scout
+    name = who(request, actor)
+    n = trend_scout.add_manual(db(), lines, name)
+    trend_scout.build_cards(db(), actor=name)
+    return back(request, "/trends", f"Added {n} line(s) and rebuilt the trend cards.")
+
+
+@app.post("/trends/{card_id:path}/apply")
+def trends_apply(request: Request, card_id: str, brand_id: str = Form(...), hook: str = Form(""), actor: str = Form("")):
+    from .. import trend_scout
+    name = who(request, actor)
+    try:
+        r = trend_scout.apply(db(), card_id, brand_id, name, _ops_db() if settings.ops_database_url else None, settings, hook)
+    except (KeyError, ValueError, LookupError, RuntimeError) as e:
+        return back(request, "/trends", err=str(e))
+    _kick_team_tasks()  # the render is queued for the task runner
+    return back(request, f"/variant/{r['variant_id']}", f"Trend applied: “{r['hook']}” on {r['clip'].get('caption', '')[:60]} — "
+                                                       "rendering now; it waits for your approval.")
+
+
+@app.post("/trends/{card_id:path}/dismiss")
+def trends_dismiss(request: Request, card_id: str, actor: str = Form("")):
+    from .. import trend_scout
+    trend_scout.dismiss(db(), card_id, who(request, actor))
+    return back(request, "/trends", "Dismissed")
+
+
 @app.get("/scout", response_class=HTMLResponse)
 def scout_page(request: Request, brand: str = "", source: str = "", view: str = "potential"):
     from .. import scout

@@ -129,7 +129,8 @@ def upsert_agent_post(db: DB, variant: dict, platform_post_id: str, permalink: s
                 "posting_hour_bucket": hour_bucket(local.hour if local else None),
                 "weekday": local.strftime("%a") if local else "unknown",
                 "duration_variant": edl.get("variant_label") or "default",
-                "overlay_style": (variant.get("render_qc") or {}).get("overlay_style") or "plain"}
+                "overlay_style": (variant.get("render_qc") or {}).get("overlay_style") or "plain",
+                "trend": ((variant.get("treatment") or {}).get("trend") or "none").split(":")[1] if (variant.get("treatment") or {}).get("trend") else "none"}
     prov = {k: "agent_decision" for k in creative}
     prov.update({k: "inferred_from_caption" for k in ("content_type", "caption_length", "asks_question", "hashtags",
                                                       "mentions", "cta", "emoji", "brand_named")})
@@ -155,7 +156,7 @@ def upsert_agent_post(db: DB, variant: dict, platform_post_id: str, permalink: s
 
 VARIABLES = ["content_type", "format", "hook_style", "opening_style", "duration_bucket", "captions_burned", "commentary",
              "caption_length", "asks_question", "cta", "hashtags", "mentions", "emoji", "brand_named",
-             "posting_hour_bucket", "weekday", "series", "route_role", "duration_variant", "overlay_style"]
+             "posting_hour_bucket", "weekday", "series", "route_role", "duration_variant", "overlay_style", "trend"]
 OUTCOMES = ["views", "follows_per_1k_views", "shares_per_1k_views", "saves_per_1k_views", "comments_per_1k_views",
             "engagements_per_1k_views", "avg_watch_time_s", "completion_rate"]
 MIN_N, CONCLUSIVE_N = 5, 8

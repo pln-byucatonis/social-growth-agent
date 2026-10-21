@@ -389,6 +389,37 @@ CREATE TABLE IF NOT EXISTS team_threads (
   result JSONB
 );
 
+CREATE TABLE IF NOT EXISTS trend_signals (
+  signal_id TEXT PRIMARY KEY,
+  source TEXT NOT NULL,
+  text TEXT NOT NULL,
+  url TEXT,
+  score DOUBLE PRECISION,
+  seen_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS trend_cards (
+  card_id TEXT PRIMARY KEY,
+  kind TEXT,
+  title TEXT,
+  summary TEXT,
+  why_now TEXT,
+  signals JSONB,
+  sightings INTEGER,
+  velocity DOUBLE PRECISION,
+  score DOUBLE PRECISION,
+  lifespan_days INTEGER,
+  fits JSONB,
+  recipe JSONB,
+  risk JSONB,
+  status TEXT,
+  applied JSONB,
+  first_seen TEXT,
+  last_seen TEXT,
+  expires_at TEXT,
+  updated_at TEXT
+);
+
 CREATE TABLE IF NOT EXISTS team_tasks (
   task_id TEXT PRIMARY KEY,
   thread_id TEXT NOT NULL,
@@ -490,6 +521,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS ux_experiment_arms_variant ON experiment_arms(
 CREATE INDEX IF NOT EXISTS ix_team_messages_thread ON team_messages(thread_id, id);
 
 CREATE UNIQUE INDEX IF NOT EXISTS ux_team_tasks_action ON team_tasks(thread_id, action_index);
+
+CREATE INDEX IF NOT EXISTS ix_trend_signals_seen ON trend_signals(seen_at);
 
 CREATE INDEX IF NOT EXISTS ix_competitor_handle ON competitor_snapshots(handle, captured_at);
 

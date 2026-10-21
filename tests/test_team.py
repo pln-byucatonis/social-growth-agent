@@ -38,7 +38,7 @@ class TeamTests(unittest.TestCase):
 
     def test_roster_has_all_ten_with_rules(self):
         r = team.roster(self.db)
-        self.assertEqual(len(r), 10)
+        self.assertEqual(len(r), 11)
         self.assertTrue(all(a["rules"] and a["mission"] for a in r))
         for a in r:
             self.assertIsInstance(team.status_line(self.db, a["key"]), str)
@@ -74,7 +74,7 @@ class TeamTests(unittest.TestCase):
         t = team.start_challenge(self.db, "How do we grow Putt Tour?", "bill", background=False)
         msgs = team.messages(self.db, t["thread_id"])
         rounds = [(m.get("meta") or {}).get("round") for m in msgs]
-        self.assertEqual(rounds.count("perspective"), 10)
+        self.assertEqual(rounds.count("perspective"), 11)
         self.assertIn("liaison", rounds)  # scout answered the CGO's question
         self.assertEqual(rounds[-1], "synthesis")
         th = self.db.get("team_threads", "thread_id", t["thread_id"])

@@ -1,0 +1,355 @@
+{
+  "_doc": "Short-form formats the Trend Scout recognises in signals. match: lowercase phrases that mark the format in titles/hooks. hooks: per word family ({x} = filled from the clip); overlay: the overlay recipe applied with the hook. fit: 0-1 per family. Trending commercial music is never suggested: brand accounts may only use licensed / platform commercial audio.",
+  "formats": {
+    "wait_for_it": {
+      "name": "Wait for it",
+      "match": [
+        "wait for it",
+        "wait till the end",
+        "watch till the end",
+        "wait for the end"
+      ],
+      "hooks": {
+        "combat": [
+          "WAIT FOR THE TAP"
+        ],
+        "putt": [
+          "WAIT FOR IT"
+        ],
+        "slap": [
+          "WAIT FOR THE SWING"
+        ],
+        "default": [
+          "WAIT FOR IT"
+        ]
+      },
+      "overlay": {
+        "countdown": true
+      },
+      "fit": {
+        "combat": 0.8,
+        "putt": 0.95,
+        "slap": 0.9,
+        "carrom": 0.8,
+        "street": 0.85
+      }
+    },
+    "pov": {
+      "name": "POV",
+      "match": [
+        "pov:",
+        "pov "
+      ],
+      "hooks": {
+        "combat": [
+          "POV: YOU'RE STUCK IN THE PASSENGER SEAT",
+          "POV: YOU TAPPED TOO LATE"
+        ],
+        "putt": [
+          "POV: YOU NEED THIS PUTT TO WIN"
+        ],
+        "slap": [
+          "POV: YOU'RE NEXT IN LINE"
+        ],
+        "default": [
+          "POV: YOU HAD TO BE THERE"
+        ]
+      },
+      "overlay": {
+        "hook": "outline"
+      },
+      "fit": {
+        "combat": 0.85,
+        "putt": 0.8,
+        "slap": 0.85,
+        "carrom": 0.6,
+        "street": 0.8
+      }
+    },
+    "rate_it": {
+      "name": "Rate it 1–10",
+      "match": [
+        "rate this",
+        "out of 10",
+        "1-10",
+        "1 to 10",
+        "rate it"
+      ],
+      "hooks": {
+        "default": [
+          "RATE THIS 1–10"
+        ],
+        "combat": [
+          "RATE THIS FINISH 1–10"
+        ],
+        "putt": [
+          "RATE THIS PUTT 1–10"
+        ]
+      },
+      "overlay": {},
+      "cta": "Drop your rating in the comments.",
+      "fit": {
+        "combat": 0.85,
+        "putt": 0.9,
+        "slap": 0.8,
+        "carrom": 0.85,
+        "street": 0.85
+      }
+    },
+    "guess_outcome": {
+      "name": "Guess the outcome",
+      "match": [
+        "what happens next",
+        "guess",
+        "does he make it",
+        "will he",
+        "did he make it"
+      ],
+      "hooks": {
+        "combat": [
+          "DOES HE ESCAPE?"
+        ],
+        "putt": [
+          "DOES IT DROP?"
+        ],
+        "slap": [
+          "DOES HE STAY UP?"
+        ],
+        "default": [
+          "WHAT HAPPENS NEXT?"
+        ]
+      },
+      "overlay": {
+        "countdown": true
+      },
+      "cta": "Call it before the end.",
+      "fit": {
+        "combat": 0.8,
+        "putt": 0.95,
+        "slap": 0.9,
+        "carrom": 0.85,
+        "street": 0.85
+      }
+    },
+    "tell_me_without": {
+      "name": "Tell me you're… without telling me",
+      "match": [
+        "tell me you",
+        "without telling me"
+      ],
+      "hooks": {
+        "combat": [
+          "TELL ME YOU DO JIU-JITSU WITHOUT TELLING ME"
+        ],
+        "putt": [
+          "TELL ME YOU'RE A GOLFER WITHOUT TELLING ME"
+        ],
+        "default": [
+          "TELL ME YOU'RE ADDICTED WITHOUT TELLING ME"
+        ]
+      },
+      "overlay": {
+        "hook": "pill"
+      },
+      "fit": {
+        "combat": 0.7,
+        "putt": 0.75,
+        "slap": 0.5,
+        "carrom": 0.5,
+        "street": 0.6
+      }
+    },
+    "nobody_me": {
+      "name": "Nobody: / Me:",
+      "match": [
+        "nobody:",
+        "no one:"
+      ],
+      "hooks": {
+        "default": [
+          "NOBODY: / ME AT 2AM WATCHING THIS"
+        ]
+      },
+      "overlay": {
+        "hook": "outline"
+      },
+      "fit": {
+        "combat": 0.5,
+        "putt": 0.5,
+        "slap": 0.6,
+        "carrom": 0.5,
+        "street": 0.6
+      }
+    },
+    "he_thought": {
+      "name": "He thought he had it",
+      "match": [
+        "he thought",
+        "thought he had",
+        "she thought"
+      ],
+      "hooks": {
+        "combat": [
+          "HE THOUGHT HE WAS SAFE"
+        ],
+        "putt": [
+          "HE THOUGHT IT WAS OVER"
+        ],
+        "default": [
+          "HE THOUGHT HE HAD IT"
+        ]
+      },
+      "overlay": {},
+      "fit": {
+        "combat": 0.9,
+        "putt": 0.8,
+        "slap": 0.85,
+        "carrom": 0.7,
+        "street": 0.8
+      }
+    },
+    "sound_on": {
+      "name": "Sound on",
+      "match": [
+        "sound on",
+        "turn your sound on",
+        "volume up"
+      ],
+      "hooks": {
+        "default": [
+          "SOUND ON"
+        ]
+      },
+      "overlay": {
+        "captions": "kinetic"
+      },
+      "fit": {
+        "combat": 0.7,
+        "putt": 0.6,
+        "slap": 0.95,
+        "carrom": 0.5,
+        "street": 0.6
+      }
+    },
+    "satisfying": {
+      "name": "Oddly satisfying",
+      "match": [
+        "satisfying",
+        "oddly satisfying",
+        "so clean"
+      ],
+      "hooks": {
+        "putt": [
+          "THE MOST SATISFYING PUTT"
+        ],
+        "carrom": [
+          "OBSESSED WITH THIS SHOT"
+        ],
+        "default": [
+          "SO SATISFYING"
+        ]
+      },
+      "overlay": {
+        "captions": "none"
+      },
+      "fit": {
+        "combat": 0.3,
+        "putt": 0.9,
+        "slap": 0.2,
+        "carrom": 0.95,
+        "street": 0.7
+      }
+    },
+    "underrated_sport": {
+      "name": "Sports you didn't know existed",
+      "match": [
+        "didn't know existed",
+        "underrated sport",
+        "weirdest sport",
+        "new sport"
+      ],
+      "hooks": {
+        "default": [
+          "A SPORT YOU DIDN'T KNOW EXISTED"
+        ],
+        "combat": [
+          "JIU-JITSU… IN A CAR"
+        ]
+      },
+      "overlay": {},
+      "fit": {
+        "combat": 0.95,
+        "putt": 0.7,
+        "slap": 0.9,
+        "carrom": 0.9,
+        "street": 0.8
+      }
+    }
+  },
+  "topic_keywords": {
+    "combat": [
+      "jiu jitsu",
+      "jiu-jitsu",
+      "bjj",
+      "ufc",
+      "mma",
+      "grappling",
+      "submission",
+      "wrestling",
+      "choke"
+    ],
+    "slap": [
+      "slap",
+      "power slap",
+      "slapfight"
+    ],
+    "putt": [
+      "golf",
+      "putt",
+      "mini golf",
+      "minigolf",
+      "hole in one",
+      "pga",
+      "masters",
+      "ryder cup"
+    ],
+    "carrom": [
+      "carrom",
+      "pool",
+      "billiards",
+      "snooker"
+    ],
+    "street": [
+      "skate",
+      "skateboard",
+      "street",
+      "parkour",
+      "bmx"
+    ]
+  },
+  "blocked_topics": [
+    "shooting",
+    "killed",
+    "dies",
+    "dead",
+    "death",
+    "war",
+    "election",
+    "trump",
+    "biden",
+    "harris",
+    "israel",
+    "gaza",
+    "ukraine",
+    "abuse",
+    "assault",
+    "lawsuit",
+    "arrest",
+    "tragedy",
+    "funeral",
+    "cancer",
+    "suicide",
+    "nsfw",
+    "porn"
+  ]
+}

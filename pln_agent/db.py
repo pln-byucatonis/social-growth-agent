@@ -399,6 +399,36 @@ TABLES: dict[str, list[tuple[str, str, str]]] = {
         ("created_at", "ts", ""),
         ("result", "json", ""),
     ],
+    # Trend Scout: raw signals from each source, and the trend cards built from them.
+    "trend_signals": [
+        ("signal_id", "text", "PRIMARY KEY"),
+        ("source", "text", "NOT NULL"),  # reddit/r/<sub> | google_trends | youtube/popular | competitor/<handle> | manual/<who>
+        ("text", "text", "NOT NULL"),
+        ("url", "text", ""),
+        ("score", "real", ""),
+        ("seen_at", "ts", ""),
+    ],
+    "trend_cards": [
+        ("card_id", "text", "PRIMARY KEY"),  # format:<key> | topic:<family>:<date>
+        ("kind", "text", ""),  # format | topic
+        ("title", "text", ""),
+        ("summary", "text", ""),
+        ("why_now", "text", ""),
+        ("signals", "json", ""),
+        ("sightings", "int", ""),
+        ("velocity", "real", ""),
+        ("score", "real", ""),
+        ("lifespan_days", "int", ""),
+        ("fits", "json", ""),  # brand_id -> {score, hook}
+        ("recipe", "json", ""),  # overlay overrides + CTA
+        ("risk", "json", ""),
+        ("status", "text", ""),  # active | applied | dismissed | expired
+        ("applied", "json", ""),
+        ("first_seen", "ts", ""),
+        ("last_seen", "ts", ""),
+        ("expires_at", "ts", ""),
+        ("updated_at", "ts", ""),
+    ],
     # an adopted challenge action, tracked: its status comes from what actually happened (renders, drafts, schedules)
     "team_tasks": [
         ("task_id", "text", "PRIMARY KEY"),
@@ -492,6 +522,7 @@ INDEXES = [
     "CREATE UNIQUE INDEX IF NOT EXISTS ux_experiment_arms_variant ON experiment_arms(variant_id)",
     "CREATE INDEX IF NOT EXISTS ix_team_messages_thread ON team_messages(thread_id, id)",
     "CREATE UNIQUE INDEX IF NOT EXISTS ux_team_tasks_action ON team_tasks(thread_id, action_index)",
+    "CREATE INDEX IF NOT EXISTS ix_trend_signals_seen ON trend_signals(seen_at)",
     "CREATE INDEX IF NOT EXISTS ix_competitor_handle ON competitor_snapshots(handle, captured_at)",
     "CREATE INDEX IF NOT EXISTS ix_comments_status ON comments(status, priority)",
     "CREATE INDEX IF NOT EXISTS ix_comments_created ON comments(created_at)",

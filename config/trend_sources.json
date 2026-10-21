@@ -1,0 +1,20 @@
+{
+  "_doc": "Where the Trend Scout listens. reddit: public daily top posts (no login). google_trends: the public daily trending-searches feed. youtube: most-popular Sports chart (needs PLN_YOUTUBE_API_KEY). Competitor standout hooks and pasted TikTok Creative Center lines are always used.",
+  "reddit": [
+    "bjj",
+    "MMA",
+    "golf",
+    "sports",
+    "sportsarefun",
+    "Damnthatsinteresting",
+    "memes",
+    "TikTokCringe"
+  ],
+  "google_trends_geo": "US",
+  "youtube_category": "17",
+  "lifespan_days": {
+    "format": 10,
+    "topic": 3
+  },
+  "window_days": 7
+}

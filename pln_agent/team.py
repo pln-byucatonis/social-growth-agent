@@ -115,6 +115,14 @@ def _ctx_migration(db):
                                                   "bridge_posts": p["bridge"]["bridge_posts"]} for p in t["platforms"]]}
 
 
+def _ctx_trends(db):
+    from .trend_scout import active
+    cards = active(db)[:10]
+    return {"cards": [{k: c.get(k) for k in ("card_id", "title", "kind", "score", "velocity", "sightings", "status", "expires_at")}
+                      | {"hooks": {b: f.get("hook") for b, f in (c.get("fits") or {}).items() if f.get("score", 0) >= 0.7}} for c in cards],
+            "sources": json.loads(db.kv_get("trend_scout:sources") or "{}")}
+
+
 AGENTS = [
     {"key": "cgo", "name": "Chief Growth Officer", "layer": "strategy", "page": "/growth",
      "mission": "Decides where effort goes across brands each week, by priority tier and measured follower efficiency, and turns the team's findings into one ranked action list.",
@@ -176,6 +184,13 @@ AGENTS = [
                "Assigned arms only touch drafts nobody has approved.",
                "Experiments without enough posts after the time limit close as inconclusive."],
      "params": {"max_weeks": _num("Weeks before an under-sampled test closes", 6, 1, 26)}, "context": _ctx_lab},
+    {"key": "trends", "name": "Trend Scout", "layer": "creative", "page": "/trends",
+     "mission": "Spots the formats, hooks and topics rising right now — Reddit, Google Trends, YouTube, competitors, TikTok Creative Center — and turns the ones that fit into ready hooks per brand.",
+     "rules": ["A trend card needs real sightings; velocity compares this week with the last.",
+               "Never suggests trending commercial music: brand accounts use licensed or commercial-library audio only.",
+               "Topics touching tragedy, politics, crime or NSFW are blocked; no athlete or brand names in hooks.",
+               "Applying a card only drafts a post on a real clip — it waits for approval like any other."],
+     "params": {"min_sightings": _num("Sightings before a format becomes a card", 1, 1, 20)}, "context": _ctx_trends},
     {"key": "migration", "name": "Audience Migration", "layer": "distribution", "page": "/migration",
      "mission": "Tracks WPL → Putt Tour on every platform: follower trends, bridge posts, decline alerts, and which account the numbers say should be home.",
      "rules": ["No follower transfer is assumed; bridge results are associations with their sample size.",

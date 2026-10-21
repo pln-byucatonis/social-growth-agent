@@ -1,0 +1,25 @@
+{% extends "base.html" %}{% block title %}Trends{% endblock %}{% block body %}
+<div class="ph"><div class="t"><div class="eyebrow">Content · Trend Scout</div><h1>Trends</h1>
+<p>Formats, hooks and topics rising right now, how well each fits our brands, and a ready hook per brand. <b>Apply</b> puts the trend on that brand's best unused clip and renders it — it then waits for your approval like any other post.</p></div>
+<div class="acts"><form method="post" action="{{ base }}/trends/refresh" class="inline"><button class="sm">Scan now</button></form><a class="btn sm ghost" href="{{ base }}/trends{{ '' if show == 'all' else '?show=all' }}">{{ 'Active only' if show == 'all' else 'All, incl. dismissed' }}</a></div></div>
+<div class="flash info">Audio: brand accounts can only use licensed or commercial-library sound — the Scout never suggests trending commercial songs.</div>
+<div class="kpis"><div class="kpi"><div class="v">{{ cards|length }}</div><div class="l">Trend cards</div></div>
+{% for k, v in sources.items() %}<div class="kpi {{ 'ok' if v.ok else 'warn' }}"><div class="v" style="font-size:18px">{{ v.signals if v.ok else '—' }}</div><div class="l">{{ k|label }}</div>{% if not v.ok %}<div class="h">{{ v.why }}</div>{% endif %}</div>{% else %}<div class="kpi warn"><div class="v" style="font-size:18px">—</div><div class="l">No scan yet</div></div>{% endfor %}</div>
+<div class="split"><div>
+{% for c in cards %}<div class="card"><div class="ch"><h2>{{ c.title }}</h2><div class="acts">{{ chip(c.status) }} {{ chip('x','info', c.kind|label) }}</div></div>
+<p class="small muted" style="margin-top:0">{{ c.summary }}{% if c.why_now %} {{ c.why_now }}{% endif %} · worth using ~{{ c.lifespan_days }} days{% if c.velocity %} · velocity ×{{ c.velocity }}{% endif %}</p>
+<div class="tw"><table class="stack"><thead><tr><th>Brand</th><th>Fit</th><th>Hook</th><th></th></tr></thead><tbody>
+{% for bid, f in (c.fits or {}).items()|sort(attribute='1.score', reverse=True) %}{% if f.score >= 0.5 %}<tr><td><b>{{ brands.get(bid, bid) }}</b></td><td>{{ (f.score*100)|round|int }}%</td>
+<td colspan="2"><form method="post" action="{{ base }}/trends/{{ c.card_id }}/apply" class="fbar"><input type="hidden" name="brand_id" value="{{ bid }}"><input name="hook" value="{{ f.hook }}" placeholder="Type a hook" maxlength="60" style="min-width:220px" class="grow">{% if not user %}<input name="actor" placeholder="Name" style="width:80px">{% endif %}<button class="sm primary">Apply to a clip</button></form></td></tr>{% endif %}{% endfor %}</tbody></table></div>
+{% if c.recipe and c.recipe.overlay %}<p class="faint small">Look: {% for k, v in c.recipe.overlay.items() %}{{ k|label }} {{ v }}{{ ', ' if not loop.last }}{% endfor %}{% if c.recipe.cta %} · CTA “{{ c.recipe.cta }}”{% endif %}</p>{% endif %}
+<details><summary class="small">Seen in ({{ c.sightings }})</summary><ul class="small" style="padding-left:18px">{% for s in c.signals %}<li>{% if s.url %}<a href="{{ s.url }}" target="_blank" rel="noopener">{{ s.text }}</a>{% else %}{{ s.text }}{% endif %} <span class="faint">— {{ s.source }}</span></li>{% endfor %}</ul></details>
+{% for r in c.risk or [] %}<p class="small" style="color:var(--warn);margin:4px 0 0">• {{ r }}</p>{% endfor %}
+{% if c.applied %}<p class="small">Applied: {% for a in c.applied %}<a href="{{ base }}/variant/{{ a.variant_id }}">{{ brands.get(a.brand_id, a.brand_id) }} “{{ a.hook }}”</a>{{ ', ' if not loop.last }}{% endfor %}</p>{% endif %}
+{% if c.status == 'active' %}<form method="post" action="{{ base }}/trends/{{ c.card_id }}/dismiss" class="fbar" style="margin-top:6px">{% if not user %}<input name="actor" placeholder="Name" style="width:80px">{% endif %}<button class="sm ghost">Dismiss</button></form>{% endif %}</div>
+{% else %}<div class="card"><div class="empty">No trend cards yet. Click <b>Scan now</b>, or paste lines from TikTok Creative Center on the right.</div></div>{% endfor %}
+</div><div>
+<div class="card"><div class="ch"><h2>Add from TikTok Creative Center</h2></div><p class="small muted" style="margin-top:0">TikTok has no API for trends: open <a href="https://ads.tiktok.com/business/creativecenter/inspiration/popular/hashtag/pc/en" target="_blank" rel="noopener">Creative Center → Trends</a> and paste trending hashtags or hooks, one per line.</p>
+<form method="post" action="{{ base }}/trends/manual"><textarea name="lines" rows="5" placeholder="#povchallenge&#10;wait for the end&#10;rate this 1-10" required></textarea><div class="fbar" style="margin-top:6px">{% if not user %}<input name="actor" placeholder="Your name">{% endif %}<button class="sm">Add &amp; rebuild cards</button></div></form></div>
+<div class="card"><div class="ch"><h2>Latest signals</h2></div>{% if recent %}<ul class="list">{% for s in recent %}<li><div class="body"><span class="clip2">{{ s.text }}</span><span class="sub">{{ s.source }} · {{ s.seen_at|ago }}</span></div></li>{% endfor %}</ul>{% else %}<div class="empty">None yet.</div>{% endif %}</div>
+</div></div>
+{% endblock %}
