@@ -151,6 +151,7 @@ TABLES: dict[str, list[tuple[str, str, str]]] = {
         ("render_status", "text", ""),
         ("render_path", "text", ""),
         ("public_media_url", "text", ""),  # approved render on the public CDN (platform pull-from-URL)
+        ("render_qc", "json", ""),  # Video Production quality checks on the latest render
         ("treatment", "json", ""),  # Creative Director: hook / edit / context / payoff / conversion + duration variants
         ("created_at", "ts", ""),
         ("updated_at", "ts", ""),

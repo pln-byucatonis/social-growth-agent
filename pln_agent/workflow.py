@@ -241,6 +241,9 @@ def run_publisher(db: DB, settings: Settings, now: datetime | None = None, trans
             problems.append(f"variant state is {v['state']}")
         if rights.blockers:
             problems.append("rights: " + "; ".join(rights.blockers))
+        qc = v.get("render_qc") or {}
+        if qc and not qc.get("passed", True):
+            problems.append("render failed quality checks: " + "; ".join(qc.get("errors", [])))
         if _published_today(db, acc["account_id"], now) >= caps.get(acc["platform"], 1):
             db.update("publish_jobs", "job_id", job["job_id"], {"next_attempt_at": (now + timedelta(hours=12)).replace(microsecond=0).isoformat(),
                                                                "last_error": "daily rate cap reached; deferred", "updated_at": now_iso()})

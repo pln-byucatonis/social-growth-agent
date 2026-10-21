@@ -52,7 +52,31 @@ def _tick(db: DB, settings: Settings, do_ops: bool) -> dict:
         out["ops_clips"] = import_ops_clips(db, ops, settings.ops_assets_bucket, limit=200, min_score=60, actor="worker")
         out["intelligence"] = start_intelligence(settings)
     out["planned"] = plan_new_clear_assets(db, settings)
+    out["video"] = start_video_poll(settings)
     return out
+
+
+_video_lock = threading.Lock()
+
+
+def start_video_poll(settings: Settings) -> str:
+    """Pick up finished ops verticals and render their cuts, off the request path (FFmpeg is slow)."""
+    if _video_lock.locked():
+        return "already running"
+
+    def work():
+        with _video_lock:
+            try:
+                from .ops_vertical import poll
+                own = DB(settings.database_url, init=False)
+                r = poll(own, settings.ops_assets_bucket, settings)
+                if r["ready"]:
+                    log.info("ops verticals ready: %s", r["ready"])
+            except Exception:  # noqa: BLE001
+                log.exception("ops vertical poll failed")
+
+    threading.Thread(target=work, daemon=True, name="pln-video").start()
+    return "started"
 
 
 _intel_lock = threading.Lock()

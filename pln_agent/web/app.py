@@ -758,6 +758,27 @@ def scout_scan(request: Request):
     return back(request, "/scout", "Scanning the library — refresh in a minute.")
 
 
+@app.post("/variant/{vid:path}/cuts/render")
+def variant_cuts_render(request: Request, vid: str, use_ops: str = Form("on")):
+    """Video Production: all three cuts. With use_ops, ask the ops pipeline for subject-tracked 9:16 versions
+    first (they render automatically when ready); otherwise render now with the agent's own crop."""
+    import threading
+    from ..media import render_cuts
+    from ..ops_vertical import request_cuts
+    actor = request.state.user or "dashboard"
+    if use_ops == "on":
+        try:
+            r = request_cuts(db(), vid, actor)
+        except Exception as e:  # noqa: BLE001
+            return back(request, f"/variant/{vid}", err=f"ops vertical request failed: {str(e)[:200]}")
+        if r.get("requested"):
+            return back(request, f"/variant/{vid}", f"Asked ops for subject-tracked 9:16 cuts {', '.join(r['requested'])} — "
+                                                    "they render here automatically when ready (a few minutes).")
+    threading.Thread(target=lambda: render_cuts(DB(settings.database_url, init=False), vid, settings, actor),
+                     daemon=True).start()
+    return back(request, f"/variant/{vid}", "Rendering all cuts — refresh in a couple of minutes.")
+
+
 @app.post("/variant/{vid:path}/cut")
 def variant_cut(request: Request, vid: str, label: str = Form(...)):
     from ..creative_director import use_cut

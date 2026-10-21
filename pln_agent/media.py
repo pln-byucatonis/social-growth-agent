@@ -163,10 +163,27 @@ def build_caption_track(variant: dict, asset: dict) -> list[dict]:
     return cues
 
 
-def render_variant(db: DB, variant_id: str, settings: Settings, actor: str = "renderer") -> dict:
+def render_variant(db: DB, variant_id: str, settings: Settings, actor: str = "renderer", cut: dict | None = None) -> dict:
+    """Render the post's EDL — or, with `cut` (a Creative Director duration variant), that cut into its own
+    folder without touching the post's main render. Every render gets quality checks."""
     v = db.get("variants", "variant_id", variant_id)
     asset = db.get("assets", "asset_id", v["asset_id"])
-    outdir = settings.render_dir / _safe(variant_id)
+    outdir = settings.render_dir / _safe(variant_id) / (f"cut_{cut['label']}" if cut else "")
+    if cut:
+        v = {**v, "edl": {**(v.get("edl") or {}), "segments": cut["segments"]}}
+        ov = cut.get("ops_vertical") or {}
+        if ov.get("status") == "ready" and ov.get("key"):
+            # ops already made a subject-tracked 9:16 of exactly this window: use it as the source (times from
+            # 0), shift captions to match, and don't crop again
+            start, end = ov["window"]
+            bucket = os.environ.get("PLN_OPS_ASSETS_BUCKET", settings.ops_assets_bucket)
+            asset = {**asset, "media_path": f"s3://{bucket}/{ov['key']}", "media_present": True, "width": 1080, "height": 1920,
+                     "transcript": [{**c, "start": c["start"] - start, "end": c["end"] - start}
+                                    for c in (asset.get("transcript") or []) if c["end"] > start and c["start"] < end]}
+            seg = dict(cut["segments"][0])
+            seg.update({"source_in": 0.0, "source_out": round(end - start, 2)})
+            v = {**v, "edl": {**v["edl"], "segments": [seg]}, "thumbnail": {**(v.get("thumbnail") or {}),
+                                                                             "source_time": max(0.0, cut.get("payoff_at_s") or 0)}}
     outdir.mkdir(parents=True, exist_ok=True)
     (outdir / "edl.json").write_text(json.dumps({"variant_id": variant_id, "source": asset["media_path"],
                                                  "source_sha256": asset["sha256"], **v["edl"]}, indent=2))
@@ -208,8 +225,8 @@ def render_variant(db: DB, variant_id: str, settings: Settings, actor: str = "re
                 tf = outdir / f"overlay_{j}.txt"
                 tf.write_text(_wrap(o["text"], 22 if out["w"] <= 1080 else 40))
                 small = o.get("position", "").endswith("small")
-                y = {"upper_third": "h*0.18", "center": "(h-text_h)/2", "top": "h*0.06",
-                     "lower_third": "h*0.70", "lower_left_small": "h*0.90"}.get(o.get("position"), "h*0.15")
+                y = {"upper_third": "h*0.18", "center": "(h-text_h)/2", "top": "h*0.13",
+                     "lower_third": "h*0.62", "lower_left_small": "h*0.74"}.get(o.get("position"), "h*0.15")
                 x = "w*0.05" if small else "(w-text_w)/2"
                 draws.append(f"drawtext=fontfile={font}:textfile={tf}:fontsize={34 if small else 64}:fontcolor=white:"
                              f"borderw=4:bordercolor=black:line_spacing=10:x={x}:y={y}:"
@@ -218,7 +235,7 @@ def render_variant(db: DB, variant_id: str, settings: Settings, actor: str = "re
                 tf = outdir / f"cap_{k}.txt"
                 tf.write_text(_wrap(c["text"], 28))
                 draws.append(f"drawtext=fontfile={font}:textfile={tf}:fontsize=48:fontcolor=yellow:borderw=3:"
-                             f"bordercolor=black:x=(w-text_w)/2:y=h*0.78:enable='between(t,{c['start']:.2f},{c['end']:.2f})'")
+                             f"bordercolor=black:x=(w-text_w)/2:y=h*0.66:enable='between(t,{c['start']:.2f},{c['end']:.2f})'")
         parts.append(f"[cv]{chain}{(',' + ','.join(draws)) if draws else ''}[ov]")
         video = outdir / "video.mp4"
         cmd = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", *inputs,
@@ -230,7 +247,8 @@ def render_variant(db: DB, variant_id: str, settings: Settings, actor: str = "re
         if proc.returncode != 0:
             status, path, detail = "render_failed", "", proc.stderr[-800:]
         else:
-            status, path, detail = "rendered", str(video), f"ok; {framing}"
+            status, path, detail = "rendered", str(video), f"ok; {framing}" + (
+                "; ops subject-tracked vertical (MediaConvert Smart Crop)" if "/verticals/" in asset["media_path"] else "")
             cues = build_caption_track(v, asset)
             if cues:
                 (outdir / "captions.srt").write_text("\n".join(
@@ -240,13 +258,108 @@ def render_variant(db: DB, variant_id: str, settings: Settings, actor: str = "re
             subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-ss", str(t), "-i", src,
                             "-frames:v", "1", "-vf", _reframe(out, asset["width"], asset["height"], fx), str(thumb)],
                            capture_output=True, timeout=120)
+    qc = qc_render(str(outdir / "video.mp4"), out, (v.get("validation") or {}).get("spec") or {}, v.get("platform", "")) \
+        if status == "rendered" else {}
     if status == "rendered" and os.environ.get("PLN_RENDER_BUCKET"):
-        path = upload_render(outdir, variant_id, os.environ["PLN_RENDER_BUCKET"])
+        path = upload_render(outdir, variant_id + (f"/cut_{cut['label']}" if cut else ""), os.environ["PLN_RENDER_BUCKET"])
+    if cut:
+        db.audit(actor, "cut_rendered", "variants", variant_id, {"cut": cut["label"], "status": status, "qc": qc.get("summary")})
+        return {"variant_id": variant_id, "cut": cut["label"], "status": status, "path": path, "detail": detail, "qc": qc}
     # a new render invalidates any earlier public link (the file it points at is the old cut)
-    db.update("variants", "variant_id", variant_id, {"render_status": status, "render_path": path,
+    db.update("variants", "variant_id", variant_id, {"render_status": status, "render_path": path, "render_qc": qc,
                                                      "public_media_url": "", "updated_at": now_iso()})
-    db.audit(actor, "variant_rendered", "variants", variant_id, {"status": status, "detail": detail[:300]})
-    return {"variant_id": variant_id, "status": status, "path": path, "detail": detail, "dir": str(outdir)}
+    db.audit(actor, "variant_rendered", "variants", variant_id, {"status": status, "detail": detail[:300],
+                                                                  "qc": qc.get("summary")})
+    return {"variant_id": variant_id, "status": status, "path": path, "detail": detail, "dir": str(outdir), "qc": qc}
+
+
+def render_cuts(db: DB, variant_id: str, settings: Settings, actor: str = "renderer", only: list[str] | None = None) -> list[dict]:
+    """Video Production: render every available Creative Director cut (A ≈12s / B ≈25s / C ≈40s) so they can
+    be compared and tested. Results (path + QC) are stored on the treatment's duration variants."""
+    v = db.get("variants", "variant_id", variant_id)
+    t = dict(v.get("treatment") or {})
+    results = []
+    cuts = []
+    for c in t.get("duration_variants") or []:
+        c = dict(c)
+        if c.get("available") and c.get("segments") and (only is None or c["label"] in only):
+            r = render_variant(db, variant_id, settings, actor, cut=c)
+            c["render"] = {"status": r["status"], "path": r["path"], "qc": r.get("qc", {}), "at": now_iso()}
+            results.append(r)
+        cuts.append(c)
+    if cuts:
+        t["duration_variants"] = cuts
+        db.update("variants", "variant_id", variant_id, {"treatment": t, "updated_at": now_iso()})
+    return results
+
+
+# ---- quality control ---------------------------------------------------------------------------------
+
+SAFE_ZONE = {"top": 0.12, "bottom": 0.20}  # share of a 9:16 frame covered by platform UI (handles, captions, buttons)
+LOUDNESS_TARGET = (-20.0, -8.0)  # integrated LUFS acceptable range for social (platforms normalise near -14)
+
+
+def _run(cmd: list[str], timeout: int = 300) -> str:
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout).stderr or ""
+    except (subprocess.TimeoutExpired, OSError) as e:
+        return f"QC_ERROR {e}"
+
+
+def qc_render(path: str, out: dict | None, spec: dict, platform: str = "") -> dict:
+    """Checks a finished render the way a producer would: duration vs the platform's limits, output size,
+    black frames (especially a black opening), long silences, loudness, and text inside UI safe zones."""
+    errors, warnings, measures = [], [], {}
+    from .ingest import ffprobe
+    try:
+        pr = ffprobe(Path(path))
+    except Exception as e:  # noqa: BLE001
+        return {"passed": False, "errors": [f"can't read the render: {e}"], "warnings": [], "measures": {},
+                "summary": "unreadable"}
+    fmt = pr.get("format", {})
+    vstreams = [x for x in pr.get("streams", []) if x.get("codec_type") == "video"]
+    astreams = [x for x in pr.get("streams", []) if x.get("codec_type") == "audio"]
+    dur = float(fmt.get("duration") or 0)
+    measures["duration_s"] = round(dur, 2)
+    if spec.get("max_s") and dur > spec["max_s"] + 0.5:
+        errors.append(f"{dur:.1f}s is longer than {platform or 'the platform'}'s {spec['max_s']}s limit for this format")
+    if spec.get("min_s") and dur < spec["min_s"] - 0.5:
+        warnings.append(f"{dur:.1f}s is shorter than the {spec['min_s']}s minimum we aim for")
+    if vstreams and out:
+        w, h = vstreams[0].get("width"), vstreams[0].get("height")
+        measures["size"] = f"{w}x{h}"
+        if (w, h) != (out.get("w"), out.get("h")):
+            errors.append(f"output is {w}x{h}, expected {out.get('w')}x{out.get('h')}")
+    log = _run(["ffmpeg", "-hide_banner", "-nostats", "-i", path, "-vf", "blackdetect=d=0.4:pix_th=0.10",
+                "-af", "silencedetect=n=-50dB:d=2,ebur128=peak=true", "-f", "null", "-"])
+    blacks = [(float(a), float(b)) for a, b in re.findall(r"black_start:([\d.]+) black_end:([\d.]+)", log)]
+    measures["black_segments"] = len(blacks)
+    if any(a < 0.3 for a, _ in blacks):
+        errors.append("opens on black — the first frame must be the action")
+    long_black = [b - a for a, b in blacks if b - a >= 1.0]
+    if long_black:
+        warnings.append(f"{len(long_black)} black stretch(es) of {max(long_black):.1f}s+ inside the cut")
+    silences = re.findall(r"silence_duration: ([\d.]+)", log)
+    if astreams and silences:
+        warnings.append(f"{len(silences)} silence(s) of 2s+ (longest {max(float(x) for x in silences):.1f}s)")
+    lufs = re.findall(r"I:\s+(-?[\d.]+) LUFS", log)
+    if astreams and lufs:
+        i_lufs = float(lufs[-1])
+        measures["loudness_lufs"] = i_lufs
+        if i_lufs < LOUDNESS_TARGET[0]:
+            warnings.append(f"quiet ({i_lufs:.1f} LUFS; aim for about -14)")
+        elif i_lufs > LOUDNESS_TARGET[1]:
+            warnings.append(f"very loud ({i_lufs:.1f} LUFS; aim for about -14)")
+        peak = re.findall(r"Peak:\s+(-?[\d.]+) dBFS", log)
+        if peak and float(peak[-1]) > -1.0:
+            warnings.append(f"true peak {float(peak[-1]):.1f} dBFS may clip after platform encoding")
+    elif not astreams:
+        warnings.append("no audio track")
+    if "QC_ERROR" in log:
+        warnings.append("ffmpeg analysis didn't complete")
+    passed = not errors
+    return {"passed": passed, "errors": errors, "warnings": warnings, "measures": measures,
+            "summary": ("pass" if passed else "fail") + (f" · {len(warnings)} warning(s)" if warnings else "")}
 
 
 def probe_output(path: str) -> dict:

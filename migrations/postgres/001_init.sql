@@ -129,6 +129,7 @@ CREATE TABLE IF NOT EXISTS variants (
   render_status TEXT,
   render_path TEXT,
   public_media_url TEXT,
+  render_qc JSONB,
   treatment JSONB,
   created_at TEXT,
   updated_at TEXT
