@@ -139,6 +139,15 @@ class TeamTaskTests(unittest.TestCase):
         sheet = runsheet.day_sheet(self.db, self.s, day)
         rows = [r for r in sheet["rows"] if r.get("pinned")]
         self.assertEqual({r["variant_id"] for r in rows}, {s["variant_id"] for s in pinned})
+        from fastapi.testclient import TestClient
+        from pln_agent.web import app as web
+        web._db = self.db
+        page = TestClient(web.app).get(f"/runsheet?day={day.isoformat()}").text
+        others = [r for r in sheet["rows"] if not r.get("pinned")]
+        for r in rows:
+            self.assertIn(r["variant_id"], page)
+        for r in others:  # a challenge day shows only the challenge's posts
+            self.assertNotIn(f'value="{r["variant_id"]}|', page)
         out = runsheet.lock(self.db, [(r["variant_id"], r["time"].isoformat()) for r in rows], "bill")
         self.assertEqual(len(out["scheduled"]) + len(out["needs_second_approver"]) + len(out["failed"]), 3)
         t = self.advance()

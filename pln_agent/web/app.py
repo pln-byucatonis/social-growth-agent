@@ -510,7 +510,7 @@ def _render_url(request: Request, v: dict) -> str:
 
 
 @app.get("/runsheet", response_class=HTMLResponse)
-def runsheet_page(request: Request, day: str = ""):
+def runsheet_page(request: Request, day: str = "", all: int = 0):
     from .. import runsheet
     today = datetime.now(ZoneInfo(settings.timezone)).date()
     d = (today + timedelta(days=1)) if day == "tomorrow" else (date.fromisoformat(day) if day else today)
@@ -518,13 +518,18 @@ def runsheet_page(request: Request, day: str = ""):
     for r in sheet["rows"]:  # play-in-place preview, with sound, before approving
         v = db().get("variants", "variant_id", r["variant_id"]) or {}
         r["render_url"] = _render_url(request, v) if v.get("render_status") == "rendered" else ""
+    from ..team_tasks import pins_for_day
+    challenge_vids = {p["variant_id"] for p in pins_for_day(db(), d.isoformat(), settings.timezone)}
     props = [r for r in sheet["rows"] if r["kind"] == "proposed"]
     pinned = [r for r in props if r.get("pinned")]
     # what needs a decision: posts a team challenge pinned for the day; on days without any, the planner's proposals
-    approve = pinned or props
+    approve = pinned if challenge_vids else props
     return page(request, "runsheet.html", s=sheet, day=d, today=today, prev=(d - timedelta(days=1)).isoformat(),
                 next=(d + timedelta(days=1)).isoformat(), bg=bg_status("runsheet"), approve=approve,
-                suggestions=[r for r in props if r not in approve], scheduled=[r for r in sheet["rows"] if r["kind"] == "scheduled"],
+                # a day a team challenge planned shows only those posts; the planner's extras are one click away
+                suggestions=[r for r in props if r not in approve] if (all or not challenge_vids) else [],
+                hidden=0 if (all or not challenge_vids) else len([r for r in sheet["rows"] if r["variant_id"] not in challenge_vids]),
+                scheduled=[r for r in sheet["rows"] if r["kind"] == "scheduled" and (all or not challenge_vids or r["variant_id"] in challenge_vids)],
                 now=datetime.now(ZoneInfo(settings.timezone)))
 
 
