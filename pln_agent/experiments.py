@@ -87,6 +87,27 @@ def recommendations(db: DB, now: datetime | None = None) -> list[dict]:
                 recs.append({"type": "scale", "priority": "P1",
                              "text": f"'{series}' on {acc} is improving ({last:.2f} vs {prior:.2f}); allocate more footage to it.",
                              "evidence": f"{len(vals)} measured posts"})
+    # posting gaps on priority accounts (measured from the Creative Intelligence DB)
+    for r in db.query("SELECT a.account_id, a.brand_id, a.platform, a.username_original, MAX(p.published_at) AS last "
+                      "FROM accounts a LEFT JOIN posts p ON p.account_id = a.account_id "
+                      "WHERE a.verification_status = 'oauth_connected' OR p.post_id IS NOT NULL "
+                      "GROUP BY a.account_id, a.brand_id, a.platform, a.username_original"):
+        if r["brand_id"] not in ("pln", "carjitsu", "putt_tour", "world_putting_league"):
+            continue
+        try:
+            last = datetime.fromisoformat(str(r["last"]).replace("Z", "+00:00")) if r["last"] else None
+        except ValueError:
+            last = None
+        if last and last.tzinfo is None:
+            last = last.replace(tzinfo=timezone.utc)
+        gap = (now - last).days if last else None
+        if gap is None or gap > 7:
+            recs.append({"type": "posting_gap", "priority": "P0",
+                         "text": f"{r['username_original'] or r['account_id']} ({r['platform']}) "
+                                 + (f"hasn't posted in {gap} days (last {last.date().isoformat()})." if last
+                                    else "has no posts on record in the last 90 days.")
+                                 + " Approve drafts from the queue — the audience isn't hearing from us.",
+                         "evidence": "posts table (platform ingest)"})
     nowiso = now.replace(microsecond=0).isoformat()
     for s in db.all("schedules", "state='planned' AND slot_at < ?", [nowiso]):
         recs.append({"type": "missed_post", "priority": "P1",

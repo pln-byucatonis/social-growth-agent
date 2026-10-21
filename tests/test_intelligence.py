@@ -43,6 +43,14 @@ class AudienceIntelligenceTests(Base):
         self.assertGreater(k["net_follower_change"], 0)
         self.assertGreater(k["kpis"]["follows_per_1k_views"]["value"], 0)
 
+    def test_account_level_numbers_and_posting_gap_without_recent_posts(self):
+        k = audience.account_kpis(self.db, CJ_IG, days=28)
+        self.assertTrue(k["last_post_at"])
+        self.assertGreater(k["days_since_post"], 7)  # fixture posts are from summer 2026
+        from pln_agent.experiments import recommendations
+        gaps = [r for r in recommendations(self.db) if r["type"] == "posting_gap"]
+        self.assertTrue(any("@carjitsu_championship" in r["text"] for r in gaps), gaps)
+
     def test_breakdowns_by_brand_and_content_type(self):
         by_brand = {r["group"]: r for r in audience.breakdown(self.db, "brand_id")}
         self.assertEqual(set(by_brand), {"carjitsu", "pln"})

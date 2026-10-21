@@ -346,8 +346,17 @@ def account_kpis(db: DB, account_id: str, days: int = 28, end: date | None = Non
     k["outbound_clicks_per_1k_views"] = (_k(tot("clicks") / views * 1000, "measured", "Σclicks ÷ Σviews", len(measured))
                                          if views and tot("clicks") else
                                          _k(None, "unavailable", MEASURABILITY.get(acc["platform"], {}).get("outbound_clicks_per_1k_views", "not exposed")))
+    # account-level numbers that don't depend on recent posts (all platform-reported)
+    fol = [(d, v) for d, v in follows_daily if start.isoformat() <= d <= end.isoformat()]
+    reach = [(d, v) for d, v in _account_series(db, account_id, "reach") if start.isoformat() <= d <= end.isoformat()]
+    last = db.one("SELECT MAX(published_at) AS t FROM posts WHERE account_id=?", [account_id])
+    last_at = _dt(last["t"]) if last and last["t"] else None
+    days_since = (datetime.now(timezone.utc) - last_at).days if last_at else None
     return {"account_id": account_id, "brand_id": acc["brand_id"], "platform": acc["platform"],
             "handle": acc["username_original"], "window": [start.isoformat(), end.isoformat()],
+            "new_follows": sum(v for _, v in fol) if fol else None, "new_follows_days": len(fol),
+            "daily_reach_sum": sum(v for _, v in reach) if reach else None, "reach_days": len(reach),
+            "last_post_at": last_at.date().isoformat() if last_at else None, "days_since_post": days_since,
             "followers_start": win[0][1] if win else None, "followers_end": win[-1][1] if win else None,
             "net_follower_change": (win[-1][1] - win[0][1]) if len(win) >= 2 else None,
             "posts": len(posts), "posts_measured": len(measured), "views": views or None, "kpis": k}

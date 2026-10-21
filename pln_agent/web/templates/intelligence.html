@@ -8,6 +8,10 @@
 </div>
 <div class="grid">{% for r in rows %}<div class="card"><h3>{{ r.handle or r.account_id }} <span class="muted">{{ r.platform }} · {{ r.brand_id }}</span></h3>
 <p>{% if r.followers_end %}<b>{{ '{:,.0f}'.format(r.followers_end) }}</b> followers{% if r.net_follower_change is not none %} ({{ '{:+,.0f}'.format(r.net_follower_change) }} in window){% endif %}{% else %}<span class="muted">no follower snapshots</span>{% endif %} · {{ r.posts }} posts ({{ r.posts_measured }} measured) · window {{ r.window[0] }} → {{ r.window[1] }}</p>
+<p>{% if r.last_post_at %}Last post <b>{{ r.last_post_at }}</b> <span class="badge {{ 'bad' if r.days_since_post > 14 else 'warn' if r.days_since_post > 3 else 'ok' }}">{{ r.days_since_post }} days ago</span>{% else %}<span class="badge bad">no posts on record</span>{% endif %}
+{% if r.new_follows is not none %} · <b>{{ '{:,.0f}'.format(r.new_follows) }}</b> new followers over {{ r.new_follows_days }} days <span class="badge ok">measured</span>{% endif %}
+{% if r.daily_reach_sum is not none %} · daily reach summed {{ '{:,.0f}'.format(r.daily_reach_sum) }} ({{ r.reach_days }} days) <span class="badge ok">measured</span>{% endif %}</p>
+{% if r.posts == 0 %}<p class="muted">The per-post rates below need posts published in this window — there weren't any.</p>{% endif %}
 {% set t = trends[r.account_id] %}{% if t|length > 1 %}{% set lo = t|map(attribute=1)|min %}{% set hi = t|map(attribute=1)|max %}
 <svg viewBox="0 0 300 40" width="100%" height="40" role="img" aria-label="follower trend"><polyline fill="none" stroke="currentColor" stroke-width="1.5" points="{% for d, v in t %}{{ (loop.index0 / (t|length - 1) * 300)|round(1) }},{{ (38 - ((v - lo) / ((hi - lo) or 1)) * 36)|round(1) }} {% endfor %}"/></svg>{% endif %}
 <table>{% for key, label in labels.items() %}{% set k = r.kpis.get(key) %}{% if k %}<tr><td>{{ label }}</td><td><b>{{ fmt(k.value) }}</b></td><td>{{ basis(k) }}</td><td class="muted">{{ k.how }}</td></tr>{% endif %}{% endfor %}</table></div>{% endfor %}</div>
