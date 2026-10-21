@@ -299,7 +299,7 @@ def build(v: dict, cues: list[dict], duration: float, w: int, h: int, outdir: Pa
             continue
         t0, t1 = float(o.get("start", 0)), max(float(o.get("end", 3)), float(o.get("start", 0)) + 1.6)
         t1 = min(t1, duration - 0.2)
-        zone, why = ad.choose(a, ["top", "lower"], (t0 + t1) / 2) if a.get("ok") else ("top", "default position")
+        zone, why = ad.choose(a, ["top", "lower"], (t0, t1)) if a.get("ok") else ("top", "default position")
         if zone is None:
             zone, why = "top", why + " — kept at the top (a hook is essential)"
         p = outdir / f"ov_hook_{j}.png"
@@ -322,7 +322,7 @@ def build(v: dict, cues: list[dict], duration: float, w: int, h: int, outdir: Pa
             plan.append({"what": f"payoff word “{stamp}”", "zone": "—", "at": f"{t0:.1f}s", "why": "dropped: too close to the end"})
         else:
             cands = [z for z in ("middle", "top") if free(z, t0, t1)]
-            zone, why = ad.choose(a, cands, t0) if a.get("ok") else ((cands or [None])[0], "default position")
+            zone, why = ad.choose(a, cands, (t0, t1)) if a.get("ok") else ((cands or [None])[0], "default position")
             if zone is None:
                 plan.append({"what": f"payoff word “{stamp}”", "zone": "—", "at": f"{t0:.1f}s", "why": f"dropped: {why}"})
             else:
@@ -348,7 +348,7 @@ def build(v: dict, cues: list[dict], duration: float, w: int, h: int, outdir: Pa
                 plan.append({"what": f"reaction word “{word}”", "zone": "—", "at": f"{t0:.1f}s", "why": "dropped: too close to the end"})
             else:
                 cands = [z for z in ("middle", "top", "lower") if free(z, t0, t1)]
-                zone, why = ad.choose(a, cands, t0) if a.get("ok") else ((cands or [None])[0], "default position")
+                zone, why = ad.choose(a, cands, (t0, t1)) if a.get("ok") else ((cands or [None])[0], "default position")
                 if zone is None:
                     plan.append({"what": f"reaction word “{word}”", "zone": "—", "at": f"{t0:.1f}s", "why": f"dropped: {why}"})
                 else:

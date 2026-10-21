@@ -263,7 +263,9 @@ def render_variant(db: DB, variant_id: str, settings: Settings, actor: str = "re
                 hits = [b for b in beats if b["kind"] != "reaction"]
                 if payoff is None and hits:  # not on a Creative Director cut: the strongest action moment in the edit
                     payoff = max(hits, key=lambda b: b["intensity"])["t"]
-                looks = art_director.analyze(str(clean), duration, [t for t in [payoff, *[b["t"] for b in beats]] if t is not None])
+                # frames at each moment and through the ~1.3 s a word stays up after it
+                marks = [t for t in [payoff, *[b["t"] for b in beats]] if t is not None]
+                looks = art_director.analyze(str(clean), duration, sorted({round(m + d, 2) for m in marks for d in (0, 0.65, 1.3)}))
                 styled = overlays.build(v, build_caption_track(v, asset), duration, out["w"], out["h"], outdir, payoff, beats, looks)
                 ins, ps, final = overlays.ffmpeg_graph("base", 1, styled["layers"], styled["countdown"], out["w"], out["h"])
                 overlay_style, overlay_words, overlay_plan = styled["style_id"], styled.get("words") or {}, styled.get("plan") or []

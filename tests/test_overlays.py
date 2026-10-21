@@ -115,7 +115,7 @@ class ArtDirectorTests(unittest.TestCase):
         subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "mandelbrot=size=360x640:rate=30",
                         "-t", "6", "-vf", "drawbox=x=0:y=110:w=360:h=90:color=black:t=fill,"
                         "drawgrid=x=0:y=110:w=24:h=18:t=3:c=white", str(clip)], check=True)
-        a = art_director.analyze(str(clip), 6.0, [3.0])
+        a = art_director.analyze(str(clip), 6.0, [3.0], vision=False)
         self.assertTrue(a["ok"])
         self.assertGreaterEqual(art_director.zone_report(a, "top")["graphic"], art_director.GRAPHIC_COVER)
         zone, why = art_director.choose(a, ["top", "lower"], 1.0)
@@ -125,6 +125,29 @@ class ArtDirectorTests(unittest.TestCase):
         b = overlays.build(v, [], 6.0, 1080, 1920, d, 3.0, [{"kind": "payoff", "t": 3.0, "intensity": 1}], a)
         self.assertEqual(next(p for p in b["plan"] if p["what"].startswith("hook"))["zone"], "lower")
 
+    def test_vision_spots_a_title_card_the_measurements_miss(self):
+        import json as _json
+        import subprocess
+        from pln_agent import art_director
+        d = Path(tempfile.mkdtemp())
+        clip = d / "busy.mp4"
+        subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "mandelbrot=size=360x640:rate=30",
+                        "-t", "6", str(clip)], check=True)
+        calls = []
+
+        def llm(system, messages, max_tokens):
+            calls.append(messages)
+            return _json.dumps({"frames": [{"t": 3.0, "zones": ["middle"], "what": "HOLE IN ONE title card"},
+                                           {"t": 3.65, "zones": ["middle"], "what": "title card"}]})
+        a = art_director.analyze(str(clip), 6.0, [3.0, 3.65, 4.3], llm=llm)
+        self.assertTrue(calls and any(c.get("type") == "image" for c in calls[0][0]["content"]))
+        zone, why = art_director.choose(a, ["middle", "top"], (3.0, 4.3))
+        self.assertEqual(zone, "top")
+        self.assertIn("frames show a graphic", why)
+        # no model access: falls back to measurements without failing
+        b = art_director.analyze(str(clip), 6.0, [3.0], llm=lambda *x: (_ for _ in ()).throw(RuntimeError("no access")))
+        self.assertEqual(b["seen"], {})
+
     def test_locked_off_camera_is_not_a_graphic(self):
         import subprocess
         from pln_agent import art_director
@@ -132,7 +155,7 @@ class ArtDirectorTests(unittest.TestCase):
         clip = d / "still.mp4"
         subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "testsrc=size=360x640:rate=30",
                         "-t", "4", "-vf", "drawbox=x=0:y=0:w=360:h=30:color=black:t=fill", str(clip)], check=True)
-        a = art_director.analyze(str(clip), 4.0)
+        a = art_director.analyze(str(clip), 4.0, vision=False)
         self.assertEqual(art_director.choose(a, ["top", "lower"], 1.0)[0], "top")
 
     def test_animation_and_timing_rules(self):
