@@ -68,7 +68,7 @@ creative package. Dismissals survive re-scans.
 context / payoff / conversion treatment from its platform recipe (TikTok opens on the payoff; Instagram
 builds tension; Facebook adds context and invites discussion; YouTube sets up the challenge; LinkedIn is a
 business insight, not the highlight re-posted), plus A ≈12s / B ≈25s / C ≈40s cuts around the payoff with
-honest availability (a short vertical rendition can't make a 40s cut). The recommended cut comes from PLN
+honest availability (a short source can't make a 40s cut; 9:16 versions come from MediaConvert per cut). The recommended cut comes from PLN
 duration evidence when it exists, otherwise the platform's starting recipe, labelled a hypothesis; each
 treatment lists the knowledge entries it used. Switching cuts revokes approval and clears the render.
 

@@ -65,7 +65,7 @@ def duration_variants(ctx, payoff) -> list[dict]:
         actual = round(end - start, 2)
         ok = actual >= 0.75 * target
         out.append({"label": label, "target_s": target, "idea": idea, "available": ok, "actual_s": actual,
-                    "why": "" if ok else f"source is only {dur:.0f}s here (vertical rendition); a {target:.0f}s cut needs the master",
+                    "why": "" if ok else f"source is only {dur:.0f}s long; a {target:.0f}s cut needs more footage",
                     "segments": [{"source_in": round(start, 2), "source_out": round(end, 2), "purpose": f"variant {label}: {idea}",
                                   "moment": payoff.label, "source_timecode": f"{tc(start)}–{tc(end)}"}] if ok else [],
                     "payoff_at_s": round(payoff.start - start, 2) if ok else None})

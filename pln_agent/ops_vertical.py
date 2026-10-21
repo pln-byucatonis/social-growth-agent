@@ -7,8 +7,8 @@ and writes  s3://<assets bucket>/verticals/<label>/…_9x16.mp4  (plus a 16:9) a
 
 So for every Creative Director cut (A ≈12s / B ≈25s / C ≈40s) of a master-based asset the agent asks ops for a
 subject-tracked 9:16 of exactly that window, polls S3 for the result, then renders its own on-screen text +
-captions on top (no further cropping) and runs QC. Assets that are already an ops vertical rendition are used
-as-is; anything ops can't do falls back to the agent's motion-centred crop.
+captions on top (no further cropping) and runs QC. Anything ops can't do falls back to the agent's motion-centred
+crop. MediaConvert is the only vertical source: the older VerticalFn renditions are retired and never used.
 """
 from __future__ import annotations
 
@@ -37,9 +37,8 @@ def label_for(variant_id: str, cut: str) -> str:
 
 def _master(asset: dict) -> tuple[str, str] | None:
     """(bucket, key) when the asset's media is a full master (cut times are absolute in it)."""
-    clip = ((asset.get("probe") or {}).get("ops_clip") or {})
     path = asset.get("media_path") or ""
-    if not path.startswith("s3://") or "/verticals/" in path or clip.get("vertical_mode") in ("tight", "fit80+pan"):
+    if not path.startswith("s3://") or "/verticals/" in path:
         return None
     b, _, k = path[5:].partition("/")
     return b, k
@@ -52,7 +51,7 @@ def request_cuts(db: DB, variant_id: str, actor: str, invoke=None) -> dict:
     t = dict(v.get("treatment") or {})
     m = _master(asset)
     if not m:
-        return {"requested": [], "skipped": "asset is already a vertical rendition (or not on S3) — rendered directly"}
+        return {"requested": [], "skipped": "asset isn't a master on S3 — rendered with the agent's own crop"}
     invoke = invoke or (lambda payload: _clients()[0].invoke(FunctionName=VERTICALIZE_FN, InvocationType="Event",
                                                               Payload=json.dumps(payload).encode()))
     requested, cuts = [], []

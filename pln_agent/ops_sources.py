@@ -252,8 +252,8 @@ def import_ops_clips(db: DB, ops: DB, assets_bucket: str, limit: int = 100, min_
     params.append(limit)
     candidates = ops.query(
         "SELECT c.id, c.property, c.start_sec, c.end_sec, c.peak_offset_sec, c.moment_offset_sec, "
-        "c.highlight_score, c.energy_score, c.caption, c.transcript, c.source_bucket, c.source_key, c.vertical_key, "
-        "c.vertical_mode, c.vertical_subject, c.thumb_key, s.title AS source_title, s.aired_date AS aired_date, "
+        "c.highlight_score, c.energy_score, c.caption, c.transcript, c.source_bucket, c.source_key, "
+        "c.thumb_key, s.title AS source_title, s.aired_date AS aired_date, "
         "s.duration_sec AS source_duration "
         "FROM (SELECT clips.*, row_number() OVER (PARTITION BY property ORDER BY highlight_score DESC, id) AS rn "
         "      FROM clips WHERE " + " AND ".join(where) + ") c "
@@ -282,7 +282,9 @@ def import_ops_clips(db: DB, ops: DB, assets_bucket: str, limit: int = 100, min_
             skipped.append(f"{c['id']}: unknown property {c['property']!r} (add an alias in config/brands.json)")
             continue
         start, end = float(c["start_sec"]), float(c["end_sec"])
-        rel = bool(c["vertical_key"])
+        # Always the master: 9:16 versions come from MediaConvert (ops VerticalizeFn) per cut, never the
+        # retired VerticalFn renditions in clips.vertical_key.
+        rel = False
         offset = c["moment_offset_sec"] if c["moment_offset_sec"] is not None else c["peak_offset_sec"]
         score = float(c["highlight_score"] or 0) / 100
         ctags = tags.get(c["id"], [])
@@ -298,9 +300,9 @@ def import_ops_clips(db: DB, ops: DB, assets_bucket: str, limit: int = 100, min_
             # source titles are raw master filenames; never put them in copy or thumbnails
             "title": f"{_label(ctags)} — {brand['name']}" + (f" ({str(c['aired_date'])[:10]})" if c["aired_date"] else ""),
             "description": safe_caption,
-            "media_path": f"s3://{assets_bucket}/{c['vertical_key']}" if rel else f"s3://{c['source_bucket']}/{c['source_key']}",
+            "media_path": f"s3://{c['source_bucket']}/{c['source_key']}",
             "media_present": True, "sha256": "", "content_id": c["id"], "parent_asset_id": "",
-            "provenance": "ops clip library (pln-fast-aws tagger)" + (" — vertical rendition" if rel else " — master"),
+            "provenance": "ops clip library (pln-fast-aws tagger) — master",
             "owner": rights.get("owner", ""), "license": rights.get("license", ""),
             "territory": rights.get("territory") or [], "rights_expires_at": rights.get("rights_expires_at"),
             "rights_verified": bool(rights.get("rights_verified")),
@@ -316,11 +318,11 @@ def import_ops_clips(db: DB, ops: DB, assets_bucket: str, limit: int = 100, min_
             "duration_s": (end - start) if rel else (float(c["source_duration"]) if c["source_duration"] else None),
             "width": 1080 if rel else None, "height": 1920 if rel else None, "has_audio": True,
             "probe": {"ops_clip": {"tags": ctags, "highlight_score": c["highlight_score"],
-                                   "energy_score": c.get("energy_score"), "vertical_subject": c.get("vertical_subject"),
+                                   "energy_score": c.get("energy_score"),
                                    "machine_caption": c["caption"], "raw_talent": raw_people,
                                    "thumb": f"s3://{assets_bucket}/{c['thumb_key']}" if c.get("thumb_key") else None,  # for reviewers only; never used in copy unless verified
                                    "transcript": c["transcript"], "source_title": c["source_title"],
-                                   "vertical_mode": c["vertical_mode"], "start_sec": start, "end_sec": end}},
+                                   "start_sec": start, "end_sec": end}},
             # Transcripts are burned in as captions; commentary names athletes, so only when verified.
             "transcript": [{"start": 0.0 if rel else start, "end": (end - start) if rel else end, "text": c["transcript"]}]
             if c["transcript"] and identities_ok else [],
@@ -368,3 +370,24 @@ def set_asset_rights(db: DB, asset_id: str, actor: str, **fields) -> dict:
     db.update("assets", "asset_id", asset_id, {k: v for k, v in fields.items() if k != "note"})
     db.audit(actor, "asset_rights_set", "assets", asset_id, fields)
     return cur
+
+
+def repoint_retired_verticals(db: DB, ops: DB, assets_bucket: str, settings, actor: str = "ops-sync") -> dict:
+    """One-off: assets imported from the retired VerticalFn renditions (media under verticals/) are re-imported
+    from their master, and their unreviewed drafts regenerated so cuts and times match the master. Approved,
+    scheduled or published posts are left exactly as they are."""
+    from .editorial import generate_pack
+    rows = db.query("SELECT asset_id, content_id FROM assets WHERE media_path LIKE ? AND content_id IS NOT NULL AND content_id <> ''",
+                    ["%/verticals/%"])
+    if not rows:
+        return {"repointed": 0}
+    r = import_ops_clips(db, ops, assets_bucket, clip_ids=[x["content_id"] for x in rows], actor=actor)
+    regenerated = 0
+    for x in rows:
+        a = db.get("assets", "asset_id", x["asset_id"])
+        if a and "/verticals/" not in (a.get("media_path") or ""):
+            generate_pack(db, x["asset_id"], settings)
+            regenerated += 1
+    db.audit(actor, "retired_verticals_repointed", "assets", "", {"assets": len(rows), "reimported": r.get("imported"),
+                                                                    "regenerated": regenerated})
+    return {"repointed": len(rows), "regenerated": regenerated}

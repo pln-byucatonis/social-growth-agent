@@ -222,7 +222,8 @@ class OpsImportTests(unittest.TestCase):
         self.assertEqual(r["imported"], 2)  # superseded + unknown-property clips excluded
         self.assertTrue(any("Mystery" in s for s in r["skipped"]))
         a = self.db.get("assets", "asset_id", clip_asset_id("CJ.mp4:10-24"))
-        self.assertEqual(a["media_path"], "s3://assets-bucket/verticals/CJ-10-24_9x16.mp4")
+        self.assertEqual(a["media_path"], "s3://pln-vod-library/PLNstudio/CJ.mp4")  # never the retired VerticalFn rendition
+        self.assertEqual(a["moments"][0]["start"], 10.0)  # times are in the master
         self.assertEqual(a["brand_id"], "carjitsu")
         self.assertEqual(a["moments"][1]["kind"], "finish")
         self.assertEqual(a["people"], [{"name": "Athlete Seven", "verified": False, "detected_by": "face",
@@ -395,3 +396,20 @@ class ProxiedDashboardTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+@unittest.skipUnless(PG, "set PLN_TEST_DATABASE_URL to run the ops import against Postgres")
+class RetiredVerticalFnTests(unittest.TestCase):
+    def test_assets_on_old_renditions_move_to_the_master_and_drafts_regenerate(self):
+        from tests.helpers import make
+        from pln_agent.ops_sources import import_ops_clips, repoint_retired_verticals, clip_asset_id
+        db, s = make(packs=False)
+        ops = DB(test_db_url(), init=False)
+        ops.execute(OPS_DDL)
+        import_ops_clips(db, ops, "assets-bucket", min_score=50)
+        aid = clip_asset_id("CJ.mp4:10-24")
+        db.update("assets", "asset_id", aid, {"media_path": "s3://assets-bucket/verticals/CJ-10-24_9x16.mp4"})  # as imported before
+        r = repoint_retired_verticals(db, ops, "assets-bucket", s)
+        self.assertEqual(r["repointed"], 1)
+        self.assertEqual(db.get("assets", "asset_id", aid)["media_path"], "s3://pln-vod-library/PLNstudio/CJ.mp4")
+        self.assertEqual(repoint_retired_verticals(db, ops, "assets-bucket", s), {"repointed": 0})

@@ -105,7 +105,16 @@ def refresh_intelligence(db: DB, settings: Settings, ops: DB | None) -> dict:
     """Phase 1 loop: real performance in → creative evidence → cadence → knowledge review.
     Each step is isolated so one failure (e.g. a platform page timing out) doesn't stop the rest."""
     from . import audience, cadence, community, competitive, growth_lab, growth_officer, migration_tracking, insights, knowledge, publishing, scout
-    steps = [("knowledge_seed", lambda: knowledge.seed(db, "worker")),
+    def retire_verticals():  # one-off: move assets off the retired VerticalFn renditions (runs off the request path)
+        if not ops or db.kv_get("migr:verticalfn_retired") == "done":
+            return "done"
+        from .ops_sources import repoint_retired_verticals
+        r = repoint_retired_verticals(db, ops, settings.ops_assets_bucket, settings, "worker")
+        db.kv_set("migr:verticalfn_retired", "done", "worker")
+        return r
+
+    steps = [("retired_verticals", retire_verticals),
+             ("knowledge_seed", lambda: knowledge.seed(db, "worker")),
              ("social", lambda: audience.import_ops_social(db, ops, settings.timezone, "worker") if ops else None),
              ("instagram", lambda: insights.collect_instagram(db, actor="worker")),
              ("youtube", lambda: insights.collect_youtube(db, settings.timezone, actor="worker")),
