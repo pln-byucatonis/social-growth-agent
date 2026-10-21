@@ -1,23 +1,31 @@
 {% extends "base.html" %}{% block title %}Run sheet{% endblock %}{% block body %}
-<div class="ph"><div class="t"><div class="eyebrow">Today</div><h1>Run sheet · {{ day.strftime('%A, %b %-d') }}</h1>
-<p>Everything going out that day, in time order ({{ s.timezone.split('/')[-1].replace('_',' ') }} time). Tick the proposed posts you want and lock them in — they're approved and scheduled at the shown time, which is each account's best learned window.</p></div>
-<div class="acts"><div class="seg"><a href="{{ base }}/runsheet?day={{ prev }}">‹ {{ prev[5:] }}</a><a href="{{ base }}/runsheet" class="{{ 'on' if not request.query_params.get('day') }}">Tomorrow</a><a href="{{ base }}/runsheet?day={{ next }}">{{ next[5:] }} ›</a></div>
-<form method="get" class="inline"><input type="date" name="day" value="{{ s.day }}" onchange="this.form.submit()"></form></div></div>
-{% if dry_run or not publishing_enabled %}<div class="flash info">Publishing is simulated right now, so locked-in posts are rehearsed, not posted.</div>{% endif %}
-<div class="kpis"><div class="kpi info"><div class="v">{{ s.counts.scheduled }}</div><div class="l">Scheduled</div></div><div class="kpi"><div class="v">{{ s.counts.proposed }}</div><div class="l">Proposed by the planner</div></div>
-<div class="kpi"><div class="v">{{ s.rows|map(attribute='account_id')|unique|list|length }}</div><div class="l">Accounts posting</div></div><div class="kpi {{ 'warn' if s.unplaced else '' }}"><div class="v">{{ s.unplaced|length }}</div><div class="l">Drafts that didn't fit</div></div></div>
-<form method="post" action="{{ base }}/runsheet/lock"><input type="hidden" name="day" value="{{ s.day }}">
-<div class="card flush"><div class="tw"><table class="stack"><thead><tr><th style="width:28px"><input type="checkbox" data-all="pick" aria-label="Select all proposed"></th><th>Time</th><th>Post</th><th>Status</th><th>Why this time</th><th></th></tr></thead><tbody>
-{% for r in s.rows %}<tr>
-<td data-l="">{% if r.kind == 'proposed' %}<input type="checkbox" name="pick" value="{{ r.variant_id }}|{{ r.time.isoformat() }}" {{ 'checked' if r.qc != false }} aria-label="Lock in">{% endif %}</td>
-<td class="nowrap"><b style="font-size:15px">{{ r.time.strftime('%-I:%M %p') }}</b></td>
+{% macro row(r, pick=True) %}<tr>
+<td data-l="">{% if pick and r.kind == 'proposed' %}<input type="checkbox" name="pick" value="{{ r.variant_id }}|{{ r.time.isoformat() }}" {{ 'checked' if r.qc != false and r.pinned }} aria-label="Approve and schedule">{% endif %}</td>
+<td class="nowrap"><b style="font-size:15px">{{ r.time.strftime('%-I:%M %p') }}</b>{% if r.kind == 'proposed' and r.time < now %}<span class="sub" style="color:#fcd34d">time passed — goes out right after you approve</span>{% endif %}</td>
 <td><a href="{{ base }}/variant/{{ r.variant_id }}"><b class="clip2">{{ r.hook or r.variant_id }}</b></a><span class="sub">{{ r.account_id|acct }} · {{ r.brand_id|brand }}</span>
 <div>{% if r.pinned %}<a href="{{ base }}/team/challenge/{{ r.thread_id }}#tasks">{{ chip('x','info','Team challenge') }}</a>{% endif %}{% if r.route_role %}{{ chip(r.route_role,'muted',r.route_role|label) }}{% endif %}{% if r.two_person %}{{ chip('x','review','2 approvers') }}{% endif %}{% if r.qc == false %}{{ chip('x','bad','Failed QC') }}{% elif r.render and r.render != 'rendered' %}{{ chip('x','muted','Not rendered') }}{% endif %}</div></td>
-<td>{% if r.kind == 'scheduled' %}{{ chip('scheduled') }}<span class="sub">{{ r.job|label }} · {{ r.mode|label }}</span>{% if r.error %}<span class="sub" style="color:#fca5a5">{{ r.error }}</span>{% endif %}{% else %}{{ chip('proposed') }}<span class="sub">{{ r.state|label }}{% if r.score %} · score {{ (r.score*100)|round|int }}{% endif %}</span>{% endif %}</td>
+<td>{% if r.kind == 'scheduled' %}{{ chip('scheduled') }}<span class="sub">{{ r.job|label }} · {{ r.mode|label }}</span>{% if r.error %}<span class="sub" style="color:#fca5a5">{{ r.error }}</span>{% endif %}{% else %}{{ chip(r.state) }}<span class="sub">{{ r.mode|label }}{% if r.score %} · score {{ (r.score*100)|round|int }}{% endif %}</span>{% endif %}</td>
 <td class="small muted">{{ r.why_time or '' }}</td>
-<td class="act">{% if r.kind == 'scheduled' %}<button class="sm ghost" formaction="{{ base }}/runsheet/unschedule" name="vid" value="{{ r.variant_id }}" formnovalidate>Unschedule</button>{% endif %}</td></tr>
-{% else %}<tr><td colspan="6"><div class="empty">Nothing scheduled or proposed for this day. Drafts show up here once they're in review and the account has posting times.</div></td></tr>{% endfor %}</tbody></table></div></div>
-{% if s.counts.proposed %}<div class="bulkbar"><b id="bulkn"></b>{% if not user %}<input name="actor" placeholder="Your name" required>{% endif %}<button class="primary">Approve &amp; schedule selected</button><span class="faint small">Combat and partnership posts stay in review until a second approver signs off.</span></div>{% endif %}
+<td class="act">{% if r.kind == 'scheduled' %}<button class="sm ghost" formaction="{{ base }}/runsheet/unschedule" name="vid" value="{{ r.variant_id }}" formnovalidate>Unschedule</button>{% endif %}</td></tr>{% endmacro %}
+{% macro table(rows, pick=True, all_box=False) %}<div class="card flush"><div class="tw"><table class="stack"><thead><tr><th style="width:28px">{% if all_box %}<input type="checkbox" data-all="pick" aria-label="Select all">{% endif %}</th><th>Time</th><th>Post</th><th>Status</th><th>Why this time</th><th></th></tr></thead><tbody>
+{% for r in rows %}{{ row(r, pick) }}{% endfor %}</tbody></table></div></div>{% endmacro %}
+
+<div class="ph"><div class="t"><div class="eyebrow">{{ 'Today' if day == today else 'Run sheet' }}</div><h1>Run sheet · {{ day.strftime('%A, %b %-d') }}</h1>
+<p>What needs your approval {{ 'today' if day == today else 'this day' }}, in time order ({{ s.timezone.split('/')[-1].replace('_',' ') }} time). Approving schedules each post at the time shown.</p></div>
+<div class="acts"><div class="seg"><a href="{{ base }}/runsheet?day={{ prev }}">‹ {{ prev[5:] }}</a><a href="{{ base }}/runsheet" class="{{ 'on' if day == today }}">Today</a><a href="{{ base }}/runsheet?day=tomorrow" class="{{ 'on' if (day - today).days == 1 }}">Tomorrow</a><a href="{{ base }}/runsheet?day={{ next }}">{{ next[5:] }} ›</a></div>
+<form method="get" class="inline"><input type="date" name="day" value="{{ s.day }}" onchange="this.form.submit()"></form></div></div>
+{% if dry_run or not publishing_enabled %}<div class="flash info">Publishing is simulated right now, so approved posts are rehearsed, not posted. Going live needs your explicit authorisation per account.</div>{% endif %}
+<div class="kpis"><div class="kpi {{ 'warn' if approve else 'ok' }}"><div class="v">{{ approve|length }}</div><div class="l">Waiting for your approval</div></div><div class="kpi info"><div class="v">{{ scheduled|length }}</div><div class="l">Already scheduled</div></div>
+<div class="kpi"><div class="v">{{ suggestions|length }}</div><div class="l">Other planner suggestions</div></div></div>
+
+<form method="post" action="{{ base }}/runsheet/lock"><input type="hidden" name="day" value="{{ s.day }}">
+<div class="ch" style="margin:4px 0 8px"><h2>Needs your approval</h2></div>
+{% if approve %}{{ table(approve, True, True) }}
+<div class="bulkbar"><b id="bulkn"></b>{% if not user %}<input name="actor" placeholder="Your name" required>{% endif %}<button class="primary">Approve &amp; schedule selected</button><span class="faint small">Combat and partnership posts stay in review until a second approver signs off.</span></div>
+{% else %}<div class="card"><div class="empty">Nothing waiting for you {{ 'today' if day == today else 'on this day' }}.</div></div>{% endif %}
+
+{% if scheduled %}<details class="card" style="margin-top:12px"><summary><b>Already scheduled ({{ scheduled|length }})</b></summary><div style="margin-top:8px">{{ table(scheduled, False) }}</div></details>{% endif %}
+{% if suggestions %}<details class="card" style="margin-top:12px"><summary><b>Other planner suggestions ({{ suggestions|length }})</b> <span class="faint small">— drafts the planner would post this day; tick any you also want</span></summary><div style="margin-top:8px">{{ table(suggestions, True) }}</div></details>{% endif %}
 </form>
 {% if s.unplaced %}<div class="card"><details><summary>Drafts that didn't fit this day ({{ s.unplaced|length }})</summary><ul class="list">{% for u in s.unplaced %}<li><div class="body"><a href="{{ base }}/variant/{{ u.variant_id }}" class="mono">{{ u.variant_id }}</a><span class="sub">{{ u.reason }}</span></div></li>{% endfor %}</ul></details></div>{% endif %}
 <script>(function(){var n=document.getElementById('bulkn');if(!n)return;function u(){n.textContent=document.querySelectorAll('input[name=pick]:checked').length+' selected'}document.querySelectorAll('input[name=pick],[data-all]').forEach(function(c){c.addEventListener('change',u)});u()})()</script>

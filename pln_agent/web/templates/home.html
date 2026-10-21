@@ -1,7 +1,7 @@
 {% extends "base.html" %}{% block title %}Today{% endblock %}{% block body %}
 <div class="ph"><div class="t"><div class="eyebrow">Growth Desk</div><h1>Today</h1>
 <p>What needs a person right now, what's going out next, and how publishing is doing.</p></div>
-<div class="acts"><a class="btn primary" href="{{ base }}/runsheet">Plan tomorrow</a><a class="btn" href="{{ base }}/queue?state=in_review">Review drafts</a></div></div>
+<div class="acts"><a class="btn primary" href="{{ base }}/runsheet?day=tomorrow">Plan tomorrow</a><a class="btn" href="{{ base }}/queue?state=in_review">Review drafts</a></div></div>
 <div class="kpis">
 <a class="kpi {{ 'warn' if counts.get('in_review',0) else '' }}" href="{{ base }}/queue?state=in_review"><div class="v">{{ counts.get('in_review',0)|num }}</div><div class="l">Drafts waiting for approval</div></a>
 <a class="kpi {{ 'bad' if counts.get('needs_fix',0) else '' }}" href="{{ base }}/queue?state=needs_fix"><div class="v">{{ counts.get('needs_fix',0)|num }}</div><div class="l">Drafts that need a fix</div></a>
@@ -20,7 +20,7 @@
 </div><div>
 <div class="card"><div class="ch"><h2>Next up</h2><div class="acts"><a class="btn sm ghost" href="{{ base }}/runsheet">Run sheet →</a></div></div>
 {% if upcoming %}<ul class="list">{% for u in upcoming %}<li><div class="body"><b class="nowrap">{{ u.slot_at|when(true) }}</b> <span class="faint small">{{ u.slot_at|ago }}</span><div><a href="{{ base }}/variant/{{ u.variant_id }}">{{ u.hook or u.variant_id }}</a></div><span class="sub">{{ u.account_id|acct }}</span></div></li>{% endfor %}</ul>
-{% else %}<div class="empty">Nothing scheduled. <a href="{{ base }}/runsheet">Plan tomorrow →</a></div>{% endif %}</div>
+{% else %}<div class="empty">Nothing scheduled. <a href="{{ base }}/runsheet?day=tomorrow">Plan tomorrow →</a></div>{% endif %}</div>
 <div class="card"><div class="ch"><h2>Controls</h2></div>
 <form method="post" action="{{ base }}/publish/run"><button class="grow" style="width:100%">Run the publisher now</button><p class="faint small">Respects every gate: approvals, rights, rate caps, dry-run.</p></form><hr>
 <form method="post" action="{{ base }}/kill"><b>Emergency stop</b><p class="faint small">Halts the publisher and pauses every queued post. Recorded in the audit log.</p>

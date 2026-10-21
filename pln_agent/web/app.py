@@ -506,10 +506,17 @@ def calendar(request: Request, start: str = ""):
 @app.get("/runsheet", response_class=HTMLResponse)
 def runsheet_page(request: Request, day: str = ""):
     from .. import runsheet
-    d = date.fromisoformat(day) if day else datetime.now(ZoneInfo(settings.timezone)).date() + timedelta(days=1)
+    today = datetime.now(ZoneInfo(settings.timezone)).date()
+    d = (today + timedelta(days=1)) if day == "tomorrow" else (date.fromisoformat(day) if day else today)
     sheet = runsheet.day_sheet(db(), settings, d)
-    return page(request, "runsheet.html", s=sheet, day=d, prev=(d - timedelta(days=1)).isoformat(),
-                next=(d + timedelta(days=1)).isoformat(), bg=bg_status("runsheet"))
+    props = [r for r in sheet["rows"] if r["kind"] == "proposed"]
+    pinned = [r for r in props if r.get("pinned")]
+    # what needs a decision: posts a team challenge pinned for the day; on days without any, the planner's proposals
+    approve = pinned or props
+    return page(request, "runsheet.html", s=sheet, day=d, today=today, prev=(d - timedelta(days=1)).isoformat(),
+                next=(d + timedelta(days=1)).isoformat(), bg=bg_status("runsheet"), approve=approve,
+                suggestions=[r for r in props if r not in approve], scheduled=[r for r in sheet["rows"] if r["kind"] == "scheduled"],
+                now=datetime.now(ZoneInfo(settings.timezone)))
 
 
 @app.post("/runsheet/lock")
