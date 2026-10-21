@@ -49,9 +49,11 @@ def plan_week(db: DB, settings: Settings, start: date, days: int = 7, states=("i
         if acc in free:
             continue
         lst = []
+        from .publishing import account_slots
+        acc_slots, _why = account_slots(db, acc, v["platform"], slots)
         for d in range(days):
             day = start + timedelta(days=d)
-            for hhmm in slots.get(v["platform"], []):
+            for hhmm in acc_slots:
                 if v["platform"] == "linkedin" and day.weekday() >= 5:
                     continue
                 h, m = map(int, hhmm.split(":"))

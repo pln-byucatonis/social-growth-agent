@@ -253,7 +253,7 @@ class DashboardTests(Base):
         web._db = self.db
         c = TestClient(web.app)
         for path, needle in (("/intelligence", "Followers gained per 1,000 views"), ("/creative", "evidence rule"),
-                             ("/knowledge", "Platform rule"), ("/cadence", "starting")):
+                             ("/knowledge", "Platform rule"), ("/cadence", "Frequency tests")):
             r = c.get(path)
             self.assertEqual(r.status_code, 200, path)
             self.assertIn(needle, r.text, path)
@@ -263,6 +263,28 @@ class DashboardTests(Base):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PublishingStrategistTests(Base):
+    def test_learns_the_better_window_and_keeps_exploring(self):
+        from pln_agent.calendar_planner import slot_hypotheses
+        from pln_agent.publishing import account_slots, learn_slots
+        r = learn_slots(self.db, CJ_IG, self.s.timezone, outcome="shares_per_1k_views")
+        best = {w["window"]: w for w in r["windows"]}
+        self.assertIn(best["12:00–14:00"]["evidence"], ("conclusive", "suggestive"))  # submissions posted at noon ET
+        self.assertEqual(r["learned_slots"][0], "13:00")
+        slots, why = account_slots(self.db, CJ_IG, "instagram", slot_hypotheses())
+        self.assertEqual(slots[0], "13:00")
+        self.assertIn("exploration slot", why)
+
+    def test_frequency_test_sets_the_weekly_target(self):
+        from datetime import date, timedelta
+        from pln_agent.cadence import weekly_target
+        from pln_agent.publishing import plan_frequency_test
+        monday = date.today() - timedelta(days=date.today().weekday())
+        rows = plan_frequency_test(self.db, "carjitsu.tiktok.carjitsuchampionship", start=monday)
+        self.assertEqual([r["result"]["arm"] for r in rows], ["A", "B", "C"])
+        self.assertEqual(weekly_target(self.db, "carjitsu.tiktok.carjitsuchampionship"), 21)  # week A = start max
 
 
 class GrowthOfficerTests(Base):

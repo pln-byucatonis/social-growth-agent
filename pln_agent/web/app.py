@@ -687,7 +687,24 @@ def cadence_page(request: Request):
     rows = [{**r, "acc": accs.get(r["account_id"], {})} for r in d.all("cadence", order="account_id")]
     order = {"increase": 0, "decrease": 1, "production_limited": 2, "hold": 3, "collect_baseline": 4}
     rows.sort(key=lambda r: (order.get(r["action"], 9), r["account_id"]))
-    return page(request, "cadence.html", rows=rows)
+    import json as _json
+    from ..calendar_planner import slot_hypotheses
+    from ..publishing import account_slots
+    hyp = slot_hypotheses()
+    for r in rows:
+        raw = d.kv_get(f"slots:{r['account_id']}")
+        r["slots_learned"] = _json.loads(raw) if raw else None
+        r["slots_used"], r["slots_why"] = account_slots(d, r["account_id"], r["acc"].get("platform", ""), hyp)
+    tests = d.all("experiments", "variable='frequency'", order="week_start")
+    return page(request, "cadence.html", rows=rows, tests=tests)
+
+
+@app.post("/cadence/{account_id}/frequency-test")
+def cadence_frequency_test(request: Request, account_id: str):
+    from ..publishing import plan_frequency_test
+    _admin(request)
+    rows = plan_frequency_test(db(), account_id, actor=request.state.user or "dashboard")
+    return back(request, "/cadence", f"Planned a 3-week frequency test for {account_id} starting {rows[0]['week_start']}")
 
 
 @app.post("/cadence/recompute")

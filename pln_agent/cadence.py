@@ -151,7 +151,12 @@ def recommend(db: DB, account_id: str, persist: bool = True) -> dict:
 
 
 def weekly_target(db: DB, account_id: str) -> int | None:
-    """What the calendar planner should aim for this week (None = no cadence record yet)."""
+    """What the calendar planner should aim for this week (None = no cadence record yet). A running frequency
+    test week overrides the recommendation with its arm."""
+    from .publishing import frequency_arm
+    arm = frequency_arm(db, account_id)
+    if arm is not None:
+        return int(arm)
     r = db.get("cadence", "account_id", account_id)
     if not r or r.get("recommended_per_week") is None:
         return None
