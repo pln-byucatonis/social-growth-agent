@@ -32,6 +32,9 @@ class FakeHooks:
         self.promoted += clip_ids
         return {"assets": [], "packs": [], "skipped": []}
 
+    def regenerate(self, db, asset_id):
+        self.regenerated = getattr(self, "regenerated", []) + [asset_id]
+
     def request_cut(self, db, vid, label):
         v = db.get("variants", "variant_id", vid)
         t = dict(v["treatment"])
@@ -143,6 +146,13 @@ class TeamTaskTests(unittest.TestCase):
             self.assertEqual(t[3]["status"], "done")
             self.assertEqual(t[4]["status"], "done")
         self.assertEqual(t[5]["status"], "waiting")  # nothing published yet
+
+    def test_old_drafts_without_a_cut_plan_are_regenerated(self):
+        for v in self.db.all("variants", "asset_id=?", [CJ]):
+            self.db.update("variants", "variant_id", v["variant_id"], {"treatment": {}})
+        team.adopt(self.db, "th-test", 0, "bill")
+        self.advance()
+        self.assertIn(CJ, self.hooks.regenerated)
 
     def test_mark_retry_and_pages(self):
         from fastapi.testclient import TestClient

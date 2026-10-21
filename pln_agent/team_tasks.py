@@ -231,6 +231,10 @@ class Hooks:
             raise RuntimeError("the ops database isn't configured — can't import clips")
         return promote(db, self.ops, clip_ids, self.settings, actor="team-tasks")
 
+    def regenerate(self, db: DB, asset_id: str) -> None:
+        from .editorial import generate_pack
+        generate_pack(db, asset_id, self.settings, actor="team-tasks")
+
     def request_cut(self, db: DB, variant_id: str, label: str) -> dict:
         from .ops_vertical import request_cuts
         return request_cuts(db, variant_id, "team-tasks", only=[label])
@@ -252,6 +256,15 @@ def _ensure_drafts(db: DB, hooks: Hooks, clips: list[dict]) -> list[str]:
         a = _asset_for(db, c["clip_id"])
         if not a or not db.query("SELECT variant_id FROM variants WHERE asset_id=?", [a["asset_id"]]):
             todo.append(c["clip_id"])
+    # drafts made before the Creative Director existed have no cut plan: regenerate them (generate_pack keeps
+    # approved / scheduled posts as they are)
+    for c in clips:
+        if c["clip_id"] in todo:
+            continue
+        stale = [v for v in _pilot_variants(db, c["clip_id"]) if not (v.get("treatment") or {}).get("duration_variants")
+                 and v["state"] in ("in_review", "needs_fix")]
+        if stale:
+            hooks.regenerate(db, stale[0]["asset_id"])
     if not todo:
         return []
     r = hooks.promote(db, todo)
