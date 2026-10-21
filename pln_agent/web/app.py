@@ -661,6 +661,54 @@ def growth_page(request: Request):
     return page(request, "growth.html", b=brief, shares=cgo.current_shares(d))
 
 
+@app.get("/experiments", response_class=HTMLResponse)
+def experiments_page(request: Request):
+    from .. import growth_lab as lab
+    d = db()
+    exps = [e for e in d.all("experiments", order="week_start DESC") if (e.get("result") or {}).get("mode") or e["variable"] == "frequency"]
+    counts = {}
+    for r in d.query("SELECT experiment_id, arm, COUNT(*) AS n FROM experiment_arms GROUP BY experiment_id, arm"):
+        counts.setdefault(r["experiment_id"], {})[r["arm"]] = r["n"]
+    accs = [a for a in d.all("accounts", order="account_id") if not a.get("hard_block_reason")]
+    return page(request, "experiments.html", exps=exps, counts=counts, proposals=lab.propose(d), accs=accs,
+                outcomes=lab.RATE_OUTCOMES)
+
+
+@app.post("/experiments/new")
+def experiments_new(request: Request, account_id: str = Form(...), variable: str = Form(...), mode: str = Form("assigned"),
+                    arm_a: str = Form(...), arm_b: str = Form(...), arm_c: str = Form(""), hypothesis: str = Form(...),
+                    outcome: str = Form("engagements_per_1k_views"), actor: str = Form("")):
+    from .. import growth_lab as lab
+    given = [x.strip() for x in (arm_a, arm_b, arm_c) if x.strip()]
+    if variable == "cut":  # arms are the cut labels themselves
+        arms = {x.upper(): f"cut {x.upper()}" for x in given}
+    else:
+        arms = dict(zip("ABC", given))
+    try:
+        e = lab.create(db(), account_id, variable, arms, hypothesis, who(request, actor), mode=mode, outcome=outcome)
+    except (KeyError, ValueError, WorkflowError) as ex:
+        return back(request, "/experiments", err=str(ex))
+    n = db().one("SELECT COUNT(*) AS n FROM experiment_arms WHERE experiment_id=?", [e["experiment_id"]])["n"]
+    return back(request, "/experiments", f"Started {e['experiment_id']}" + (f" — {n} draft(s) assigned to arms" if mode == "assigned" else ""))
+
+
+@app.post("/experiments/read")
+def experiments_read(request: Request):
+    from .. import growth_lab as lab
+    r = lab.refresh(db(), actor=request.state.user or "dashboard")
+    return back(request, "/experiments", f"Read {r['read']} experiment(s); {r['concluded']} concluded; {r['assigned']} new draft(s) assigned")
+
+
+@app.post("/experiments/{eid}/stop")
+def experiments_stop(request: Request, eid: str, reason: str = Form(""), actor: str = Form("")):
+    from .. import growth_lab as lab
+    try:
+        lab.stop(db(), eid, who(request, actor), reason or "stopped from dashboard")
+    except WorkflowError as ex:
+        return back(request, "/experiments", err=str(ex))
+    return back(request, "/experiments", f"Stopped {eid}")
+
+
 @app.get("/competitors", response_class=HTMLResponse)
 def competitors_page(request: Request, brand: str = ""):
     from .. import competitive as ci

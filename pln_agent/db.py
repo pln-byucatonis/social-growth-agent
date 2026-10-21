@@ -275,6 +275,15 @@ TABLES: dict[str, list[tuple[str, str, str]]] = {
         ("status", "text", ""),
         ("result", "json", ""),
     ],
+    # Growth Lab: which draft went into which arm of an assigned experiment.
+    "experiment_arms": [
+        ("id", "pk", ""),
+        ("experiment_id", "text", "NOT NULL"),
+        ("variant_id", "text", "NOT NULL"),
+        ("arm", "text", "NOT NULL"),
+        ("assigned_at", "ts", ""),
+        ("applied", "json", ""),
+    ],
     # Creative Intelligence Database: one row per real post (historical or agent-published) with the
     # creative variables, where each value came from, the source footage and publishing details.
     # Performance lives in `metrics` (post-level rows share platform_post_id).
@@ -433,6 +442,7 @@ INDEXES = [
     "CREATE INDEX IF NOT EXISTS ix_posts_account ON posts(account_id, published_at)",
     "CREATE INDEX IF NOT EXISTS ix_scout_source ON scout_moments(source_id, potential)",
     "CREATE INDEX IF NOT EXISTS ix_scout_brand ON scout_moments(brand_id, potential)",
+    "CREATE UNIQUE INDEX IF NOT EXISTS ux_experiment_arms_variant ON experiment_arms(variant_id)",
     "CREATE INDEX IF NOT EXISTS ix_competitor_handle ON competitor_snapshots(handle, captured_at)",
     "CREATE INDEX IF NOT EXISTS ix_comments_status ON comments(status, priority)",
     "CREATE INDEX IF NOT EXISTS ix_comments_created ON comments(created_at)",

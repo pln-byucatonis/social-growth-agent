@@ -265,6 +265,15 @@ CREATE TABLE IF NOT EXISTS experiments (
   result JSONB
 );
 
+CREATE TABLE IF NOT EXISTS experiment_arms (
+  id BIGSERIAL PRIMARY KEY,
+  experiment_id TEXT NOT NULL,
+  variant_id TEXT NOT NULL,
+  arm TEXT NOT NULL,
+  assigned_at TEXT,
+  applied JSONB
+);
+
 CREATE TABLE IF NOT EXISTS posts (
   post_id TEXT PRIMARY KEY,
   account_id TEXT NOT NULL,
@@ -426,6 +435,8 @@ CREATE INDEX IF NOT EXISTS ix_posts_account ON posts(account_id, published_at);
 CREATE INDEX IF NOT EXISTS ix_scout_source ON scout_moments(source_id, potential);
 
 CREATE INDEX IF NOT EXISTS ix_scout_brand ON scout_moments(brand_id, potential);
+
+CREATE UNIQUE INDEX IF NOT EXISTS ux_experiment_arms_variant ON experiment_arms(variant_id);
 
 CREATE INDEX IF NOT EXISTS ix_competitor_handle ON competitor_snapshots(handle, captured_at);
 

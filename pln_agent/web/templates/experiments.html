@@ -1,0 +1,26 @@
+{% extends "base.html" %}{% block body %}
+<div class="card"><h3>Growth Lab</h3>
+<p class="muted"><b>Assigned</b> tests put unapproved drafts into arms (cut A/B/C, hook style), alternating by score, so you review exactly what will be posted. <b>Observed</b> tests compare a creative variable already recorded on each post (commentary, captions_burned, posting_hour_bucket ...). <b>Frequency</b> tests come from the Cadence page. Results use the evidence rule: ≥5 measured posts per arm before anything is said, ≥8 and q&lt;0.05 for conclusive, per-1k-view rates only. Conclusive and suggestive results are written to the Knowledge Engine as PLN evidence.</p>
+<form method="post" action="{{ base }}/experiments/read"><button>Assign new drafts + read results now</button></form></div>
+{% if proposals %}<div class="card"><h3>Suggested tests</h3>{% for p in proposals %}
+<form method="post" action="{{ base }}/experiments/new"><b>{{ p.account_id }}</b> · {{ p.variable }} · {{ p.drafts }} drafts — {{ p.hypothesis }}
+<input type="hidden" name="account_id" value="{{ p.account_id }}"><input type="hidden" name="variable" value="{{ p.variable }}"><input type="hidden" name="mode" value="{{ p.mode }}">
+<input type="hidden" name="arm_a" value="{{ p.arms.A }}"><input type="hidden" name="arm_b" value="{{ p.arms.B }}"><input type="hidden" name="hypothesis" value="{{ p.hypothesis }}">
+{% if not user %}<input name="actor" placeholder="your name">{% endif %} <button>Start</button></form>{% endfor %}</div>{% endif %}
+<div class="card"><h3>New test</h3><form method="post" action="{{ base }}/experiments/new">
+<select name="account_id">{% for a in accs %}<option value="{{ a.account_id }}">{{ a.account_id }}</option>{% endfor %}</select>
+<select name="mode"><option value="assigned">assigned</option><option value="observed">observed</option></select>
+<input name="variable" placeholder="cut | hook_style | commentary | posting_hour_bucket ..." size="30"><br>
+<input name="arm_a" placeholder="control (arm A)"> <input name="arm_b" placeholder="arm B"> <input name="arm_c" placeholder="arm C (optional)">
+<select name="outcome">{% for o in outcomes %}<option>{{ o }}</option>{% endfor %}</select><br>
+<input name="hypothesis" placeholder="hypothesis" size="80"> {% if not user %}<input name="actor" placeholder="your name">{% endif %} <button>Start test</button>
+<p class="muted">For cut tests the arms are cut labels (A / B / C). For hook tests they're hook styles (e.g. title_card, share_prompt). For observed tests they're the recorded values (e.g. yes / no).</p></form></div>
+<div class="card tablewrap"><table><tr><th>experiment</th><th>account</th><th>test</th><th>arms</th><th>latest read</th><th>status</th><th></th></tr>
+{% for e in exps %}{% set r = e.result or {} %}{% set l = r.latest or {} %}<tr><td>{{ e.experiment_id }}<br><span class="muted">from {{ r.started_at or e.week_start }} · {{ r.mode or 'weekly' }}</span></td>
+<td>{{ e.account_id }}</td><td><b>{{ e.variable }}</b><br>{{ e.hypothesis }}<br><span class="muted">{{ e.success_metric }}</span></td>
+<td>{% for k, v in (r.arms or {'arm': r.arm}).items() %}{{ k }}: {{ v }}{% if counts.get(e.experiment_id, {}).get(k) %} ({{ counts[e.experiment_id][k] }} drafts){% endif %}<br>{% endfor %}{% if r.posts_per_week %}{{ r.posts_per_week }}/week{% endif %}</td>
+<td>{% if l %}<b>{{ l.verdict }}</b>{% for row in l.rows %}<br><span class="muted">{{ row.arm }} vs {{ row.control }}: n={{ row.n_arm }}/{{ row.n_control }}{% if row.lift is not none %} · {{ '{:+.0%}'.format(row.lift) }}{% endif %}{% if row.q is not none %} · q={{ '%.3f'|format(row.q) }}{% endif %} · {{ row.evidence }}</span>{% endfor %}{% else %}<span class="muted">not read yet</span>{% endif %}</td>
+<td><span class="badge {{ 'ok' if e.status == 'concluded' else 'warn' if e.status in ('inconclusive','abandoned') else '' }}">{{ e.status }}</span></td>
+<td>{% if e.status in ('running','planned') %}<form method="post" action="{{ base }}/experiments/{{ e.experiment_id }}/stop">{% if not user %}<input name="actor" placeholder="your name" size="8">{% endif %}<button>Stop</button></form>{% endif %}</td></tr>
+{% else %}<tr><td class="muted" colspan="7">No experiments yet.</td></tr>{% endfor %}</table></div>
+{% endblock %}
