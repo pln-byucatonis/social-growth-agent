@@ -1,18 +1,19 @@
-{% extends "base.html" %}{% block body %}
-<div class="card"><h3>Agent Team</h3>
-<p class="muted">Each agent's job, how it decides, and the two ways to steer it. <b>Settings</b> are numbers and switches the agent's code reads on its next run. <b>Directives</b> are written guidance the agent follows in conversations and team challenges. Talking to the team uses Claude ({{ llm.model }}) on Amazon Bedrock, grounded in each agent's own data; nothing an agent says is executed until you adopt it.</p></div>
-<div class="card"><h3>Challenge the team</h3>
-<form method="post" action="{{ base }}/team/challenge"><textarea name="text" rows="3" style="width:100%" placeholder="e.g. Putt Tour has had no posts in 90 days and WPL is losing followers. What should we do in the next 2 weeks to grow Putt Tour on Instagram?" required></textarea>
-<details><summary class="muted">Only some agents (default: all ten)</summary>{% for a in agents %}<label style="margin-right:10px"><input type="checkbox" name="agents" value="{{ a.key }}"> {{ a.name }}</label>{% endfor %}</details>
-{% if not user %}<input name="actor" placeholder="your name"> {% endif %}<button class="primary">Send to the team</button>
-<p class="muted">Each agent answers from its own data, agents answer questions they ask each other, then the Chief Growth Officer pulls it into one recommendation with owners. Takes about a minute.</p></form>
-{% if challenges %}<p><b>Recent challenges</b><br>{% for c in challenges %}<a href="{{ base }}/team/challenge/{{ c.thread_id }}">{{ c.title[:110] }}</a> <span class="muted">{{ c.created_at[:16] }} · {{ c.status }}</span><br>{% endfor %}</p>{% endif %}</div>
-<div class="card"><h3>Directives for the whole team</h3>{% for d in team_directives %}<form method="post" action="{{ base }}/team/directive/{{ d.directive_id }}/retire">• {{ d.text }} <span class="muted">{{ d.created_by }} · {{ d.created_at[:10] }}</span> {% if not user %}<input name="actor" placeholder="name" size="8">{% endif %}<button>Retire</button></form>{% else %}<p class="muted">None.</p>{% endfor %}
-<form method="post" action="{{ base }}/team/directive"><input type="hidden" name="agent" value="team"><input name="text" size="80" placeholder="e.g. Putt Tour is the priority brand through November" required> {% if not user %}<input name="actor" placeholder="your name"> {% endif %}<button>Add</button></form></div>
-<div class="grid">{% for a in agents %}<div class="card"><h3 style="margin-top:0"><a href="{{ base }}/team/agent/{{ a.key }}">{{ a.name }}</a> <span class="badge">{{ a.layer }}</span></h3>
-<p>{{ a.mission }}</p><p class="muted">{{ a.status }}</p>
-<details><summary>How it decides ({{ a.rules|length }} rules)</summary><ul>{% for r in a.rules %}<li class="muted">{{ r }}</li>{% endfor %}</ul></details>
-{% if a.params %}<p class="muted">Settings: {% for p in a.params %}{{ p.label }} <b>{{ p.value }}</b>{% if p.overridden %} <span class="badge warn">changed</span>{% endif %}{% if not loop.last %} · {% endif %}{% endfor %}</p>{% endif %}
-{% if a.directives %}<p class="muted">{{ a.directives|length }} active directive(s)</p>{% endif %}
-<p><a href="{{ base }}/team/agent/{{ a.key }}">Talk to it / adjust →</a> · <a href="{{ base }}{{ a.page }}">its page</a></p></div>{% endfor %}</div>
+{% extends "base.html" %}{% block title %}Agent Team{% endblock %}{% block body %}
+<div class="ph"><div class="t"><div class="eyebrow">Team</div><h1>Agent Team</h1>
+<p>The ten agents, what each one is doing, and two ways to steer them: <b>settings</b> (numbers the agent's code uses on its next run) and <b>directives</b> (written guidance it follows when you talk to it). Conversations use {{ llm.model.split('.')[-1] }} on Amazon Bedrock, grounded in each agent's own data. Nothing an agent suggests happens until you adopt it.</p></div></div>
+<div class="split"><div>
+<div class="card"><div class="ch"><h2>Challenge the team</h2></div>
+<form method="post" action="{{ base }}/team/challenge"><textarea name="text" rows="3" placeholder="e.g. Putt Tour hasn't posted in 90 days and WPL is losing followers. What should we do in the next two weeks to grow Putt Tour on Instagram?" required></textarea>
+<details style="margin:6px 0"><summary class="small">Only some agents (default: all ten)</summary><div class="fbar" style="margin-top:6px">{% for a in agents %}<label class="small"><input type="checkbox" name="agents" value="{{ a.key }}"> {{ a.name }}</label>{% endfor %}</div></details>
+<div class="fbar">{% if not user %}<input name="actor" placeholder="Your name">{% endif %}<button class="primary">Send to the team</button><span class="faint small">Each agent answers from its data, they answer each other's questions, then the Chief Growth Officer writes one plan with owners. About a minute.</span></div></form></div>
+<div class="grid">{% for a in agents %}<a class="card" href="{{ base }}/team/agent/{{ a.key }}" style="display:block;color:inherit;margin:0">
+<div class="fbar"><h2 class="grow">{{ a.name }}</h2>{{ chip(a.layer,'muted',a.layer|label) }}</div>
+<p class="small muted" style="margin:6px 0">{{ a.mission }}</p><p class="small"><b>{{ a.status or '—' }}</b></p>
+<div>{% set changed = a.params|selectattr('overridden')|list %}{% if changed %}{{ chip('x','warn', changed|length ~ ' setting' ~ ('s' if changed|length != 1) ~ ' changed') }}{% endif %}{% if a.directives %}{{ chip('x','info', a.directives|length ~ ' directive' ~ ('s' if a.directives|length != 1)) }}{% endif %}</div></a>{% endfor %}</div>
+</div><div>
+<div class="card"><div class="ch"><h2>Recent challenges</h2></div>{% if challenges %}<ul class="list">{% for c in challenges %}<li><div class="body"><a href="{{ base }}/team/challenge/{{ c.thread_id }}" class="clip2">{{ c.title }}</a><span class="sub">{{ c.created_by }} · {{ c.created_at|ago }}</span></div>{{ chip(c.status) }}</li>{% endfor %}</ul>{% else %}<div class="empty">None yet.</div>{% endif %}</div>
+<div class="card"><div class="ch"><h2>Directives for everyone</h2></div>
+{% if team_directives %}<ul class="list">{% for d in team_directives %}<li><div class="body">{{ d.text }}<span class="sub">{{ d.created_by }} · {{ d.created_at|ago }}</span></div><form method="post" action="{{ base }}/team/directive/{{ d.directive_id }}/retire" class="fbar">{% if not user %}<input name="actor" placeholder="Name" style="width:80px">{% endif %}<button class="sm ghost">Retire</button></form></li>{% endfor %}</ul>{% else %}<p class="faint small">None.</p>{% endif %}
+<form method="post" action="{{ base }}/team/directive" style="margin-top:8px"><input type="hidden" name="agent" value="team"><textarea name="text" rows="2" placeholder="e.g. Putt Tour is the priority brand through November" required></textarea><div class="fbar" style="margin-top:6px">{% if not user %}<input name="actor" placeholder="Your name">{% endif %}<button class="sm">Add directive</button></div></form></div>
+</div></div>
 {% endblock %}

@@ -1,23 +1,27 @@
-{% extends "base.html" %}{% block body %}
-<div class="card"><h3>Social Growth Knowledge Engine</h3>
-<p class="muted">Applied in this order: <b>Platform rule</b> (binding) → <b>PLN evidence</b> (our measured data; outranks recommendations) → <b>Platform guidance</b> → <b>External research</b> (never a rule) → <b>Hypothesis</b> (to be tested). Every cited page is re-fetched weekly and its quote re-checked; anything that changed goes to <i>needs review</i> for a person — the engine never rewrites guidance itself.</p>
-<p>{% for l in levels %}<a class="badge" href="?level={{ l }}">{{ labels[l] }}</a> {% endfor %}<a class="badge" href="?">all</a></p>
-<form method="post" action="{{ base }}/knowledge/review"><button>Re-check all sources now</button></form></div>
-<div class="card tablewrap"><table><tr><th>level</th><th>scope</th><th>guidance</th><th>source</th><th>status</th><th></th></tr>
-{% for e in rows %}<tr><td><span class="badge {{ 'bad' if e.level == 'platform_rule' else 'ok' if e.level == 'pln_evidence' else 'warn' if e.level == 'hypothesis' else '' }}">{{ labels.get(e.level, e.level) }}</span></td>
-<td class="muted">{{ e.platform or 'all platforms' }}<br>{{ e.brand_id or 'all brands' }}<br>{{ e.topic }}</td>
-<td>{{ e.statement }}{% if e.quote %}<br><span class="muted">“{{ e.quote }}”</span>{% endif %}{% if e.applicability %}<br><span class="muted">→ {{ e.applicability }}</span>{% endif %}</td>
-<td class="muted">{% if e.source_url %}<a href="{{ e.source_url }}" target="_blank" rel="noopener">{{ e.source_title or e.source_url }}</a><br>{% endif %}{{ e.publisher }}<br>dated {{ e.source_date or '—' }} · retrieved {{ e.retrieved_at }}{% if e.reviewed_at %}<br>checked {{ (e.reviewed_at or '')[:10] }} by {{ e.reviewed_by }}{% endif %}</td>
-<td><span class="badge {{ 'warn' if e.status == 'needs_review' else '' }}">{{ e.status }}</span></td>
-<td>{% if e.level != 'pln_evidence' %}<form method="post" action="{{ base }}/knowledge/{{ e.entry_id }}/status">{% if e.status != 'current' %}<button name="status" value="current">Mark current</button>{% endif %}{% if e.status != 'retired' %}<button name="status" value="retired">Retire</button>{% endif %}</form>{% endif %}</td></tr>{% endfor %}</table></div>
-<div class="card"><h3>Add guidance</h3><form method="post" action="{{ base }}/knowledge/add">
-<label>Level <select name="level"><option value="platform_guidance">Platform guidance</option><option value="platform_rule">Platform rule</option><option value="external_research">External research</option><option value="hypothesis">Hypothesis</option></select></label>
-<label>Platform <input name="platform" placeholder="instagram / blank = all" size="12"></label><label>Topic <input name="topic" placeholder="cadence, hook…" size="10"></label><br>
-<label>Statement <input name="statement" required size="80"></label><br>
-<label>Verbatim quote <input name="quote" size="60"></label><br>
-<label>Source URL <input name="source_url" size="50"></label><label>Title <input name="source_title" size="30"></label><br>
-<label>Publisher <input name="publisher" size="25"></label><label>Source date <input name="source_date" placeholder="YYYY-MM-DD or 'undated'" size="18"></label><br>
-<label>How it applies to PLN <input name="applicability" size="70"></label><br><button>Add</button></form>
-<p class="muted">Platform and research entries need a URL and a date. PLN evidence can't be typed in — it's written from measured results.</p></div>
-<div class="card tablewrap"><h3>Source checks</h3><table><tr><th>source</th><th>last checked</th><th>HTTP</th><th>status</th></tr>{% for s in sources %}<tr><td><a href="{{ s.url }}" target="_blank" rel="noopener">{{ s.title or s.url }}</a></td><td>{{ (s.last_checked_at or '')[:16] }}</td><td>{{ s.http_status }}</td><td>{{ s.status }} <span class="muted">{{ s.note }}</span></td></tr>{% else %}<tr><td class="muted">Not checked yet.</td></tr>{% endfor %}</table></div>
+{% extends "base.html" %}{% block title %}Knowledge{% endblock %}{% block body %}
+<div class="ph"><div class="t"><div class="eyebrow">Insight · Knowledge Engine</div><h1>Knowledge</h1>
+<p>The guidance the agents follow, in priority order: <b>Platform rule</b> (binding) → <b>PLN evidence</b> (our measured data) → platform guidance → external research → hypothesis. Cited pages are re-checked weekly; anything that changed goes to <i>needs review</i> for a person.</p></div>
+<div class="acts"><form method="post" action="{{ base }}/knowledge/review" class="inline"><button>Re-check all sources</button></form><a class="btn primary" href="#add">Add guidance</a></div></div>
+{% set cur = request.query_params.get('level', '') %}
+<div class="card"><div class="seg" style="flex-wrap:wrap">{% for l in levels %}<a href="?level={{ l }}" class="{{ 'on' if cur == l }}">{{ labels[l] }}</a>{% endfor %}<a href="?" class="{{ 'on' if not cur }}">All</a></div></div>
+<div class="card flush"><div class="tw"><table class="stack"><thead><tr><th>Level</th><th>Guidance</th><th>Applies to</th><th>Source</th><th>Status</th><th></th></tr></thead><tbody>
+{% for e in rows %}<tr><td>{{ chip(e.level, 'bad' if e.level == 'platform_rule' else ('ok' if e.level == 'pln_evidence' else ('warn' if e.level == 'hypothesis' else 'info')), labels.get(e.level, e.level)) }}</td>
+<td>{{ e.statement|prose }}{% if e.quote %}<span class="sub">“{{ e.quote }}”</span>{% endif %}{% if e.applicability %}<span class="sub">→ {{ e.applicability }}</span>{% endif %}</td>
+<td class="small">{{ (e.platform|platform) if e.platform else 'All platforms' }}<span class="sub">{{ (e.brand_id|brand) if e.brand_id else 'All brands' }}{% if e.topic %} · {{ e.topic|label }}{% endif %}</span></td>
+<td class="small">{% if e.source_url %}<a href="{{ e.source_url }}" target="_blank" rel="noopener" class="clip2">{{ e.source_title or e.source_url }}</a>{% endif %}<span class="sub">{{ e.publisher }}{% if e.source_date %} · {{ e.source_date }}{% endif %}</span>{% if e.reviewed_at %}<span class="sub">checked {{ e.reviewed_at|ago }}</span>{% endif %}</td>
+<td>{{ chip(e.status) }}</td>
+<td class="act">{% if e.level != 'pln_evidence' %}<form method="post" action="{{ base }}/knowledge/{{ e.entry_id }}/status" class="fbar">{% if e.status != 'current' %}<button class="sm" name="status" value="current">Mark current</button>{% endif %}{% if e.status != 'retired' %}<button class="sm ghost" name="status" value="retired">Retire</button>{% endif %}</form>{% endif %}</td></tr>
+{% else %}<tr><td colspan="6"><div class="empty">Nothing at this level.</div></td></tr>{% endfor %}</tbody></table></div></div>
+<div class="grid g2"><div class="card" id="add"><div class="ch"><h2>Add guidance</h2></div><form method="post" action="{{ base }}/knowledge/add">
+<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))"><label class="field"><span>Level</span><select name="level"><option value="platform_guidance">Platform guidance</option><option value="platform_rule">Platform rule</option><option value="external_research">External research</option><option value="hypothesis">Hypothesis</option></select></label>
+<label class="field"><span>Platform</span><input name="platform" placeholder="instagram · blank = all"></label><label class="field"><span>Topic</span><input name="topic" placeholder="cadence, hook…"></label></div>
+<label class="field" style="margin-top:8px"><span>Statement</span><input name="statement" required></label>
+<label class="field" style="margin-top:8px"><span>Verbatim quote from the source</span><input name="quote"></label>
+<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin-top:8px"><label class="field"><span>Source URL</span><input name="source_url" type="url"></label><label class="field"><span>Title</span><input name="source_title"></label>
+<label class="field"><span>Publisher</span><input name="publisher"></label><label class="field"><span>Source date</span><input name="source_date" placeholder="YYYY-MM-DD or undated"></label></div>
+<label class="field" style="margin-top:8px"><span>How it applies to PLN</span><input name="applicability"></label>
+<div style="margin-top:10px"><button class="primary">Add</button></div><p class="faint small">Platform and research entries need a URL and a date. PLN evidence can't be typed in — it's written from measured results.</p></form></div>
+<div class="card flush"><div class="ch"><h2>Source checks</h2></div><div class="tw"><table class="stack"><thead><tr><th>Source</th><th>Checked</th><th>Status</th></tr></thead><tbody>
+{% for s in sources %}<tr><td><a href="{{ s.url }}" target="_blank" rel="noopener" class="clip2">{{ s.title or s.url }}</a></td><td class="nowrap">{{ s.last_checked_at|ago }}<span class="sub">HTTP {{ s.http_status }}</span></td><td>{{ chip(s.status, 'ok' if s.status in ('unchanged','baseline') else 'warn') }}{% if s.note %}<span class="sub">{{ s.note }}</span>{% endif %}</td></tr>
+{% else %}<tr><td colspan="3"><div class="empty">Not checked yet.</div></td></tr>{% endfor %}</tbody></table></div></div></div>
 {% endblock %}

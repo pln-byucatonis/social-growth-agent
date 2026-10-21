@@ -1,23 +1,34 @@
-{% extends "base.html" %}{% block body %}
-<div class="card"><form method="get"><div class="grid"><select name="platform"><option value="">all platforms</option>{% for p in platforms %}<option {{ 'selected' if p==platform }}>{{ p }}</option>{% endfor %}</select>
-<select name="state"><option value="">all states</option>{% for s in ['needs_fix','in_review','approved','scheduled','simulated','published','failed','rejected','cancelled'] %}<option {{ 'selected' if s==state }}>{{ s }}</option>{% endfor %}</select><button>Filter</button></div></form></div>
+{% extends "base.html" %}{% block title %}Approvals{% endblock %}{% block body %}
+{% macro q(st) %}{{ base }}/queue?state={{ st }}{% if platform %}&platform={{ platform|urlencode }}{% endif %}{% if brand %}&brand={{ brand|urlencode }}{% endif %}{% endmacro %}
+<div class="ph"><div class="t"><div class="eyebrow">Today</div><h1>Approvals</h1>
+<p>Drafts the agents made from licensed footage, best first. Approve to make them schedulable (then lock them in on the <a href="{{ base }}/runsheet">run sheet</a>); open one to edit copy, switch cut or render.</p></div></div>
+<div class="card"><div class="fbar">
+<div class="seg">{% for st, nm in [('in_review','In review'),('needs_fix','Needs fix'),('approved','Approved'),('scheduled','Scheduled'),('published','Published'),('failed','Failed'),('','All')] %}
+<a href="{{ q(st) }}" class="{{ 'on' if st == state }}">{{ nm }}{% if st %} <span class="faint">{{ state_counts.get(st, 0) }}</span>{% endif %}</a>{% endfor %}</div>
+<form method="get" class="fbar grow"><input type="hidden" name="state" value="{{ state }}">
+<select name="brand"><option value="">All brands</option>{% for b in brands %}<option value="{{ b }}" {{ 'selected' if b==brand }}>{{ b|brand }}</option>{% endfor %}</select>
+<select name="platform"><option value="">All platforms</option>{% for pl in platforms %}<option value="{{ pl }}" {{ 'selected' if pl==platform }}>{{ pl|platform }}</option>{% endfor %}</select>
+<button>Apply</button>{% if brand or platform %}<a class="btn ghost" href="{{ base }}/queue?state={{ state }}">Clear</a>{% endif %}</form></div></div>
 <form method="post" action="{{ base }}/queue/bulk" id="bulk">
-<input type="hidden" name="back_to" value="/queue{% if platform or state %}?{% if platform %}platform={{ platform|urlencode }}{% endif %}{% if platform and state %}&{% endif %}{% if state %}state={{ state|urlencode }}{% endif %}{% endif %}">
-<div class="card tablewrap"><p class="muted">{{ total }} posts match{% if total > limit %}; showing the top {{ limit }} by platform, state and score. Filter by platform or state to see the rest{% endif %}.</p><table class="queue"><tr><th><input type="checkbox" aria-label="select all" onclick="for(const c of document.querySelectorAll('input[name=pick]'))c.checked=this.checked;document.getElementById('bulkn').textContent=document.querySelectorAll('input[name=pick]:checked').length+' selected'" style="width:auto"></th><th></th><th>platform</th><th>destination</th><th>state</th><th>hook</th><th>risk</th><th>permission</th><th>score</th></tr>
-{% for v in variants %}{% set a = accs[v.account_id] %}{% set p = perm[v.account_id] %}<tr>
-<td data-l="">{% if v.state in ['in_review','approved','needs_fix'] %}<input type="checkbox" name="pick" value="{{ v.variant_id }}|{{ v.caption_hash }}" aria-label="select" onchange="document.getElementById('bulkn').textContent=document.querySelectorAll('input[name=pick]:checked').length+' selected'" style="width:auto">{% endif %}</td>
-<td class="thumb"><a href="{{ base }}/variant/{{ v.variant_id }}">{% if thumbs.get(v.asset_id) %}<img src="{{ thumbs[v.asset_id] }}" alt="" loading="lazy" style="width:96px;height:54px;object-fit:cover;border-radius:6px;display:block">{% else %}<span class="muted">no preview</span>{% endif %}</a></td>
-<td data-l="platform">{{ v.platform }}</td><td data-l="destination">{{ a.username_original or '(pending)' }}<br><span class="muted">{{ v.route_role }} · {{ a.canonical_brand_id }}</span></td>
-<td data-l="state"><span class="badge {{ 'ok' if v.state in ['approved','scheduled','simulated','published'] else ('bad' if v.state in ['needs_fix','failed'] else '') }}">{{ v.state }}</span></td>
-<td data-l="hook" class="hook"><a href="{{ base }}/variant/{{ v.variant_id }}">{{ v.hook }}</a></td>
-<td data-l="risk">{% for b in v.risk_flags.blockers %}<span class="badge bad">{{ b }}</span>{% endfor %}{% for f in v.risk_flags.review_flags %}<span class="badge warn">{{ f }}</span>{% endfor %}{% for e in v.validation.errors %}<span class="badge bad">{{ e }}</span>{% endfor %}</td>
-<td data-l="permission">{% if p[0] %}<span class="badge ok">live OK</span>{% else %}<span class="badge">{{ a.verification_status }}</span>{% if a.hard_block_reason %}<span class="badge bad">hard block</span>{% endif %}{% endif %}</td>
-<td data-l="score">{{ '%.3f'|format(v.score or 0) }}</td></tr>{% endfor %}</table></div>
-<div class="card bulkbar"><b id="bulkn">0 selected</b>
-{% if not user %}<input name="reviewer" placeholder="your name" style="max-width:180px">{% endif %}
-<input name="note" placeholder="note (required to reject)" style="max-width:280px">
-<button class="primary" name="decision" value="approve">Approve selected</button>
-<button class="danger" name="decision" value="reject">Reject selected</button>
-<span class="muted">Each approval is recorded under your name. Sensitive posts (two-person sign-off) and posts whose copy changed are skipped.</span></div>
+<input type="hidden" name="back_to" value="/queue?state={{ state }}{% if platform %}&platform={{ platform|urlencode }}{% endif %}{% if brand %}&brand={{ brand|urlencode }}{% endif %}">
+<div class="card flush"><div class="ch"><h2>{{ total|num }} post{{ 's' if total != 1 }}</h2><span class="faint small">{% if total > limit %}showing the top {{ limit }} by score{% endif %}</span></div>
+<div class="tw"><table class="stack"><thead><tr><th style="width:28px"><input type="checkbox" data-all="pick" aria-label="Select all"></th><th style="width:84px"></th><th>Post</th><th>Status</th><th>Issues</th><th>Can go live?</th><th class="num">Score</th></tr></thead><tbody>
+{% for v in variants %}{% set a = accs[v.account_id] %}{% set pm = perm[v.account_id] %}{% set rf = v.risk_flags or {} %}{% set issues = (rf.blockers or []) + ((v.validation or {}).errors or []) %}<tr>
+<td data-l="">{% if v.state in ['in_review','approved','needs_fix'] %}<input type="checkbox" name="pick" value="{{ v.variant_id }}|{{ v.caption_hash }}" aria-label="Select">{% endif %}</td>
+<td data-l=""><a href="{{ base }}/variant/{{ v.variant_id }}">{% if thumbs.get(v.asset_id) %}<img class="thumb" src="{{ thumbs[v.asset_id] }}" alt="" loading="lazy">{% else %}<span class="thumb faint center" style="font-size:10px;line-height:40px">no preview</span>{% endif %}</a></td>
+<td><a href="{{ base }}/variant/{{ v.variant_id }}"><b class="clip2">{{ v.hook }}</b></a><span class="sub">{{ v.account_id|acct }} · {{ a.canonical_brand_id|brand }}</span></td>
+<td>{{ chip(v.state) }}</td>
+<td>{% if issues %}<details><summary><span class="chip bad">{{ issues|length }} blocking</span></summary>{% for b in issues %}<div class="small muted">• {{ b }}</div>{% endfor %}</details>{% endif %}
+{% for f in rf.review_flags or [] %}<span class="chip warn">{{ f|label }}</span>{% endfor %}{% if rf.two_person_signoff %}<span class="chip review">2 approvers</span>{% endif %}
+{% if not issues and not rf.review_flags %}<span class="faint small">None</span>{% endif %}</td>
+<td>{% if pm[0] %}{{ chip('ok', 'ok', 'Live ready') }}{% else %}{{ chip(a.verification_status) }}{% if a.hard_block_reason %}{{ chip('x','bad','Blocked') }}{% endif %}{% endif %}</td>
+<td class="num"><b>{{ ((v.score or 0) * 100)|round|int }}</b></td></tr>
+{% else %}<tr><td colspan="7"><div class="empty">No posts here.{% if state == 'in_review' %} New drafts appear as Scout promotes moments.{% endif %}</div></td></tr>{% endfor %}</tbody></table></div></div>
+<div class="bulkbar"><b id="bulkn">0 selected</b>
+{% if not user %}<input name="reviewer" placeholder="Your name" style="max-width:180px">{% endif %}
+<input name="note" placeholder="Note (required to reject)" class="grow" style="max-width:320px">
+<button class="primary" name="decision" value="approve">Approve selected</button><button class="danger" name="decision" value="reject">Reject selected</button>
+<span class="faint small">Recorded under your name. Two-approver posts and posts whose copy changed since you loaded the page are skipped.</span></div>
 </form>
+<script>document.querySelectorAll('input[name=pick],[data-all]').forEach(function(c){c.addEventListener('change',function(){document.getElementById('bulkn').textContent=document.querySelectorAll('input[name=pick]:checked').length+' selected'})})</script>
 {% endblock %}

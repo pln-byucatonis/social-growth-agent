@@ -43,6 +43,8 @@ HERE = Path(__file__).parent
 settings = load_settings()
 app = FastAPI(title="PLN Social Growth Agent", docs_url=None, redoc_url=None)
 templates = Jinja2Templates(directory=str(HERE / "templates"))
+from .ui import register as _register_ui  # noqa: E402
+fmt = _register_ui(templates, settings, lambda: db())
 settings.render_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/renders", StaticFiles(directory=str(settings.render_dir)), name="renders")
 _db: DB | None = None
@@ -171,10 +173,22 @@ def page(request: Request, name: str, **kw):
 
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
+    from .. import growth_officer as cgo
     d = db()
     counts = {r["state"]: r["n"] for r in d.query("SELECT state, COUNT(*) AS n FROM variants GROUP BY state")}
-    jobs = d.all("publish_jobs", order="updated_at DESC")[:15]
-    return page(request, "home.html", counts=counts, jobs=jobs, recs=recommendations(d)[:25])
+    jobs = d.all("publish_jobs", order="updated_at DESC")[:12]
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    upcoming = d.query("SELECT s.variant_id, s.account_id, s.slot_at, v.hook FROM schedules s LEFT JOIN variants v ON v.variant_id=s.variant_id "
+                       "WHERE s.state='scheduled' AND s.slot_at >= ? ORDER BY s.slot_at", [now.isoformat()])[:8]
+    next24 = sum(1 for u in upcoming if u["slot_at"] < (now + timedelta(hours=24)).isoformat())
+    esc = d.one("SELECT COUNT(*) AS n FROM comments WHERE status='escalated'")["n"]
+    waiting = d.one("SELECT COUNT(*) AS n FROM comments WHERE status IN ('drafted','needs_answer')")["n"]
+    failed = sum(1 for j in d.all("publish_jobs", "state IN ('failed','blocked')"))
+    last = d.one("SELECT MAX(published_at) AS m FROM posts p JOIN accounts a ON a.account_id=p.account_id WHERE a.brand_id IN ('pln','carjitsu','putt_tour')")
+    brief = cgo.latest_brief(d) or {}
+    actions = [a for a in brief.get("actions", []) if a["priority"] in ("P0", "P1")][:8]
+    return page(request, "home.html", counts=counts, jobs=jobs, recs=recommendations(d)[:12], upcoming=upcoming, next24=next24,
+                esc=esc, waiting_replies=waiting, failed=failed, last_post=(last or {}).get("m"), actions=actions, brief=brief)
 
 
 @app.post("/kill")
@@ -187,11 +201,15 @@ def kill(request: Request, state: str = Form(...), actor: str = Form(""), reason
 
 
 @app.get("/queue", response_class=HTMLResponse)
-def queue(request: Request, platform: str = "", state: str = ""):
+def queue(request: Request, platform: str = "", state: str = "", brand: str = ""):
     d = db()
     where, params = ["1=1"], []
     if platform:
         where.append("platform=?"), params.append(platform)
+    if brand:
+        where.append("brand_id=?"), params.append(brand)
+    base_cond, base_params = " AND ".join(where), list(params)
+    state_counts = {r["state"]: r["n"] for r in d.query(f"SELECT state, COUNT(*) AS n FROM variants WHERE {base_cond} GROUP BY state", base_params)}
     if state:
         where.append("state=?"), params.append(state)
     cond = " AND ".join(where)
@@ -199,7 +217,7 @@ def queue(request: Request, platform: str = "", state: str = ""):
     vs = [d.decode("variants", r) for r in d.query(
         "SELECT variant_id, asset_id, account_id, platform, state, hook, score, risk_flags, validation, caption_hash "
         "FROM variants "
-        f"WHERE {cond} ORDER BY platform, state, score DESC LIMIT {QUEUE_LIMIT}", params)]
+        f"WHERE {cond} ORDER BY score DESC, platform LIMIT {QUEUE_LIMIT}", params)]
     accs = {a["account_id"]: a for a in d.all("accounts")}
     perm = {k: publish_eligibility(a, settings, kill_switch_on(d)) for k, a in accs.items()}
     platforms = [r["platform"] for r in d.query("SELECT DISTINCT platform FROM variants ORDER BY platform")]
@@ -211,8 +229,9 @@ def queue(request: Request, platform: str = "", state: str = ""):
         for a in d.query(f"SELECT asset_id, probe FROM assets WHERE asset_id IN ({marks})", ids):
             a = d.decode("assets", a)
             thumbs[a["asset_id"]] = asset_thumb_url(a)
+    brands = [r["brand_id"] for r in d.query("SELECT DISTINCT brand_id FROM variants ORDER BY brand_id")]
     return page(request, "queue.html", variants=vs, accs=accs, perm=perm, platform=platform, state=state, thumbs=thumbs,
-                platforms=platforms, total=total, limit=QUEUE_LIMIT)
+                platforms=platforms, total=total, limit=QUEUE_LIMIT, brand=brand, brands=brands, state_counts=state_counts)
 
 
 @app.post("/queue/bulk")
@@ -1138,8 +1157,16 @@ def migration_review(request: Request, pid: int, decision: str = Form(...), acto
 
 
 @app.get("/audit", response_class=HTMLResponse)
-def audit(request: Request):
-    return page(request, "audit.html", rows=db().all("audit_log", order="id DESC")[:300])
+def audit(request: Request, actor: str = "", q: str = ""):
+    where, params = ["1=1"], []
+    if actor:
+        where.append("actor=?"), params.append(actor)
+    if q:
+        where.append("(action LIKE ? OR entity_id LIKE ?)"), params.extend([f"%{q}%", f"%{q}%"])
+    d = db()
+    actors = [r["actor"] for r in d.query("SELECT actor, COUNT(*) AS n FROM audit_log GROUP BY actor ORDER BY n DESC")][:30]
+    return page(request, "audit.html", rows=d.all("audit_log", " AND ".join(where), params, order="id DESC")[:300],
+                actors=actors, actor=actor, q=q)
 
 
 @app.post("/internal/tick")

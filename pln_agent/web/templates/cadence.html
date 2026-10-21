@@ -1,14 +1,20 @@
-{% extends "base.html" %}{% block body %}
-<div class="card"><h3>Adaptive cadence</h3>
-<p class="muted">Each account starts from a configurable <b>starting</b> cadence (config/cadence.json — a test schedule, not a rule). Once ≥4 weeks are measured, the recommendation follows incremental followers per extra post, engagement dilution in busier weeks and the drafts we can actually supply. The calendar planner caps each account at its recommended weekly number.</p>
-<form method="post" action="{{ base }}/cadence/recompute"><button>Recompute now</button></form></div>
-<div class="card tablewrap"><table><tr><th>account</th><th>starting /week</th><th>recommended /week</th><th>action</th><th>confidence</th><th>why</th><th>weeks</th><th>posting times</th><th></th></tr>
-{% for r in rows %}<tr><td>{{ r.acc.username_original or r.account_id }}<br><span class="muted">{{ r.acc.platform }} · {{ r.acc.brand_id }}</span></td>
-<td>{{ '%g'|format(r.start_min) }}–{{ '%g'|format(r.start_max) }}</td><td><b>{{ '%g'|format(r.recommended_per_week) if r.recommended_per_week is not none else '—' }}</b></td>
-<td><span class="badge {{ 'ok' if r.action == 'increase' else 'warn' if r.action in ('decrease','production_limited') else '' }}">{{ r.action }}</span></td><td>{{ r.confidence }}</td>
-<td>{{ r.rationale }}</td><td>{{ (r.evidence or {}).get('weeks', 0) }}</td>
-<td>{{ r.slots_used|join(', ') }}<br><span class="muted">{{ r.slots_why }}</span>{% if r.slots_learned and r.slots_learned.windows %}<br><details><summary class="muted">windows ({{ r.slots_learned.outcome }})</summary>{% for w in r.slots_learned.windows %}{{ w.window }}: n={{ w.n }} {{ '{:+.0%}'.format(w.lift) if w.lift is not none else '' }} {{ w.evidence }}<br>{% endfor %}</details>{% endif %}</td>
-<td><form method="post" action="{{ base }}/cadence/{{ r.account_id }}/frequency-test"><button>Start frequency test</button></form></td></tr>{% else %}<tr><td class="muted">No cadence computed yet — press Recompute.</td></tr>{% endfor %}</table></div>
-<div class="card tablewrap"><h3>Frequency tests</h3><table><tr><th>week</th><th>account</th><th>arm</th><th>posts/week</th><th>status</th></tr>
-{% for e in tests %}<tr><td>{{ e.week_start }}</td><td>{{ e.account_id }}</td><td>{{ e.result.arm }}</td><td>{{ e.result.posts_per_week }}</td><td>{{ e.status }}</td></tr>{% else %}<tr><td class="muted">None yet — start one per account above (A = starting cadence, B = one step up, C = starting cadence re-spaced).</td></tr>{% endfor %}</table></div>
+{% extends "base.html" %}{% block title %}Cadence{% endblock %}{% block body %}
+<div class="ph"><div class="t"><div class="eyebrow">Plan · Publishing Strategist</div><h1>Cadence &amp; posting times</h1>
+<p>How often each account should post and when. Every account starts on a starting cadence (a test, not a rule). After 4+ measured weeks the recommendation follows the extra followers each additional post brings, whether busier weeks dilute engagement, and how many drafts we can actually supply. Posting times are learned per account; one slot a day stays exploratory.</p></div>
+<div class="acts"><form method="post" action="{{ base }}/cadence/recompute" class="inline"><button>Recompute now</button></form></div></div>
+{% set ns = namespace(up=0, down=0, lim=0, base=0) %}{% for r in rows %}{% if r.action == 'increase' %}{% set ns.up = ns.up + 1 %}{% elif r.action == 'decrease' %}{% set ns.down = ns.down + 1 %}{% elif r.action == 'production_limited' %}{% set ns.lim = ns.lim + 1 %}{% elif r.action == 'collect_baseline' %}{% set ns.base = ns.base + 1 %}{% endif %}{% endfor %}
+<div class="kpis"><div class="kpi ok"><div class="v">{{ ns.up }}</div><div class="l">Should post more</div></div><div class="kpi warn"><div class="v">{{ ns.down }}</div><div class="l">Should post less</div></div>
+<div class="kpi warn"><div class="v">{{ ns.lim }}</div><div class="l">Limited by drafts on hand</div></div><div class="kpi"><div class="v">{{ ns.base }}</div><div class="l">Still collecting a baseline</div></div></div>
+<div class="card flush"><div class="tw"><table class="stack"><thead><tr><th>Account</th><th class="num">Start / wk</th><th class="num">Recommended / wk</th><th>Call</th><th>Why</th><th>Posting times</th><th></th></tr></thead><tbody>
+{% for r in rows %}<tr><td><b>{{ r.account_id|acct(false) }}</b><span class="sub">{{ r.acc.platform|platform }} · {{ r.acc.brand_id|brand }}</span></td>
+<td class="num">{{ '%g'|format(r.start_min) }}–{{ '%g'|format(r.start_max) }}</td><td class="num"><b style="font-size:15px">{{ '%g'|format(r.recommended_per_week) if r.recommended_per_week is not none else '—' }}</b></td>
+<td>{{ chip(r.action) }}<span class="sub">{{ r.confidence|label }} confidence · {{ (r.evidence or {}).get('weeks', 0) }} weeks</span></td>
+<td class="small muted"><span class="clip2" title="{{ r.rationale }}">{{ r.rationale }}</span></td>
+<td>{% for t in r.slots_used %}<span class="chip">{{ t }}</span>{% endfor %}<span class="sub">{{ r.slots_why }}</span>
+{% if r.slots_learned and r.slots_learned.windows %}<details><summary class="small">Measured windows ({{ r.slots_learned.outcome|label }})</summary>{% for w in r.slots_learned.windows %}<div class="small"><span class="mono">{{ w.window }}</span> n={{ w.n }} {{ '{:+.0%}'.format(w.lift) if w.lift is not none else '' }} {{ chip(w.evidence) }}</div>{% endfor %}</details>{% endif %}</td>
+<td class="act"><form method="post" action="{{ base }}/cadence/{{ r.account_id }}/frequency-test"><button class="sm">Start 3-week test</button></form></td></tr>
+{% else %}<tr><td colspan="7"><div class="empty">No cadence computed yet — press Recompute now.</div></td></tr>{% endfor %}</tbody></table></div></div>
+<div class="card flush"><div class="ch"><h2>Frequency tests</h2><span class="faint small">Week A = starting cadence · B = one step up · C = starting cadence, re-spaced</span></div><div class="tw"><table class="stack"><thead><tr><th>Week of</th><th>Account</th><th>Arm</th><th class="num">Posts / wk</th><th>Status</th></tr></thead><tbody>
+{% for e in tests %}<tr><td class="nowrap">{{ e.week_start|when(true) }}</td><td>{{ e.account_id|acct }}</td><td>{{ e.result.arm }}</td><td class="num">{{ e.result.posts_per_week }}</td><td>{{ chip(e.status) }}</td></tr>
+{% else %}<tr><td colspan="5"><div class="empty">None running. Start one per account above.</div></td></tr>{% endfor %}</tbody></table></div></div>
 {% endblock %}

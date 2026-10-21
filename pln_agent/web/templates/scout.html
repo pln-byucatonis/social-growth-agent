@@ -1,16 +1,25 @@
-{% extends "base.html" %}{% block body %}
-<div class="card"><h3>Viral Content Scout <span class="muted">{{ model }}</span></h3>
-<p class="muted">Every clip in the ops library scored 0–100 for its chance to stop a scroll on its own property, plus a separate PLN-crossover score. Explainable parts (weights): {% for k, w in weights.items() %}{{ k }} {{ (w*100)|round|int }}% · {% endfor %}The learned part stays neutral until PLN evidence exists.</p>
-<p>{% for b, n in counts.items() %}<a class="badge" href="?brand={{ b }}">{{ b }} ({{ n }})</a> {% endfor %}<a class="badge" href="?">all</a> · view: <a href="?brand={{ brand }}&source={{ source|urlencode }}&view=potential">own property</a> · <a href="?brand={{ brand }}&source={{ source|urlencode }}&view=pln">PLN crossover</a></p>
-<form method="post" action="{{ base }}/scout/scan"><button>Scan library now</button></form></div>
-<div class="grid"><div class="card tablewrap"><h3>Events (source masters)</h3><table><tr><th>event</th><th>moments</th><th>best</th></tr>
-{% for s in sources %}<tr><td><a href="?brand={{ brand }}&source={{ s.source_id|urlencode }}">{{ s.source_id.split('/')[-1] }}</a><br><span class="muted">{{ s.brand_id }}</span></td><td>{{ s.moments }}</td><td>{{ '%.0f'|format(s.best) }}</td></tr>{% else %}<tr><td class="muted">Nothing scanned yet.</td></tr>{% endfor %}</table></div>
-<div class="card tablewrap"><h3>{% if source %}Top {{ moments|length }} moments in {{ source.split('/')[-1] }}{% else %}Top {{ moments|length }} moments{% if brand %} — {{ brand }}{% endif %}{% endif %}</h3>
-<form method="post" action="{{ base }}/scout/promote"><table><tr><th></th><th></th><th>moment</th><th>score</th><th>why</th></tr>
-{% for m in moments %}<tr><td><input type="checkbox" name="clip_id" value="{{ m.clip_id }}" {{ 'disabled' if m.status == 'promoted' }}></td>
-<td>{% if m.thumb %}<img src="{{ m.thumb }}" width="96" height="54" style="object-fit:cover;border-radius:4px" loading="lazy" alt="">{% endif %}</td>
-<td><b>{{ (m.categories or ['—'])|join(', ') }}</b><br><span class="muted">{{ m.brand_id }} · {{ '%.0f'|format(m.start_sec) }}–{{ '%.0f'|format(m.end_sec) }}s · {{ m.status }}</span><br><span class="muted">{{ m.caption[:120] }}</span></td>
-<td><b>{{ '%.0f'|format(m.pln_potential if view == 'pln' else m.potential) }}</b></td>
-<td class="muted">{% for k, x in m.detail.parts.items() %}{{ k }} {{ '%.2f'|format(x.score) }} <span title="{{ x.why }}">ⓘ</span> · {% endfor %}<br>{{ m.detail.parts.category.why }} · {{ m.detail.parts.learned.why }}{% if m.detail.safety %}<br><span class="badge warn">{{ m.detail.safety }}</span>{% endif %}</td></tr>{% else %}<tr><td class="muted" colspan="5">No moments yet.</td></tr>{% endfor %}</table>
-<button class="primary">Make drafts from selected</button> <span class="muted">Creates assets + a creative package per moment; rights and identity gates still apply.</span></form></div></div>
+{% extends "base.html" %}{% block title %}Scout{% endblock %}{% block body %}
+<div class="ph"><div class="t"><div class="eyebrow">Content · Viral Content Scout</div><h1>Scout</h1>
+<p>Every clip in the ops library, scored 0–100 for its chance to stop a scroll on its own brand, plus a separate PLN-crossover score. Tick the best moments and make drafts from them.</p></div>
+<div class="acts"><form method="post" action="{{ base }}/scout/scan" class="inline"><button>Scan library now</button></form></div></div>
+<div class="kpis">{% for b, n in counts.items() %}<a class="kpi {{ 'info' if b == brand }}" href="?brand={{ b }}&view={{ view }}"><div class="v">{{ n|compact }}</div><div class="l">{{ b|brand }}</div></a>{% endfor %}<a class="kpi {{ 'info' if not brand }}" href="?view={{ view }}"><div class="v">{{ counts.values()|sum|compact }}</div><div class="l">All brands</div></a></div>
+<div class="card"><div class="fbar"><span class="small muted">Rank by</span><div class="seg"><a href="?brand={{ brand }}&source={{ source|urlencode }}&view=potential" class="{{ 'on' if view != 'pln' }}">Own brand</a><a href="?brand={{ brand }}&source={{ source|urlencode }}&view=pln" class="{{ 'on' if view == 'pln' }}">PLN crossover</a></div>
+{% if source %}<span class="chip info">{{ source.split('/')[-1] }}</span><a class="btn sm ghost" href="?brand={{ brand }}&view={{ view }}">All events</a>{% endif %}
+<details class="grow"><summary class="small">How scores are built ({{ model }})</summary><p class="small muted">{% for k, w in weights.items() %}{{ k|label }} {{ (w*100)|round|int }}%{{ ' · ' if not loop.last }}{% endfor %}. The learned part stays neutral until PLN evidence exists. Injury and knockout moments are penalised and never used as the hook.</p></details></div></div>
+<div class="split"><div>
+<form method="post" action="{{ base }}/scout/promote"><div class="card flush"><div class="ch"><h2>Top {{ moments|length }} moments{% if brand %} · {{ brand|brand }}{% endif %}</h2></div>
+<div class="tw"><table class="stack"><thead><tr><th style="width:28px"><input type="checkbox" data-all="clip_id" aria-label="Select all"></th><th style="width:84px"></th><th>Moment</th><th class="num">Score</th><th>Why</th></tr></thead><tbody>
+{% for m in moments %}<tr><td data-l="">{% if m.status != 'promoted' %}<input type="checkbox" name="clip_id" value="{{ m.clip_id }}" aria-label="Select">{% endif %}</td>
+<td data-l="">{% if m.thumb %}<img class="thumb" src="{{ m.thumb }}" loading="lazy" alt="">{% else %}<span class="thumb"></span>{% endif %}</td>
+<td><b>{{ (m.categories or ['Moment'])|map('label')|join(', ') }}</b> {% if m.status == 'promoted' %}{{ chip('x','ok','Drafted') }}{% endif %}<span class="sub clip2">{{ m.caption }}</span><span class="sub">{{ m.brand_id|brand }} · {{ '%.0f'|format(m.start_sec) }}–{{ '%.0f'|format(m.end_sec) }}s · {{ (m.source_id or '').split('/')[-1] }}</span></td>
+<td class="num"><b style="font-size:16px">{{ '%.0f'|format(m.pln_potential if view == 'pln' else m.potential) }}</b></td>
+<td class="small muted">{{ m.detail.parts.category.why }}{% if m.detail.safety %}<div>{{ chip('x','warn',m.detail.safety) }}</div>{% endif %}
+<details><summary class="small">Breakdown</summary>{% for k, x in m.detail.parts.items() %}<div>{{ k|label }} <b>{{ '%.2f'|format(x.score) }}</b> — {{ x.why }}</div>{% endfor %}</details></td></tr>
+{% else %}<tr><td colspan="5"><div class="empty">No moments yet — press Scan library now.</div></td></tr>{% endfor %}</tbody></table></div></div>
+<div class="bulkbar"><button class="primary">Make drafts from selected</button><span class="faint small">Creates an asset and a creative package per moment; rights and identity checks still apply before anything posts.</span></div></form>
+</div><div>
+<div class="card flush"><div class="ch"><h2>Events</h2><span class="faint small">source masters</span></div><div class="tw"><table class="stack"><thead><tr><th>Event</th><th class="num">Moments</th><th class="num">Best</th></tr></thead><tbody>
+{% for s in sources %}<tr><td><a href="?brand={{ brand }}&source={{ s.source_id|urlencode }}&view={{ view }}" class="clip2">{{ s.source_id.split('/')[-1] }}</a><span class="sub">{{ s.brand_id|brand }}</span></td><td class="num">{{ s.moments|num }}</td><td class="num">{{ '%.0f'|format(s.best) }}</td></tr>
+{% else %}<tr><td colspan="3"><div class="empty">Nothing scanned yet.</div></td></tr>{% endfor %}</tbody></table></div></div>
+</div></div>
 {% endblock %}

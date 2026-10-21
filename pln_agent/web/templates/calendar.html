@@ -1,6 +1,10 @@
-{% extends "base.html" %}{% block body %}
-<div class="card"><form method="get"><input type="date" name="start" value="{{ start }}" style="max-width:200px"> <button>Plan week</button></form>
-<p class="muted">Slots are test hypotheses (config/slots.json). Coordination: canonical before PLN amplification (≥24h), same asset ≥6h apart across accounts, per-account caps, WPL bridge ≤2/week.</p></div>
-<div class="grid">{% for day, items in days.items() %}<div class="card"><h3>{{ day }}</h3><table>{% for p in items|sort(attribute='slot') %}<tr><td>{{ p.slot.strftime('%H:%M') }}</td><td>{{ p.platform }}<br><span class="muted">{{ p.account_id }}</span></td><td><a href="{{ base }}/variant/{{ p.variant_id }}">{{ p.hook }}</a><br><span class="badge">{{ p.route_role }}</span><span class="badge">{{ p.state }}</span></td></tr>{% endfor %}</table></div>{% endfor %}</div>
-<div class="card"><h3>Not placed</h3><table>{% for u in plan.unplaced %}<tr><td>{{ u.variant_id }}</td><td class="muted">{{ u.reason }}</td></tr>{% endfor %}</table><p>{{ plan.supply_note }}</p></div>
+{% extends "base.html" %}{% block title %}Calendar{% endblock %}{% block body %}
+<div class="ph"><div class="t"><div class="eyebrow">Plan</div><h1>Calendar</h1>
+<p>The planner's week from drafts in review, approved and scheduled, following spacing rules: home account before PLN amplification (24h+), the same clip at least 6h apart across accounts, per-account daily caps, and at most two WPL bridge posts a week. To commit a day, use the <a href="{{ base }}/runsheet">run sheet</a>.</p></div>
+<div class="acts"><form method="get" class="fbar"><input type="date" name="start" value="{{ start }}"><button>Show week</button></form></div></div>
+{% if plan.supply_note %}<div class="flash info">{{ plan.supply_note }}</div>{% endif %}
+<div class="grid">{% for day, items in days.items() %}<div class="card"><div class="ch"><h2>{{ day }}</h2><span class="faint small">{{ items|length }} post{{ 's' if items|length != 1 }}</span></div>
+<ul class="list">{% for p in items|sort(attribute='slot') %}<li><b class="nowrap" style="min-width:64px">{{ p.slot.strftime('%-I:%M %p') }}</b><div class="body"><a href="{{ base }}/variant/{{ p.variant_id }}" class="clip2">{{ p.hook }}</a><span class="sub">{{ p.account_id|acct }}</span>{{ chip(p.state) }}{% if p.route_role != 'canonical' %}{{ chip(p.route_role,'muted',p.route_role|label) }}{% endif %}</div></li>{% endfor %}</ul></div>
+{% else %}<div class="empty">Nothing to place this week.</div>{% endfor %}</div>
+{% if plan.unplaced %}<div class="card"><details><summary>Not placed ({{ plan.unplaced|length }})</summary><ul class="list">{% for u in plan.unplaced %}<li><div class="body"><span class="mono">{{ u.variant_id }}</span><span class="sub">{{ u.reason }}</span></div></li>{% endfor %}</ul></details></div>{% endif %}
 {% endblock %}

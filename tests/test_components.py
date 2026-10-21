@@ -190,7 +190,7 @@ class DashboardTests(unittest.TestCase):
         r = c.post(f"/variant/{SLAP}:slapfight.x.slapfightusa/approve", data={"reviewer": "a"}, follow_redirects=False)
         self.assertIn("err=", r.headers["location"])
         c.post("/kill", data={"state": "on", "actor": "ops", "reason": "test"})
-        self.assertIn("EMERGENCY STOP ON", c.get("/").text)
+        self.assertIn("Emergency stop ON", c.get("/").text)
 
 
 if __name__ == "__main__":

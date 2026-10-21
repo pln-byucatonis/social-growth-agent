@@ -76,14 +76,15 @@ def account_slots(db: DB, account_id: str, platform: str, hypotheses: dict) -> t
     raw = db.kv_get(f"slots:{account_id}")
     learned = (json.loads(raw).get("learned_slots") if raw else None) or []
     if not learned:
-        return base, "starting hypothesis (config/slots.json) — no learned windows yet"
+        return base, "Starting time — not enough posts yet to learn this account's best window"
     slots = list(dict.fromkeys(learned + base))[:max(len(base), len(learned))]
     from .team_params import get as _param
     explore = next((f"{h:02d}:00" for h in (9, 15, 21, 12, 18) if f"{h:02d}:00" not in slots), None) \
         if _param(db, "publishing", "exploration_slot", True) else None
     if explore:
         slots.append(explore)
-    return slots, f"learned windows {', '.join(learned)} + starting slots; " + (f"exploration slot {explore}" if explore else "no exploration slot (manager setting)")
+    return slots, (f"Best measured window {', '.join(learned)}, plus starting times; "
+                   + (f"exploration slot {explore} keeps testing a new time" if explore else "no exploration slot (manager setting)"))
 
 
 def plan_frequency_test(db: DB, account_id: str, start: date | None = None, actor: str = "publishing-strategist") -> list[dict]:

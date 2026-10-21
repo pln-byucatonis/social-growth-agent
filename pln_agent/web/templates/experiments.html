@@ -1,26 +1,30 @@
-{% extends "base.html" %}{% block body %}
-<div class="card"><h3>Growth Lab</h3>
-<p class="muted"><b>Assigned</b> tests put unapproved drafts into arms (cut A/B/C, hook style), alternating by score, so you review exactly what will be posted. <b>Observed</b> tests compare a creative variable already recorded on each post (commentary, captions_burned, posting_hour_bucket ...). <b>Frequency</b> tests come from the Cadence page. Results use the evidence rule: ≥5 measured posts per arm before anything is said, ≥8 and q&lt;0.05 for conclusive, per-1k-view rates only. Conclusive and suggestive results are written to the Knowledge Engine as PLN evidence.</p>
-<form method="post" action="{{ base }}/experiments/read"><button>Assign new drafts + read results now</button></form></div>
-{% if proposals %}<div class="card"><h3>Suggested tests</h3>{% for p in proposals %}
-<form method="post" action="{{ base }}/experiments/new"><b>{{ p.account_id }}</b> · {{ p.variable }} · {{ p.drafts }} drafts — {{ p.hypothesis }}
-<input type="hidden" name="account_id" value="{{ p.account_id }}"><input type="hidden" name="variable" value="{{ p.variable }}"><input type="hidden" name="mode" value="{{ p.mode }}">
+{% extends "base.html" %}{% block title %}Experiments{% endblock %}{% block body %}
+<div class="ph"><div class="t"><div class="eyebrow">Plan · Growth Lab</div><h1>Experiments</h1>
+<p>Controlled tests. <b>Assigned</b> tests put drafts nobody has approved into arms (cut A/B/C, hook style), so you review exactly what posts. <b>Observed</b> tests compare a creative variable already recorded on each post. Nothing is called until each arm has 5+ measured posts; conclusive needs 8+ and q&lt;0.05. Winners become PLN evidence.</p></div>
+<div class="acts"><form method="post" action="{{ base }}/experiments/read" class="inline"><button>Assign new drafts &amp; read results</button></form><a class="btn primary" href="#new">New test</a></div></div>
+{% set ns = namespace(run=0, done=0) %}{% for e in exps %}{% if e.status in ('running','planned') %}{% set ns.run = ns.run + 1 %}{% elif e.status == 'concluded' %}{% set ns.done = ns.done + 1 %}{% endif %}{% endfor %}
+<div class="kpis"><div class="kpi info"><div class="v">{{ ns.run }}</div><div class="l">Running</div></div><div class="kpi ok"><div class="v">{{ ns.done }}</div><div class="l">Concluded</div></div><div class="kpi"><div class="v">{{ proposals|length }}</div><div class="l">Suggested tests</div></div></div>
+{% if proposals %}<div class="card"><div class="ch"><h2>Suggested tests</h2><span class="faint small">Possible with the drafts on hand</span></div><ul class="list">{% for p in proposals %}
+<li><div class="body"><b>{{ p.variable|label }}</b> on {{ p.account_id|acct }} <span class="faint small">· {{ p.drafts }} drafts</span><span class="sub">{{ p.hypothesis }} — A: {{ p.arms.A }} · B: {{ p.arms.B }}</span></div>
+<form method="post" action="{{ base }}/experiments/new" class="fbar"><input type="hidden" name="account_id" value="{{ p.account_id }}"><input type="hidden" name="variable" value="{{ p.variable }}"><input type="hidden" name="mode" value="{{ p.mode }}">
 <input type="hidden" name="arm_a" value="{{ p.arms.A }}"><input type="hidden" name="arm_b" value="{{ p.arms.B }}"><input type="hidden" name="hypothesis" value="{{ p.hypothesis }}">
-{% if not user %}<input name="actor" placeholder="your name">{% endif %} <button>Start</button></form>{% endfor %}</div>{% endif %}
-<div class="card"><h3>New test</h3><form method="post" action="{{ base }}/experiments/new">
-<select name="account_id">{% for a in accs %}<option value="{{ a.account_id }}">{{ a.account_id }}</option>{% endfor %}</select>
-<select name="mode"><option value="assigned">assigned</option><option value="observed">observed</option></select>
-<input name="variable" placeholder="cut | hook_style | commentary | posting_hour_bucket ..." size="30"><br>
-<input name="arm_a" placeholder="control (arm A)"> <input name="arm_b" placeholder="arm B"> <input name="arm_c" placeholder="arm C (optional)">
-<select name="outcome">{% for o in outcomes %}<option>{{ o }}</option>{% endfor %}</select><br>
-<input name="hypothesis" placeholder="hypothesis" size="80"> {% if not user %}<input name="actor" placeholder="your name">{% endif %} <button>Start test</button>
-<p class="muted">For cut tests the arms are cut labels (A / B / C). For hook tests they're hook styles (e.g. title_card, share_prompt). For observed tests they're the recorded values (e.g. yes / no).</p></form></div>
-<div class="card tablewrap"><table><tr><th>experiment</th><th>account</th><th>test</th><th>arms</th><th>latest read</th><th>status</th><th></th></tr>
-{% for e in exps %}{% set r = e.result or {} %}{% set l = r.latest or {} %}<tr><td>{{ e.experiment_id }}<br><span class="muted">from {{ r.started_at or e.week_start }} · {{ r.mode or 'weekly' }}</span></td>
-<td>{{ e.account_id }}</td><td><b>{{ e.variable }}</b><br>{{ e.hypothesis }}<br><span class="muted">{{ e.success_metric }}</span></td>
-<td>{% for k, v in (r.arms or {'arm': r.arm}).items() %}{{ k }}: {{ v }}{% if counts.get(e.experiment_id, {}).get(k) %} ({{ counts[e.experiment_id][k] }} drafts){% endif %}<br>{% endfor %}{% if r.posts_per_week %}{{ r.posts_per_week }}/week{% endif %}</td>
-<td>{% if l %}<b>{{ l.verdict }}</b>{% for row in l.rows %}<br><span class="muted">{{ row.arm }} vs {{ row.control }}: n={{ row.n_arm }}/{{ row.n_control }}{% if row.lift is not none %} · {{ '{:+.0%}'.format(row.lift) }}{% endif %}{% if row.q is not none %} · q={{ '%.3f'|format(row.q) }}{% endif %} · {{ row.evidence }}</span>{% endfor %}{% else %}<span class="muted">not read yet</span>{% endif %}</td>
-<td><span class="badge {{ 'ok' if e.status == 'concluded' else 'warn' if e.status in ('inconclusive','abandoned') else '' }}">{{ e.status }}</span></td>
-<td>{% if e.status in ('running','planned') %}<form method="post" action="{{ base }}/experiments/{{ e.experiment_id }}/stop">{% if not user %}<input name="actor" placeholder="your name" size="8">{% endif %}<button>Stop</button></form>{% endif %}</td></tr>
-{% else %}<tr><td class="muted" colspan="7">No experiments yet.</td></tr>{% endfor %}</table></div>
+{% if not user %}<input name="actor" placeholder="Your name" style="width:120px">{% endif %}<button class="sm primary">Start</button></form></li>{% endfor %}</ul></div>{% endif %}
+<div class="card flush"><div class="tw"><table class="stack"><thead><tr><th>Test</th><th>Arms</th><th>Latest read</th><th>Status</th><th></th></tr></thead><tbody>
+{% for e in exps %}{% set r = e.result or {} %}{% set l = r.latest or {} %}<tr>
+<td><b>{{ e.variable|label }}</b> · {{ e.account_id|acct }}<span class="sub">{{ e.hypothesis }}</span><span class="sub">{{ (r.mode or 'weekly')|label }} · since {{ (r.started_at or e.week_start)|when(true) }} · {{ e.success_metric|label }}</span></td>
+<td class="small">{% for k, v in (r.arms or {'Arm': r.arm}).items() %}<div><b>{{ k }}</b> {{ v }}{% if counts.get(e.experiment_id, {}).get(k) %} <span class="faint">· {{ counts[e.experiment_id][k] }} drafts</span>{% endif %}</div>{% endfor %}{% if r.posts_per_week %}<div>{{ r.posts_per_week }} posts/week</div>{% endif %}</td>
+<td>{% if l %}<b>{{ l.verdict }}</b>{% for row in l.rows %}<div class="small muted">{{ row.arm }} vs {{ row.control }}: {{ row.n_arm }}/{{ row.n_control }} posts{% if row.lift is not none %} · {{ '{:+.0%}'.format(row.lift) }}{% endif %}{% if row.q is not none %} · q {{ '%.3f'|format(row.q) }}{% endif %} {{ chip(row.evidence) }}</div>{% endfor %}{% else %}<span class="faint small">Not read yet</span>{% endif %}</td>
+<td>{{ chip(e.status) }}</td>
+<td class="act">{% if e.status in ('running','planned') %}<form method="post" action="{{ base }}/experiments/{{ e.experiment_id }}/stop" class="fbar">{% if not user %}<input name="actor" placeholder="Name" style="width:90px">{% endif %}<button class="sm ghost">Stop</button></form>{% endif %}</td></tr>
+{% else %}<tr><td colspan="5"><div class="empty">No experiments yet. Start a suggested one or create your own below.</div></td></tr>{% endfor %}</tbody></table></div></div>
+<div class="card" id="new"><div class="ch"><h2>New test</h2></div><form method="post" action="{{ base }}/experiments/new">
+<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
+<label class="field"><span>Account</span><select name="account_id">{% for a in accs %}<option value="{{ a.account_id }}">{{ a.account_id|acct }}</option>{% endfor %}</select></label>
+<label class="field"><span>Type</span><select name="mode"><option value="assigned">Assigned — put drafts into arms</option><option value="observed">Observed — compare recorded posts</option></select></label>
+<label class="field"><span>What's being tested</span><input name="variable" list="vars" placeholder="cut, hook_style, commentary…" required><datalist id="vars"><option value="cut"><option value="hook_style"><option value="commentary"><option value="captions_burned"><option value="posting_hour_bucket"><option value="asks_question"></datalist></label>
+<label class="field"><span>Measured by</span><select name="outcome">{% for o in outcomes %}<option value="{{ o }}">{{ o|label }}</option>{% endfor %}</select></label>
+<label class="field"><span>Arm A (control)</span><input name="arm_a" required></label><label class="field"><span>Arm B</span><input name="arm_b" required></label><label class="field"><span>Arm C (optional)</span><input name="arm_c"></label></div>
+<label class="field" style="margin-top:8px"><span>Hypothesis</span><input name="hypothesis" placeholder="e.g. Commentary lifts shares per 1k views on CarJitsu Instagram" required></label>
+<p class="faint small">Cut tests: arms are cut labels (A, B, C). Hook tests: hook styles (title_card, share_prompt…). Observed tests: the recorded values (yes / no).</p>
+<div class="fbar">{% if not user %}<input name="actor" placeholder="Your name">{% endif %}<button class="primary">Start test</button></div></form></div>
 {% endblock %}

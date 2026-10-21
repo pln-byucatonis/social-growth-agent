@@ -1,20 +1,24 @@
-{% extends "base.html" %}{% block body %}
-<div class="card"><h3>Creative Intelligence Database ({{ total }} posts)</h3>
-<p class="muted">Every real post — historical (platform ingest) and agent-published — with its creative variables, where each value came from, the source footage and actual performance.</p>
-<form method="get"><label>Brand <select name="brand"><option value="">all</option>{% for b in brands %}<option {{ 'selected' if b == brand }}>{{ b }}</option>{% endfor %}</select></label>
-<label>Platform <select name="platform"><option value="">all</option>{% for p in platforms %}<option {{ 'selected' if p == platform }}>{{ p }}</option>{% endfor %}</select></label>
-<label>Outcome <select name="outcome">{% for o in outcomes %}<option {{ 'selected' if o == outcome }}>{{ o }}</option>{% endfor %}</select></label>
-<label>Format <input name="fmt" value="{{ fmt }}" placeholder="e.g. reels" size="8"></label> <button>What works?</button></form>
-<p class="muted"><b>evidence rule:</b> {{ rule }}</p></div>
-{% if res %}<div class="card tablewrap"><h3>What goes with higher {{ res.outcome }} — {{ res.brand_id or 'all brands' }} / {{ res.platform or 'all platforms' }} ({{ res.posts }} posts)</h3>
-<table><tr><th>variable</th><th>value</th><th>n</th><th>median</th><th>rest</th><th>lift</th><th>q</th><th>evidence</th></tr>
-{% for f in res.findings %}<tr><td>{{ f.variable }}</td><td>{{ f.value }}</td><td>{{ f.n }} / {{ f.n_rest }}</td><td>{{ '%.2f'|format(f.median) }}</td><td>{{ '%.2f'|format(f.median_rest) if f.median_rest is not none else '—' }}</td><td>{{ '{:+.0%}'.format(f.lift) if f.lift is not none else '—' }}</td><td>{{ '%.3f'|format(f.q) if f.q is not none else '—' }}</td>
-<td><span class="badge {{ 'ok' if f.evidence == 'conclusive' else 'warn' if f.evidence == 'suggestive' else '' }}">{{ f.evidence }}</span></td></tr>{% else %}<tr><td class="muted">No comparable groups yet.</td></tr>{% endfor %}</table></div>{% endif %}
-<div class="card tablewrap"><h3>Recent posts</h3><table><tr><th>published</th><th>account</th><th>post</th><th>creative (provenance)</th><th>views</th><th>shares/1k</th><th>eng/1k</th></tr>
-{% for p in recent %}<tr><td>{{ (p.published_at or '')[:16] }}</td><td>{{ p.account_id }}<br><span class="muted">{{ p.origin }} · {{ p.post_type }}</span></td>
-<td>{% if p.permalink %}<a href="{{ p.permalink }}" target="_blank" rel="noopener">open ↗</a>{% endif %} {{ (p.caption or '')[:90] }}</td>
-<td class="muted">{% for k in ['content_type','hook_style','duration_bucket','asks_question','cta','posting_hour_bucket'] %}{{ k }}={{ p.creative.get(k) }}<sup>{{ (p.provenance.get(k) or '')[:5] }}</sup> {% endfor %}</td>
-<td>{{ '{:,.0f}'.format(p.outcomes.views) if p.outcomes.views else '—' }}{% if p.young %} <span class="badge">young</span>{% endif %}</td>
-<td>{{ '%.2f'|format(p.outcomes.shares_per_1k_views) if p.outcomes.shares_per_1k_views is not none else '—' }}</td><td>{{ '%.1f'|format(p.outcomes.engagements_per_1k_views) if p.outcomes.engagements_per_1k_views is not none else '—' }}</td></tr>{% else %}<tr><td class="muted">No posts yet.</td></tr>{% endfor %}</table>
-<p class="muted">Provenance: <sup>agent</sup> agent decision · <sup>infer</sup> inferred from caption/metadata · <sup>unkno</sup> unknown.</p></div>
+{% extends "base.html" %}{% block title %}Creative DB{% endblock %}{% block body %}
+<div class="ph"><div class="t"><div class="eyebrow">Content · Creative Intelligence</div><h1>Creative DB</h1>
+<p>Every real post — from the platform ingest and from the agents — with its creative choices, where each value came from, and how it actually performed. Ask it what goes with better results.</p></div></div>
+<div class="card"><form method="get" class="fbar">
+<label class="field"><span>Brand</span><select name="brand"><option value="">All brands</option>{% for b in brands %}<option value="{{ b }}" {{ 'selected' if b == brand }}>{{ b|brand }}</option>{% endfor %}</select></label>
+<label class="field"><span>Platform</span><select name="platform"><option value="">All platforms</option>{% for p in platforms %}<option value="{{ p }}" {{ 'selected' if p == platform }}>{{ p|platform }}</option>{% endfor %}</select></label>
+<label class="field"><span>Outcome</span><select name="outcome">{% for o in outcomes %}<option value="{{ o }}" {{ 'selected' if o == outcome }}>{{ o|label }}</option>{% endfor %}</select></label>
+<label class="field"><span>Format</span><input name="fmt" value="{{ fmt }}" placeholder="e.g. reels" style="width:110px"></label>
+<div class="field"><span>&nbsp;</span><button class="primary">What works?</button></div></form>
+<details style="margin-top:8px"><summary class="small">How the evidence rule works</summary><p class="small muted">{{ rule }}</p></details></div>
+{% if res %}<div class="card flush"><div class="ch"><h2>What goes with higher {{ res.outcome|label|lower }}</h2><span class="faint small">{{ (res.brand_id|brand) if res.brand_id else 'All brands' }} · {{ (res.platform|platform) if res.platform else 'all platforms' }} · {{ res.posts }} posts</span></div>
+<div class="tw"><table class="stack"><thead><tr><th>Choice</th><th class="num">Posts (vs rest)</th><th class="num">Median</th><th class="num">Rest</th><th class="num">Lift</th><th class="num">q</th><th>Evidence</th></tr></thead><tbody>
+{% for f in res.findings %}<tr><td><b>{{ f.variable|label }}</b> = {{ f.value|label }}</td><td class="num">{{ f.n }} / {{ f.n_rest }}</td><td class="num">{{ '%.2f'|format(f.median) }}</td><td class="num">{{ '%.2f'|format(f.median_rest) if f.median_rest is not none else '—' }}</td>
+<td class="num"><b style="color:{{ 'var(--ok)' if (f.lift or 0) > 0 else 'var(--bad)' }}">{{ '{:+.0%}'.format(f.lift) if f.lift is not none else '—' }}</b></td><td class="num">{{ '%.3f'|format(f.q) if f.q is not none else '—' }}</td><td>{{ chip(f.evidence) }}</td></tr>
+{% else %}<tr><td colspan="7"><div class="empty">No comparable groups yet.</div></td></tr>{% endfor %}</tbody></table></div></div>{% endif %}
+<div class="card flush"><div class="ch"><h2>Recent posts</h2><span class="faint small">{{ total|num }} in the database</span></div><div class="tw"><table class="stack"><thead><tr><th>Published</th><th>Post</th><th>Creative choices</th><th class="num">Views</th><th class="num">Shares/1k</th><th class="num">Eng./1k</th></tr></thead><tbody>
+{% for p in recent %}<tr><td class="nowrap">{{ p.published_at|when(true) }}<span class="sub">{{ p.origin|label }} · {{ p.post_type|label }}</span></td>
+<td><span class="clip2">{{ p.caption or '(no caption)' }}</span><span class="sub">{{ p.account_id|acct }}{% if p.permalink %} · <a href="{{ p.permalink }}" target="_blank" rel="noopener">open ↗</a>{% endif %}</span></td>
+<td>{% for k in ['content_type','hook_style','duration_bucket','asks_question','cta','posting_hour_bucket'] %}{% set v = p.creative.get(k) %}{% if v and v != 'unknown' %}<span class="chip" title="{{ k|label }} · {{ (p.provenance.get(k) or 'unknown')|label }}">{{ v|label }}{% if (p.provenance.get(k) or '').startswith('infer') %}<span class="faint">*</span>{% endif %}</span>{% endif %}{% endfor %}</td>
+<td class="num">{{ p.outcomes.views|compact if p.outcomes.views else '—' }}{% if p.young %}<span class="sub">under 72h</span>{% endif %}</td>
+<td class="num">{{ '%.2f'|format(p.outcomes.shares_per_1k_views) if p.outcomes.shares_per_1k_views is not none else '—' }}</td><td class="num">{{ '%.1f'|format(p.outcomes.engagements_per_1k_views) if p.outcomes.engagements_per_1k_views is not none else '—' }}</td></tr>
+{% else %}<tr><td colspan="6"><div class="empty">No posts yet.</div></td></tr>{% endfor %}</tbody></table></div>
+<p class="faint small" style="padding:8px 16px 12px">* inferred from caption or metadata; others are agent decisions. Hover a chip for its variable.</p></div>
 {% endblock %}

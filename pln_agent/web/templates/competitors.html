@@ -1,21 +1,18 @@
-{% extends "base.html" %}{% block body %}
-<div class="card"><h3>Competitive Intelligence</h3>
-<p class="muted">Public numbers for the benchmark accounts in config/competitors.json, read through Instagram Business Discovery. Other accounts' views, reach and watch time are private, so the comparison is <b>engagement per follower</b> ((likes + comments) ÷ followers), worked out the same way for them and for us. These are observations about other accounts, stored as external research, not evidence about what works for PLN: anything worth copying goes through an experiment first.</p>
-<form method="post" action="{{ base }}/competitors/refresh"><button>Capture benchmarks now</button></form></div>
-<div class="card tablewrap"><h3>Benchmarks</h3><table><tr><th>account</th><th>for</th><th>followers</th><th>growth</th><th>posts/week</th><th>Reels</th><th>median engagement / follower</th><th>caption</th><th>captured</th></tr>
-{% for r in rows %}{% set p = r.profile or {} %}<tr><td><a href="https://www.instagram.com/{{ r.handle }}/" target="_blank">@{{ r.handle }}</a><br><span class="muted">{{ r.name }}</span></td>
-<td>{{ (r.compare_to or [])|join(', ') }}</td><td>{{ '{:,.0f}'.format(r.followers) if r.followers else '—' }}</td>
-<td>{% if p.growth %}{{ '{:+,}'.format(p.growth.per_week) }}/week<br><span class="muted">since {{ p.growth.since }}</span>{% else %}<span class="muted">needs a second capture</span>{% endif %}</td>
-<td>{{ p.posts_per_week if p.posts else '—' }}</td><td>{{ '{:.0%}'.format(p.reels_share) if p.posts else '—' }}</td>
-<td>{{ '{:.2%}'.format(p.median_er) if p.median_er is not none else '—' }}</td>
-<td class="muted">{% if p.posts %}{{ p.median_caption_chars|int }} chars · {{ p.median_hashtags|int }} hashtags · {{ '{:.0%}'.format(p.question_hooks) }} question hooks{% endif %}</td>
-<td class="muted">{{ (r.captured_at or '')[:10] }} · {{ hist.get(r.handle, [])|length }} capture(s)</td></tr>
-{% else %}<tr><td class="muted" colspan="9">No captures yet. Press "Capture benchmarks now" (needs a connected Instagram business account).</td></tr>{% endfor %}</table></div>
-<div class="card"><h3>Where we differ most</h3>
-{% for gp in gaps %}<p><b>{{ gp.account_id }}</b> vs {{ gp.peers }}<br>{% for n in gp.notes %}• {{ n }}<br>{% endfor %}</p>{% else %}<p class="muted">No big gaps, or not enough data on our side or theirs yet.</p>{% endfor %}</div>
-<div class="card tablewrap"><h3>Standout posts (2×+ the account's own median)</h3>
-<p class="muted">Filter: <a href="{{ base }}/competitors">all</a>{% for b in ['pln','carjitsu','putt_tour','slapfight'] %} · <a href="{{ base }}/competitors?brand={{ b }}">{{ b }}</a>{% endfor %}</p>
-<table><tr><th>account</th><th>opening line</th><th>type</th><th>× median</th></tr>
-{% for s in standouts %}<tr><td>@{{ s.handle }}</td><td>{% if s.permalink %}<a href="{{ s.permalink }}" target="_blank">{{ s.hook or '(no caption)' }}</a>{% else %}{{ s.hook }}{% endif %}</td><td>{{ s.type }}</td><td>{{ '%.1f'|format(s.x_median) }}×</td></tr>
-{% else %}<tr><td class="muted" colspan="4">None yet.</td></tr>{% endfor %}</table></div>
+{% extends "base.html" %}{% block title %}Competitors{% endblock %}{% block body %}
+<div class="ph"><div class="t"><div class="eyebrow">Insight · Competitive Intelligence</div><h1>Competitors</h1>
+<p>Public numbers for benchmark accounts (config/competitors.json) via Instagram Business Discovery. Their views and reach are private, so we compare <b>engagement per follower</b> — worked out the same way for them and us. It's research, not proof: anything worth copying goes to Experiments first.</p></div>
+<div class="acts"><form method="post" action="{{ base }}/competitors/refresh" class="inline"><button>Capture benchmarks now</button></form></div></div>
+{% if gaps %}<div class="card"><div class="ch"><h2>Where we differ most</h2></div><ul class="list">{% for gp in gaps %}<li><div class="body"><b>{{ gp.account_id|acct }}</b> <span class="faint small">vs {{ gp.peers }}</span>{% for n in gp.notes %}<div class="small">• {{ n }}</div>{% endfor %}</div></li>{% endfor %}</ul></div>{% endif %}
+<div class="card flush"><div class="ch"><h2>Benchmarks</h2></div><div class="tw"><table class="stack"><thead><tr><th>Account</th><th>Compared to</th><th class="num">Followers</th><th class="num">Growth / wk</th><th class="num">Posts / wk</th><th class="num">Reels</th><th class="num">Engagement / follower</th><th>Captions</th><th>Captured</th></tr></thead><tbody>
+{% for r in rows %}{% set p = r.profile or {} %}<tr><td><a href="https://www.instagram.com/{{ r.handle }}/" target="_blank" rel="noopener"><b>@{{ r.handle }}</b></a><span class="sub">{{ r.name }}</span></td>
+<td class="small">{% for b in r.compare_to or [] %}{{ chip(b,'muted',b|brand) }}{% endfor %}</td><td class="num">{{ r.followers|compact if r.followers else '—' }}</td>
+<td class="num">{% if p.growth %}{{ p.growth.per_week|signed }}{% else %}<span class="faint small">2nd capture needed</span>{% endif %}</td>
+<td class="num">{{ p.posts_per_week if p.posts else '—' }}</td><td class="num">{{ p.reels_share|pct if p.posts else '—' }}</td><td class="num"><b>{{ p.median_er|pct(2) if p.median_er is not none else '—' }}</b></td>
+<td class="small muted">{% if p.posts %}{{ p.median_caption_chars|int }} chars · {{ p.median_hashtags|int }} tags · {{ p.question_hooks|pct }} questions{% endif %}</td>
+<td class="nowrap small">{{ r.captured_at|ago }}<span class="sub">{{ hist.get(r.handle, [])|length }} capture(s)</span></td></tr>
+{% else %}<tr><td colspan="9"><div class="empty">No captures yet. Press "Capture benchmarks now" (needs a connected Instagram business account).</div></td></tr>{% endfor %}</tbody></table></div></div>
+<div class="card flush"><div class="ch"><h2>Standout posts</h2><span class="faint small">2×+ the account's own median</span><div class="acts"><div class="seg"><a href="{{ base }}/competitors" class="{{ 'on' if not brand }}">All</a>{% for b in ['pln','carjitsu','putt_tour','slapfight'] %}<a href="{{ base }}/competitors?brand={{ b }}" class="{{ 'on' if brand == b }}">{{ b|brand }}</a>{% endfor %}</div></div></div>
+<div class="tw"><table class="stack"><thead><tr><th>Account</th><th>Opening line</th><th>Type</th><th class="num">× median</th></tr></thead><tbody>
+{% for s in standouts %}<tr><td>@{{ s.handle }}</td><td>{% if s.permalink %}<a href="{{ s.permalink }}" target="_blank" rel="noopener">{{ s.hook or '(no caption)' }}</a>{% else %}{{ s.hook }}{% endif %}</td><td>{{ (s.type or '')|label }}</td><td class="num"><b>{{ '%.1f'|format(s.x_median) }}×</b></td></tr>
+{% else %}<tr><td colspan="4"><div class="empty">None yet.</div></td></tr>{% endfor %}</tbody></table></div></div>
 {% endblock %}

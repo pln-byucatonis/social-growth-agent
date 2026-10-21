@@ -1,45 +1,59 @@
-{% extends "base.html" %}{% block body %}
-<div class="card"><h2 style="margin:0">{{ v.platform|upper }} → {{ acc.username_original or '(pending LinkedIn page)' }} <span class="badge">{{ v.state }}</span></h2>
-<p class="muted">{{ v.variant_id }} · route {{ v.route_role }} · series “{{ v.series }}” · {{ v.format }} · north star: {{ north.label }}</p>
-<p>Asset: <a href="{{ base }}/asset/{{ asset.asset_id }}"><b>{{ asset.title }}</b></a> ({{ asset.asset_id }}) · source identity: {{ asset.source_brand_name }} · license: {{ asset.license or '—' }} · rights expire: {{ asset.rights_expires_at or '—' }} {% if asset.is_sample %}<span class="badge warn">SAMPLE DATA</span>{% endif %}</p>
-<p>{% for b in v.risk_flags.blockers %}<span class="badge bad">{{ b }}</span>{% endfor %}{% for f in v.risk_flags.review_flags %}<span class="badge warn">{{ f }}</span>{% endfor %}{% for l in v.risk_flags.labels %}<br><span class="muted">label: {{ l }}</span>{% endfor %}{% if v.risk_flags.two_person_signoff %}<br><b>Two-person signoff required.</b>{% endif %}</p>
-<p>Live publishing: {% if live_ok %}<span class="badge ok">allowed</span>{% else %}<span class="badge">not allowed</span> <span class="muted">{{ reasons|join(' · ') }}</span>{% endif %}</p></div>
-<div class="grid">
-<div class="card"><h3>Edit copy</h3><form method="post" action="{{ base }}/variant/{{ v.variant_id }}/edit">
-<label>Hook</label><input name="hook" value="{{ v.hook }}"><label>Caption (exact text that would post)</label><textarea name="caption" rows="10">{{ v.caption }}</textarea>
-<label>CTA</label><input name="cta" value="{{ v.cta }}"><label>Your name</label>{% if not user %}<input name="actor" required>{% endif %}<br><br><button>Save (invalidates prior approval)</button></form>
-{% if v.validation.errors %}<h4>Validation</h4>{% for e in v.validation.errors %}<div class="badge bad">{{ e }}</div>{% endfor %}{% endif %}
-<p class="muted">Hashtags: {{ v.hashtags|join(' ') }} — {{ v.hashtag_rationale }}</p><p class="muted">Test: {{ v.test_hypothesis }}</p></div>
-<div class="card"><h3>Approve / reject</h3><form method="post" action="{{ base }}/variant/{{ v.variant_id }}/approve">{% if not user %}<input name="reviewer" placeholder="reviewer name" required>{% endif %}<input name="note" placeholder="note"><br><br><button class="primary">Approve exact text</button></form><br>
-<form method="post" action="{{ base }}/variant/{{ v.variant_id }}/reject">{% if not user %}<input name="reviewer" placeholder="reviewer name" required>{% endif %}<input name="note" placeholder="reason (required)" required><br><br><button class="danger">Reject</button></form>
-<h4>Schedule</h4><form method="post" action="{{ base }}/variant/{{ v.variant_id }}/schedule"><input name="slot_at" value="{{ planned.slot_at if planned else '' }}" placeholder="2026-10-21T18:30">{% if not user %}<input name="actor" placeholder="your name" required>{% endif %}<br><br><button>Schedule (approved only)</button></form><br>
-<form method="post" action="{{ base }}/variant/{{ v.variant_id }}/cancel"><input type="hidden" name="actor" value="dashboard"><button>Cancel</button></form>
-<h4>Approval trail</h4><table>{% for a in approvals %}<tr><td>{{ a.at }}</td><td>{{ a.decision }}</td><td>{{ a.reviewer }}</td><td class="muted">{{ a.note }}</td></tr>{% endfor %}</table></div>
-<div class="card media"><h3>Source clip</h3>{% if source.src %}<video src="{{ source.src }}" poster="{{ source.poster }}" controls muted playsinline preload="metadata"></video>
-<p class="muted">Plays the exact cut this post uses ({{ '%.1f'|format(v.edl.segments[0].source_in) if v.edl.segments else '' }}s–{{ '%.1f'|format(v.edl.segments[-1].source_out) if v.edl.segments else '' }}s of the source). Captions and on-screen text appear in the finished render below.</p>
-{% else %}<p class="muted">No playable source for this asset.</p>{% endif %}
-<h3>Finished post</h3>{% if v.render_status == 'rendering' %}<p><b>Rendering…</b> refresh in a minute.</p>{% elif render_url and '.mp4' in render_url %}<video src="{{ render_url }}" controls muted playsinline></video>{% elif render_url %}<img src="{{ render_url }}" style="max-width:100%">{% else %}<p class="muted">Not rendered yet ({{ v.render_status }}).</p>{% endif %}
-{% if v.render_qc %}<p>Quality checks: <span class="badge {{ 'ok' if v.render_qc.passed else 'bad' }}">{{ v.render_qc.summary }}</span>{% for e in v.render_qc.errors %} <span class="badge bad">{{ e }}</span>{% endfor %}{% for w in v.render_qc.warnings %} <span class="badge warn">{{ w }}</span>{% endfor %} <span class="muted">{{ v.render_qc.measures }}</span></p>{% endif %}
-<form method="post" action="{{ base }}/variant/{{ v.variant_id }}/render"><button>{{ 'Re-render' if render_url else 'Render finished post (9:16, burned text)' }}</button></form>
-{% if v.public_media_url %}<p>Public link: <a href="{{ v.public_media_url }}" target="_blank" rel="noopener">{{ v.public_media_url }}</a></p>
-{% elif render_url and v.state in ('approved','scheduled') %}<form method="post" action="{{ base }}/variant/{{ v.variant_id }}/public-link"><button>Create public link</button> <span class="muted">for platforms that pull the video from a URL (Instagram, Facebook, TikTok); created automatically at publish time</span></form>
-{% elif render_url %}<p class="muted">A public link can be created once this post is approved.</p>{% endif %}
-<h4>Edit decision list</h4><table>{% for s in v.edl.segments %}<tr><td>{{ '%.2f'|format(s.source_in) }}–{{ '%.2f'|format(s.source_out) }}s</td><td>{{ s.purpose }}</td><td class="muted">{{ s.source_timecode }}</td></tr>{% endfor %}</table><p class="muted">{{ v.edl.notes }}</p></div>
-</div>
-{% set t = v.treatment %}{% if t %}<div class="card"><h3>Creative treatment — {{ t.platform }}{% if t.route_role %} <span class="muted">({{ t.route_role }})</span>{% endif %}</h3>
-<table><tr><td><b>Hook</b></td><td>{{ t.hook.opening_beat }}<br><span class="muted">first seconds: “{{ t.hook.first_seconds }}”</span></td></tr>
-<tr><td><b>Edit</b></td><td>{{ t.edit.pace }}</td></tr><tr><td><b>Context</b></td><td>{{ t.context.approach }}</td></tr>
-<tr><td><b>Payoff</b></td><td>{{ t.payoff.label }}{% if t.payoff.what %} — {{ t.payoff.what }}{% endif %}</td></tr>
-<tr><td><b>Conversion</b></td><td>{{ t.conversion.reason_to_follow }}{% if t.conversion.cta %}<br><span class="muted">CTA: {{ t.conversion.cta }}</span>{% endif %}</td></tr></table>
-{% if t.note %}<p class="muted">{{ t.note }}</p>{% endif %}
-<h4>Duration variants</h4><table>{% for x in t.duration_variants %}<tr><td><b>{{ x.label }}</b>{% if x.label == t.recommended_variant %} <span class="badge ok">recommended</span>{% endif %}{% if (v.edl or {}).get('variant_label') == x.label %} <span class="badge">in use</span>{% endif %}</td>
-<td>≈{{ x.target_s|int }}s · {{ x.idea }}</td><td class="muted">{% if x.available %}{{ x.actual_s }}s, payoff at {{ x.payoff_at_s }}s{% else %}{{ x.why }}{% endif %}
-{% if x.ops_vertical %}<br>ops vertical: {{ x.ops_vertical.status }}{% endif %}
-{% if x.render %}<br>render: {{ x.render.status }}{% if x.render.qc %} · QC <span class="badge {{ 'ok' if x.render.qc.passed else 'bad' }}">{{ x.render.qc.summary }}</span>{% for e in x.render.qc.errors %}<br><span class="badge bad">{{ e }}</span>{% endfor %}{% for w in x.render.qc.warnings %}<br><span class="badge warn">{{ w }}</span>{% endfor %}{% endif %}{% endif %}</td>
-<td>{% if x.available and v.state in ('in_review','needs_fix','approved') %}<form method="post" action="{{ base }}/variant/{{ v.variant_id }}/cut"><input type="hidden" name="label" value="{{ x.label }}"><button>Use cut {{ x.label }}</button></form>{% endif %}</td></tr>{% endfor %}</table>
-<form method="post" action="{{ base }}/variant/{{ v.variant_id }}/cuts/render"><label><input type="checkbox" name="use_ops" value="on" checked> use the ops subject-tracked vertical (Smart Crop)</label> <button>Produce all cuts (A/B/C)</button></form>
-<p class="muted">Why {{ t.recommended_variant }}: {{ t.recommended_why }} · Knowledge used: {% for k in t.knowledge_refs %}<a href="{{ base }}/knowledge">{{ k }}</a> {% endfor %}</p></div>{% endif %}
-<div class="card"><h3>Score (explainable)</h3><table>{% for k, x in v.score_breakdown.parts.items() %}<tr><td>{{ k }}</td><td>{{ x.score }}</td><td class="muted">{{ x.why }}</td></tr>{% endfor %}</table></div>
-<div class="card"><h3>Exact API requests this would send (tokens redacted, dry-run preview)</h3><pre>{{ would_send|tojson(indent=2) }}</pre></div>
-<div class="card"><h3>Publish jobs</h3><pre>{{ jobs|tojson(indent=2) }}</pre><h3>Audit</h3><table>{% for a in audit %}<tr><td>{{ a.at }}</td><td>{{ a.actor }}</td><td>{{ a.action }}</td><td class="muted">{{ a.detail }}</td></tr>{% endfor %}</table></div>
+{% extends "base.html" %}{% block title %}{{ v.hook or 'Post' }}{% endblock %}{% block body %}
+{% set rf = v.risk_flags or {} %}{% set errs = (v.validation or {}).errors or [] %}
+<div class="ph"><div class="t"><div class="eyebrow"><a href="{{ base }}/queue?state={{ v.state }}">← Approvals</a> · {{ v.platform|platform }} post</div>
+<h1>{{ v.hook or v.variant_id }}</h1>
+<p>{{ chip(v.state) }} {{ v.account_id|acct }} · {{ acc.canonical_brand_id|brand }} · {{ v.route_role|label }}{% if v.series %} · series “{{ v.series }}”{% endif %} · score <b>{{ ((v.score or 0)*100)|round|int }}</b></p></div>
+<div class="acts">{% if v.state in ('in_review','approved','needs_fix') %}<a class="btn" href="#decide">Approve / schedule ↓</a>{% endif %}<a class="btn ghost" href="{{ base }}/asset/{{ asset.asset_id }}">Source asset</a></div></div>
+{% if rf.blockers or errs %}<div class="flash err"><b>Can't be approved yet.</b>{% for b in (rf.blockers or []) + errs %}<div class="small">• {{ b }}</div>{% endfor %}</div>{% endif %}
+{% if rf.review_flags or rf.two_person_signoff %}<div class="flash info">{% if rf.two_person_signoff %}<b>Needs two approvers.</b> {% endif %}{% for f in rf.review_flags or [] %}{{ chip(f, 'warn', f|label) }}{% endfor %}{% for l in rf.labels or [] %}<div class="small muted">{{ l }}</div>{% endfor %}</div>{% endif %}
+{% if asset.is_sample %}<div class="flash info">Sample data — not real footage.</div>{% endif %}
+<div class="split"><div>
+<div class="card"><div class="ch"><h2>Finished post</h2><div class="acts"><form method="post" action="{{ base }}/variant/{{ v.variant_id }}/render" class="inline"><button class="sm">{{ 'Re-render' if render_url else 'Render 9:16 post' }}</button></form></div></div>
+{% if v.render_status == 'rendering' %}<div class="empty">Rendering… refresh in a minute.</div>{% elif render_url and '.mp4' in render_url %}<video src="{{ render_url }}" controls muted playsinline></video>{% elif render_url %}<img src="{{ render_url }}" style="max-width:100%;border-radius:8px">{% else %}<div class="empty">Not rendered yet.</div>{% endif %}
+{% if v.render_qc %}<p>{{ chip('ok' if v.render_qc.passed else 'bad', 'ok' if v.render_qc.passed else 'bad', 'QC passed' if v.render_qc.passed else 'QC failed') }} <span class="muted small">{{ v.render_qc.summary }}</span></p>
+{% for e in v.render_qc.errors %}<div class="small" style="color:#fca5a5">• {{ e }}</div>{% endfor %}{% for w in v.render_qc.warnings %}<div class="small" style="color:var(--warn)">• {{ w }}</div>{% endfor %}{% endif %}
+{% if v.public_media_url %}<p class="small">Public link: <a href="{{ v.public_media_url }}" target="_blank" rel="noopener">{{ v.public_media_url }}</a></p>
+{% elif render_url and v.state in ('approved','scheduled') %}<form method="post" action="{{ base }}/variant/{{ v.variant_id }}/public-link"><button class="sm">Create public link</button> <span class="faint small">Instagram, Facebook and TikTok pull the video from a URL; this is created automatically at publish time.</span></form>{% endif %}</div>
+<div class="card"><div class="ch"><h2>Source clip</h2></div>{% if source.src %}<video src="{{ source.src }}" poster="{{ source.poster }}" controls muted playsinline preload="metadata"></video>
+<p class="faint small">The exact cut this post uses ({{ '%.1f'|format(v.edl.segments[0].source_in) if v.edl.segments else '' }}–{{ '%.1f'|format(v.edl.segments[-1].source_out) if v.edl.segments else '' }}s of {{ asset.title }}). Captions and on-screen text are in the finished post.</p>
+{% else %}<div class="empty">No playable source for this asset.</div>{% endif %}</div>
+{% set t = v.treatment %}{% if t %}<div class="card"><div class="ch"><h2>Cuts</h2><div class="acts"><form method="post" action="{{ base }}/variant/{{ v.variant_id }}/cuts/render" class="fbar"><label class="small muted"><input type="checkbox" name="use_ops" value="on" checked> subject-tracked vertical (ops Smart Crop)</label><button class="sm">Produce A/B/C</button></form></div></div>
+<div class="tw"><table class="stack"><thead><tr><th>Cut</th><th>Idea</th><th>Status</th><th></th></tr></thead><tbody>{% for x in t.duration_variants %}<tr>
+<td class="nowrap"><b>{{ x.label }}</b> · ≈{{ x.target_s|int }}s{% if x.label == t.recommended_variant %} {{ chip('ok','ok','Recommended') }}{% endif %}{% if (v.edl or {}).get('variant_label') == x.label %} {{ chip('x','info','In use') }}{% endif %}</td>
+<td>{{ x.idea }}<span class="sub">{% if x.available %}{{ x.actual_s }}s, payoff at {{ x.payoff_at_s }}s{% else %}{{ x.why }}{% endif %}</span></td>
+<td>{% if x.ops_vertical %}{{ chip(x.ops_vertical.status, text='Vertical ' ~ (x.ops_vertical.status|label|lower)) }}{% endif %}{% if x.render %}{{ chip(x.render.status) }}{% if x.render.qc %}{{ chip('q', 'ok' if x.render.qc.passed else 'bad', 'QC ' ~ ('passed' if x.render.qc.passed else 'failed')) }}{% endif %}{% endif %}{% if not x.available %}<span class="faint small">Not possible</span>{% endif %}</td>
+<td class="act">{% if x.available and v.state in ('in_review','needs_fix','approved') and (v.edl or {}).get('variant_label') != x.label %}<form method="post" action="{{ base }}/variant/{{ v.variant_id }}/cut"><input type="hidden" name="label" value="{{ x.label }}"><button class="sm">Use cut {{ x.label }}</button></form>{% endif %}</td></tr>{% endfor %}</tbody></table></div>
+<p class="faint small">Why {{ t.recommended_variant }}: {{ t.recommended_why }}</p></div>
+<div class="card"><div class="ch"><h2>Creative treatment</h2></div><ul class="list">
+<li><div class="body"><span class="faint small">Hook</span><div>{{ t.hook.opening_beat }}</div><span class="sub">First seconds: “{{ t.hook.first_seconds }}”</span></div></li>
+<li><div class="body"><span class="faint small">Edit</span><div>{{ t.edit.pace }}</div></div></li><li><div class="body"><span class="faint small">Context</span><div>{{ t.context.approach }}</div></div></li>
+<li><div class="body"><span class="faint small">Payoff</span><div>{{ t.payoff.label }}{% if t.payoff.what %} — {{ t.payoff.what }}{% endif %}</div></div></li>
+<li><div class="body"><span class="faint small">Why follow</span><div>{{ t.conversion.reason_to_follow }}</div>{% if t.conversion.cta %}<span class="sub">CTA: {{ t.conversion.cta }}</span>{% endif %}</div></li></ul>
+{% if t.note %}<p class="faint small">{{ t.note }}</p>{% endif %}{% if t.knowledge_refs %}<p class="faint small">Based on: {% for k in t.knowledge_refs %}<a href="{{ base }}/knowledge">{{ k }}</a> {% endfor %}</p>{% endif %}</div>{% endif %}
+</div><div>
+<div class="card" id="decide"><div class="ch"><h2>Decision</h2></div>
+<p class="small">Live publishing: {% if live_ok %}{{ chip('ok','ok','Allowed') }}{% else %}{{ chip('x','muted','Simulated') }}<span class="sub">{{ reasons|join(' · ') }}</span>{% endif %}</p>
+<form method="post" action="{{ base }}/variant/{{ v.variant_id }}/approve" class="fbar">{% if not user %}<input name="reviewer" placeholder="Your name" required class="grow">{% endif %}<input name="note" placeholder="Note (optional)" class="grow"><button class="primary">Approve this exact text</button></form>
+<hr><form method="post" action="{{ base }}/variant/{{ v.variant_id }}/schedule" class="fbar"><div class="field grow"><span>Post at ({{ tz_name }})</span><input name="slot_at" type="datetime-local" value="{{ planned.slot_at|localinput if planned else '' }}"></div>{% if not user %}<input name="actor" placeholder="Your name" required>{% endif %}<button>Schedule</button></form>
+<p class="faint small">Only approved posts can be scheduled. The <a href="{{ base }}/runsheet">run sheet</a> picks the best time for you.</p>
+<hr><form method="post" action="{{ base }}/variant/{{ v.variant_id }}/reject" class="fbar">{% if not user %}<input name="reviewer" placeholder="Your name" required class="grow">{% endif %}<input name="note" placeholder="Why (required)" required class="grow"><button class="danger">Reject</button></form>
+{% if v.state == 'scheduled' %}<form method="post" action="{{ base }}/variant/{{ v.variant_id }}/cancel" style="margin-top:8px"><input type="hidden" name="actor" value="{{ user or 'dashboard' }}"><button class="ghost sm">Cancel this post</button></form>{% endif %}
+{% if approvals %}<hr><span class="faint small">Approval trail</span><ul class="list">{% for a in approvals %}<li><div class="body">{{ chip(a.decision, 'ok' if a.decision == 'approve' else ('bad' if a.decision == 'reject' else 'muted'), a.decision|label) }} {{ a.reviewer }} <span class="faint small">{{ a.at|ago }}</span>{% if a.note %}<span class="sub">{{ a.note }}</span>{% endif %}</div></li>{% endfor %}</ul>{% endif %}</div>
+<div class="card"><div class="ch"><h2>Copy</h2></div><form method="post" action="{{ base }}/variant/{{ v.variant_id }}/edit">
+<div class="field"><span>Hook</span><input name="hook" value="{{ v.hook }}"></div>
+<div class="field" style="margin-top:8px"><span>Caption — the exact text that posts</span><textarea name="caption" rows="9">{{ v.caption }}</textarea></div>
+<div class="field" style="margin-top:8px"><span>Call to action</span><input name="cta" value="{{ v.cta }}"></div>
+<div class="fbar" style="margin-top:10px">{% if not user %}<input name="actor" placeholder="Your name" required class="grow">{% endif %}<button>Save copy</button><span class="faint small">Saving clears earlier approvals.</span></div></form>
+{% if v.hashtags %}<p class="faint small">Hashtags: {{ v.hashtags|join(' ') }}{% if v.hashtag_rationale %} — {{ v.hashtag_rationale }}{% endif %}</p>{% endif %}</div>
+<div class="card"><div class="ch"><h2>Why this score</h2></div><ul class="list">{% for k, x in v.score_breakdown.parts.items() %}<li><div class="body"><b>{{ k|label }}</b> <span class="faint small">{{ x.score }}</span><span class="sub">{{ x.why }}</span></div></li>{% endfor %}</ul></div>
+<div class="card"><div class="ch"><h2>Source</h2></div><p><a href="{{ base }}/asset/{{ asset.asset_id }}"><b>{{ asset.title }}</b></a></p>
+<p class="small muted">{{ asset.source_brand_name }} · licence {{ asset.license or '—' }} · rights until {{ asset.rights_expires_at|when(true) if asset.rights_expires_at else '—' }}</p></div>
+</div></div>
+<div class="card"><details><summary>Technical details — API preview, edit list, publish jobs, audit</summary>
+<h3 style="margin-top:12px">Edit decision list</h3><div class="tw"><table><thead><tr><th>In → out</th><th>Purpose</th><th>Timecode</th></tr></thead><tbody>{% for s in v.edl.segments %}<tr><td class="nowrap">{{ '%.2f'|format(s.source_in) }}–{{ '%.2f'|format(s.source_out) }}s</td><td>{{ s.purpose|label }}</td><td class="mono">{{ s.source_timecode }}</td></tr>{% endfor %}</tbody></table></div>
+<p class="faint small">{{ v.edl.notes }}</p>
+<h3>Requests this would send (tokens redacted)</h3><pre>{{ would_send|tojson(indent=2) }}</pre>
+<h3>Publish jobs</h3><pre>{{ jobs|tojson(indent=2) }}</pre>
+<h3>Audit</h3><div class="tw"><table><tbody>{% for a in audit %}<tr><td class="nowrap">{{ a.at|when(true) }}</td><td>{{ a.actor }}</td><td>{{ a.action|label }}</td><td class="muted small">{{ a.detail }}</td></tr>{% endfor %}</tbody></table></div>
+<p class="faint mono">{{ v.variant_id }} · north star: {{ north.label }}</p></details></div>
 {% endblock %}

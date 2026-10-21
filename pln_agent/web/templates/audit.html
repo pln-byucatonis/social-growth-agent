@@ -1,3 +1,9 @@
-{% extends "base.html" %}{% block body %}
-<div class="card tablewrap"><h3>Audit log (latest 300)</h3><table><tr><th>at</th><th>actor</th><th>action</th><th>entity</th><th>detail</th></tr>
-{% for r in rows %}<tr><td>{{ r.at }}</td><td>{{ r.actor }}</td><td>{{ r.action }}</td><td>{{ r.entity }} {{ r.entity_id }}</td><td class="muted">{{ r.detail }}</td></tr>{% endfor %}</table></div>{% endblock %}
+{% extends "base.html" %}{% block title %}Audit log{% endblock %}{% block body %}
+<div class="ph"><div class="t"><div class="eyebrow">Admin</div><h1>Audit log</h1><p>Every approval, edit, schedule, setting change and agent action, newest first.</p></div></div>
+<div class="card"><form method="get" class="fbar"><select name="actor"><option value="">Everyone</option>{% for a in actors %}<option {{ 'selected' if a == actor }}>{{ a }}</option>{% endfor %}</select>
+<input name="q" value="{{ q }}" placeholder="Action or item contains…" class="grow"><button>Filter</button>{% if actor or q %}<a class="btn ghost" href="{{ base }}/audit">Clear</a>{% endif %}</form></div>
+<div class="card flush"><div class="ch"><h2>{{ rows|length }} entr{{ 'y' if rows|length == 1 else 'ies' }}</h2><span class="faint small">latest 300</span></div><div class="tw"><table class="stack"><thead><tr><th>When</th><th>Who</th><th>What</th><th>Item</th><th>Detail</th></tr></thead><tbody>
+{% for r in rows %}<tr><td class="nowrap" title="{{ r.at }}">{{ r.at|when(true) }}<span class="sub">{{ r.at|ago }}</span></td><td>{{ r.actor }}</td><td><b>{{ r.action|label }}</b></td><td class="small">{{ r.entity|label }}<span class="sub mono">{{ r.entity_id }}</span></td>
+<td class="small muted">{% if r.detail %}<details><summary class="clip2">{{ r.detail|string|truncate(110) }}</summary><pre>{{ r.detail|tojson(indent=1) if r.detail is mapping else r.detail }}</pre></details>{% endif %}</td></tr>
+{% else %}<tr><td colspan="5"><div class="empty">Nothing matches.</div></td></tr>{% endfor %}</tbody></table></div></div>
+{% endblock %}

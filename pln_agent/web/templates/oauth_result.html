@@ -1,8 +1,7 @@
-{% extends "base.html" %}{% block body %}
-<div class="card">{% if error %}<h3>Couldn't connect</h3><p class="badge bad">{{ error }}</p>
-{% else %}<h3>{{ label }} connected</h3>
-{% if result.connected %}<p>Connected {{ result.connected|length }} account(s):</p><ul>{% for c in result.connected %}<li><b>{{ c.account_id }}</b> — {{ c.platform }} {{ c.handle }} (id {{ c.platform_id }})</li>{% endfor %}</ul>{% else %}<p>No agent account matched what this login manages.</p>{% endif %}
-{% if result.unmatched %}<p class="muted">This login also manages these, which don't match an agent account (not connected):</p><ul>{% for u in result.unmatched %}<li>{{ u.platform }} {{ u.handle or u.name }} (id {{ u.platform_id }})</li>{% endfor %}</ul>{% endif %}
-<p class="muted">Publishing is still off for these accounts until it's authorized separately.</p>{% endif %}
-<p><a class="btn" href="{{ portal }}">Back to Accounts in ops</a></p></div>
+{% extends "base.html" %}{% block title %}Connect{% endblock %}{% block body %}
+<div class="ph"><div class="t"><div class="eyebrow">Admin · Accounts</div><h1>{% if error %}Couldn't connect{% else %}{{ label }} connected{% endif %}</h1></div><div class="acts"><a class="btn primary" href="{{ portal }}">Back to Accounts</a></div></div>
+{% if error %}<div class="flash err">{{ error }}</div>{% else %}
+<div class="card"><div class="ch"><h2>Connected {{ result.connected|length }} account{{ 's' if result.connected|length != 1 }}</h2></div>{% if result.connected %}<ul class="list">{% for c in result.connected %}<li><div class="body"><b>{{ c.handle }}</b> · {{ c.platform|platform }}<span class="sub mono">{{ c.account_id }} · id {{ c.platform_id }}</span></div>{{ chip('oauth_connected') }}</li>{% endfor %}</ul>{% else %}<div class="empty">No agent account matched what this login manages.</div>{% endif %}</div>
+{% if result.unmatched %}<div class="card"><div class="ch"><h2>Also managed by this login, not connected</h2></div><ul class="list">{% for u in result.unmatched %}<li><div class="body">{{ u.handle or u.name }} · {{ u.platform|platform }}<span class="sub mono">id {{ u.platform_id }}</span></div></li>{% endfor %}</ul></div>{% endif %}
+<div class="flash info">Publishing stays off for these accounts until it's authorized separately.</div>{% endif %}
 {% endblock %}

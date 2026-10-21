@@ -1,17 +1,25 @@
-{% extends "base.html" %}{% block body %}
-<div class="card"><p class="muted"><a href="{{ base }}/team">← Agent Team</a></p><h3 style="margin-top:0">{{ a.name }} <span class="badge">{{ a.layer }}</span></h3>
-<p>{{ a.mission }}</p><p class="muted">{{ a.status }} · <a href="{{ base }}{{ a.page }}">its page</a></p>
-<b>How it decides</b><ul>{% for r in a.rules %}<li>{{ r }}</li>{% endfor %}</ul></div>
-<div class="grid"><div class="card"><h3>Settings</h3>{% for p in a.params %}
-<form method="post" action="{{ base }}/team/agent/{{ a.key }}/param"><input type="hidden" name="name" value="{{ p.key }}">{{ p.label }}:
-{% if p.type == 'bool' %}<select name="value"><option value="true" {{ 'selected' if p.value }}>on</option><option value="false" {{ '' if p.value else 'selected' }}>off</option></select>
-{% else %}<input name="value" type="number" step="{{ p.step }}" min="{{ p.min }}" max="{{ p.max }}" value="{{ p.value }}" style="width:110px">{% endif %}
-<span class="muted">default {{ p.default }}</span> {% if not user %}<input name="actor" placeholder="name" size="8">{% endif %}<button>Save</button>{% if p.overridden %} <button name="reset" value="1">Reset</button>{% endif %}</form>
-{% else %}<p class="muted">No numeric settings; steer it with directives.</p>{% endfor %}</div>
-<div class="card"><h3>Directives</h3>{% for d in a.directives %}<form method="post" action="{{ base }}/team/directive/{{ d.directive_id }}/retire"><input type="hidden" name="back_to" value="/team/agent/{{ a.key }}">• {{ d.text }} <span class="muted">{{ 'whole team' if d.agent_key == 'team' else d.source }} · {{ d.created_by }} · {{ d.created_at[:10] }}</span> {% if not user %}<input name="actor" placeholder="name" size="8">{% endif %}<button>Retire</button></form>{% else %}<p class="muted">None.</p>{% endfor %}
-<form method="post" action="{{ base }}/team/directive"><input type="hidden" name="agent" value="{{ a.key }}"><input type="hidden" name="back_to" value="/team/agent/{{ a.key }}"><textarea name="text" rows="2" style="width:100%" placeholder="Course correction, e.g. stop recommending more volume until supply is above 10 drafts" required></textarea>{% if not user %}<input name="actor" placeholder="your name"> {% endif %}<button>Add directive</button></form></div></div>
-<div class="card"><h3>Talk to {{ a.name }}</h3>
-{% if chats %}<p class="muted">Conversations: {% for c in chats %}<a href="{{ base }}/team/agent/{{ a.key }}?thread={{ c.thread_id }}">{{ c.title[:50] }}</a>{% if not loop.last %} · {% endif %}{% endfor %} · <a href="{{ base }}/team/agent/{{ a.key }}?thread=new">new</a></p>{% endif %}
-{% for m in msgs %}<div style="margin:8px 0;padding:8px;border-radius:6px;background:{{ 'var(--soft, #f2f4f7)' if m.role == 'manager' else 'transparent' }}"><b>{{ 'You' if m.role == 'manager' else a.name }}</b> <span class="muted">{{ m.created_at[:16] }}{% if (m.meta or {}).get('fallback') %} · Claude unavailable{% endif %}</span><div style="white-space:pre-wrap">{{ m.content }}</div></div>{% endfor %}
-<form method="post" action="{{ base }}/team/agent/{{ a.key }}/chat"><input type="hidden" name="thread" value="{{ thread if thread != 'new' else '' }}"><textarea name="text" rows="3" style="width:100%" placeholder="Ask why it recommended something, what it would change, what data it's missing..." required></textarea>{% if not user %}<input name="actor" placeholder="your name"> {% endif %}<button class="primary">Send</button></form></div>
+{% extends "base.html" %}{% block title %}{{ a.name }}{% endblock %}{% block body %}
+<div class="ph"><div class="t"><div class="eyebrow"><a href="{{ base }}/team">← Agent Team</a> · {{ a.layer|label }}</div><h1>{{ a.name }}</h1>
+<p>{{ a.mission }}</p><p><b>{{ a.status }}</b></p></div><div class="acts"><a class="btn" href="{{ base }}{{ a.page }}">Open its page →</a></div></div>
+<div class="split"><div>
+<div class="card"><div class="ch"><h2>Talk to {{ a.name }}</h2>{% if chats %}<div class="acts"><form method="get" class="inline"><select name="thread" onchange="this.form.submit()">{% for c in chats %}<option value="{{ c.thread_id }}" {{ 'selected' if c.thread_id == thread }}>{{ c.title[:60] }}</option>{% endfor %}<option value="new" {{ 'selected' if thread == 'new' }}>+ New conversation</option></select></form></div>{% endif %}</div>
+{% for m in msgs %}<div class="msg {{ 'me' if m.role == 'manager' }}"><div class="who">{{ (m.meta or {}).get('by') or 'You' if m.role == 'manager' else a.name }} · {{ m.created_at|ago }}{% if (m.meta or {}).get('fallback') %} · {{ chip('x','warn','Claude unavailable — showing its data') }}{% endif %}</div><div style="white-space:pre-wrap">{{ m.content }}</div></div>
+{% else %}<div class="empty">Ask why it recommended something, what it would change, or what data it's missing.</div>{% endfor %}
+<form method="post" action="{{ base }}/team/agent/{{ a.key }}/chat" style="margin-top:10px"><input type="hidden" name="thread" value="{{ thread if thread != 'new' else '' }}"><textarea name="text" rows="3" placeholder="Message {{ a.name }}…" required></textarea>
+<div class="fbar" style="margin-top:6px">{% if not user %}<input name="actor" placeholder="Your name">{% endif %}<button class="primary">Send</button></div></form></div>
+<div class="card"><div class="ch"><h2>How it decides</h2></div><ul class="list">{% for r in a.rules %}<li><div class="body">{{ r }}</div></li>{% endfor %}</ul></div>
+</div><div>
+<div class="card"><div class="ch"><h2>Settings</h2><span class="faint small">used on its next run</span></div>
+{% for p in a.params %}<form method="post" action="{{ base }}/team/agent/{{ a.key }}/param" style="padding:8px 0;border-bottom:1px solid var(--hair)"><input type="hidden" name="name" value="{{ p.key }}">
+<div class="fbar"><span class="grow small">{{ p.label }}{% if p.overridden %} {{ chip('x','warn','Changed') }}{% endif %}</span><span class="faint small">default {{ p.default }}</span></div>
+<div class="fbar" style="margin-top:4px">{% if p.type == 'bool' %}<select name="value" class="grow"><option value="true" {{ 'selected' if p.value }}>On</option><option value="false" {{ '' if p.value else 'selected' }}>Off</option></select>
+{% else %}<input name="value" type="number" step="{{ p.step }}" min="{{ p.min }}" max="{{ p.max }}" value="{{ p.value }}" class="grow">{% endif %}
+{% if not user %}<input name="actor" placeholder="Name" style="width:90px">{% endif %}<button class="sm">Save</button>{% if p.overridden %}<button class="sm ghost" name="reset" value="1">Reset</button>{% endif %}</div></form>
+{% else %}<p class="faint small">No numeric settings — steer it with directives.</p>{% endfor %}</div>
+<div class="card"><div class="ch"><h2>Directives</h2></div>
+{% if a.directives %}<ul class="list">{% for d in a.directives %}<li><div class="body">{{ d.text }}<span class="sub">{{ 'Whole team' if d.agent_key == 'team' else d.source|label }} · {{ d.created_by }} · {{ d.created_at|ago }}</span></div>
+<form method="post" action="{{ base }}/team/directive/{{ d.directive_id }}/retire"><input type="hidden" name="back_to" value="/team/agent/{{ a.key }}">{% if not user %}<input name="actor" placeholder="Name" style="width:70px">{% endif %}<button class="sm ghost">Retire</button></form></li>{% endfor %}</ul>{% else %}<p class="faint small">None.</p>{% endif %}
+<form method="post" action="{{ base }}/team/directive" style="margin-top:8px"><input type="hidden" name="agent" value="{{ a.key }}"><input type="hidden" name="back_to" value="/team/agent/{{ a.key }}">
+<textarea name="text" rows="2" placeholder="Course correction, e.g. stop recommending more volume until supply is above 10 drafts" required></textarea><div class="fbar" style="margin-top:6px">{% if not user %}<input name="actor" placeholder="Your name">{% endif %}<button class="sm">Add directive</button></div></form></div>
+</div></div>
 {% endblock %}

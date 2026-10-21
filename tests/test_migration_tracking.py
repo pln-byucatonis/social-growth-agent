@@ -63,7 +63,7 @@ class MigrationTrackingTests(unittest.TestCase):
         web._db = self.db
         page = TestClient(web.app).get("/migration")
         self.assertEqual(page.status_code, 200)
-        self.assertIn("Tracking (measured)", page.text)
+        self.assertIn("Home, from the numbers", page.text)
 
 
 if __name__ == "__main__":

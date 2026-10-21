@@ -1,12 +1,34 @@
-{% extends "base.html" %}{% block body %}
-<div class="grid">
-<div class="card"><h3>Pipeline</h3><table>{% for s in ['needs_fix','in_review','approved','scheduled','simulated','published','failed','rejected'] %}<tr><td>{{ s }}</td><td><a href="{{ base }}/queue?state={{ s }}">{{ counts.get(s,0) }}</a></td></tr>{% endfor %}</table></div>
-<div class="card"><h3>Emergency stop</h3><p class="muted">Halts the publisher immediately and pauses all queued jobs. Audited.</p>
-<form method="post" action="{{ base }}/kill">{% if not user %}<input name="actor" placeholder="your name" required>{% endif %}<input name="reason" placeholder="reason"><br><br>
-{% if kill %}<input type="hidden" name="state" value="off"><button>Release emergency stop</button>{% else %}<input type="hidden" name="state" value="on"><button class="danger">EMERGENCY STOP</button>{% endif %}</form>
-<br><form method="post" action="{{ base }}/publish/run"><button>Run publisher now (respects all gates)</button></form></div>
+{% extends "base.html" %}{% block title %}Today{% endblock %}{% block body %}
+<div class="ph"><div class="t"><div class="eyebrow">Growth Desk</div><h1>Today</h1>
+<p>What needs a person right now, what's going out next, and how publishing is doing.</p></div>
+<div class="acts"><a class="btn primary" href="{{ base }}/runsheet">Plan tomorrow</a><a class="btn" href="{{ base }}/queue?state=in_review">Review drafts</a></div></div>
+<div class="kpis">
+<a class="kpi {{ 'warn' if counts.get('in_review',0) else '' }}" href="{{ base }}/queue?state=in_review"><div class="v">{{ counts.get('in_review',0)|num }}</div><div class="l">Drafts waiting for approval</div></a>
+<a class="kpi {{ 'bad' if counts.get('needs_fix',0) else '' }}" href="{{ base }}/queue?state=needs_fix"><div class="v">{{ counts.get('needs_fix',0)|num }}</div><div class="l">Drafts that need a fix</div></a>
+<a class="kpi info" href="{{ base }}/runsheet"><div class="v">{{ next24 }}</div><div class="l">Posts scheduled in the next 24h</div></a>
+<a class="kpi {{ 'bad' if esc else '' }}" href="{{ base }}/community?status=escalated"><div class="v">{{ esc }}</div><div class="l">Escalated comments</div><div class="h">{{ waiting_replies }} replies waiting for approval</div></a>
+<a class="kpi {{ 'bad' if failed else '' }}" href="{{ base }}/queue?state=failed"><div class="v">{{ failed }}</div><div class="l">Failed or blocked posts</div></a>
+<div class="kpi {{ 'bad' if not last_post else '' }}"><div class="v" style="font-size:18px">{{ last_post|ago }}</div><div class="l">Last post on PLN / CarJitsu / Putt Tour</div></div>
 </div>
-<div class="card"><h3>Recommendations (evidence-cited)</h3><table>{% for r in recs %}<tr><td><span class="badge {{ 'bad' if r.priority=='P0' else 'warn' }}">{{ r.priority }}</span></td><td>{{ r.type }}</td><td>{{ r.text }}<br><span class="muted">{{ r.evidence }}</span></td></tr>{% endfor %}</table></div>
-<div class="card"><h3>Recent publish jobs</h3><div class="tablewrap"><table><tr><th>job</th><th>variant</th><th>state</th><th>mode</th><th>attempts</th><th>permalink / error</th></tr>
-{% for j in jobs %}<tr><td>{{ j.job_id }}</td><td><a href="{{ base }}/variant/{{ j.variant_id }}">{{ j.variant_id }}</a></td><td>{{ j.state }}</td><td>{{ j.mode }}</td><td>{{ j.attempts }}</td><td>{{ j.permalink or '' }} <span class="muted">{{ j.last_error or '' }}</span></td></tr>{% endfor %}</table></div></div>
+<div class="split"><div>
+<div class="card"><div class="ch"><h2>Needs you now</h2><div class="acts"><a class="btn sm ghost" href="{{ base }}/growth">Full growth brief →</a></div></div>
+{% if actions %}<ul class="list">{% for a in actions %}<li><span class="prio {{ a.priority }}"></span><div class="body">{{ chip(a.priority) }} <span class="faint small">{{ a.area|label }}</span><div>{{ a.text|prose }}</div></div></li>{% endfor %}</ul>
+{% else %}<div class="empty">Nothing urgent in this week's brief.</div>{% endif %}</div>
+<div class="card"><div class="ch"><h2>Other recommendations</h2></div>
+{% if recs %}<ul class="list">{% for r in recs %}<li><span class="prio {{ r.priority }}"></span><div class="body"><b>{{ r.type|label }}</b> <span class="faint small">· {{ r.evidence }}</span><div class="muted">{{ r.text|prose }}</div></div></li>{% endfor %}</ul>
+{% else %}<div class="empty">No recommendations.</div>{% endif %}</div>
+</div><div>
+<div class="card"><div class="ch"><h2>Next up</h2><div class="acts"><a class="btn sm ghost" href="{{ base }}/runsheet">Run sheet →</a></div></div>
+{% if upcoming %}<ul class="list">{% for u in upcoming %}<li><div class="body"><b class="nowrap">{{ u.slot_at|when(true) }}</b> <span class="faint small">{{ u.slot_at|ago }}</span><div><a href="{{ base }}/variant/{{ u.variant_id }}">{{ u.hook or u.variant_id }}</a></div><span class="sub">{{ u.account_id|acct }}</span></div></li>{% endfor %}</ul>
+{% else %}<div class="empty">Nothing scheduled. <a href="{{ base }}/runsheet">Plan tomorrow →</a></div>{% endif %}</div>
+<div class="card"><div class="ch"><h2>Controls</h2></div>
+<form method="post" action="{{ base }}/publish/run"><button class="grow" style="width:100%">Run the publisher now</button><p class="faint small">Respects every gate: approvals, rights, rate caps, dry-run.</p></form><hr>
+<form method="post" action="{{ base }}/kill"><b>Emergency stop</b><p class="faint small">Halts the publisher and pauses every queued post. Recorded in the audit log.</p>
+<div class="fbar">{% if not user %}<input name="actor" placeholder="Your name" required class="grow">{% endif %}<input name="reason" placeholder="Reason" class="grow"></div><div style="margin-top:8px">
+{% if kill %}<input type="hidden" name="state" value="off"><button>Release emergency stop</button>{% else %}<input type="hidden" name="state" value="on"><button class="danger">Stop all publishing</button>{% endif %}</div></form></div>
+</div></div>
+<div class="card flush"><div class="ch"><h2>Recent publishing</h2></div><div class="tw"><table class="stack"><thead><tr><th>Post</th><th>Account</th><th>Status</th><th>Mode</th><th class="num">Tries</th><th>Updated</th><th>Result</th></tr></thead><tbody>
+{% for j in jobs %}<tr><td><a href="{{ base }}/variant/{{ j.variant_id }}">{{ j.variant_id.split(':')[0] }}</a></td><td>{{ j.account_id|acct }}</td><td>{{ chip(j.state) }}</td><td>{{ j.mode|label }}</td><td class="num">{{ j.attempts }}</td><td class="nowrap">{{ j.updated_at|ago }}</td>
+<td>{% if j.permalink %}<a href="{{ j.permalink }}" target="_blank">View post ↗</a>{% endif %}<span class="sub clip2">{{ j.last_error or '' }}</span></td></tr>
+{% else %}<tr><td colspan="7"><div class="empty">Nothing published yet.</div></td></tr>{% endfor %}</tbody></table></div></div>
 {% endblock %}

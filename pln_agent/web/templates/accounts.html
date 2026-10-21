@@ -1,33 +1,29 @@
-{% extends "base.html" %}{% block body %}
-<div class="card"><h3>Connect accounts</h3>
-<p>Three steps per platform: <b>1</b> register a developer app on the platform and add the redirect URL shown below;
-<b>2</b> paste its client id + secret here (stored in AWS Secrets Manager, never shown again);
-<b>3</b> press <b>Connect</b> and sign in as an admin of the brand account. One Meta sign-in connects every Facebook Page and Instagram account it manages.
-Connecting never turns on publishing — that stays a separate step per account behind the global dry-run switch.</p>
-<form method="post" action="{{ base }}/accounts/confirm-ownership"><button>Confirm PLN owns all unverified accounts</button></form></div>
-<div class="grid">{% for a in apps %}<div class="card"><h3>{{ a.p.label }}</h3>
-<p>{% if a.configured %}<span class="badge ok">app saved {{ a.client_id_hint }}</span>{% else %}<span class="badge warn">app not saved yet</span>{% endif %}
-{% if a.error %}<span class="badge bad">{{ a.error }}</span>{% endif %}</p>
-{% if a.p.key == 'meta' %}{% if meta_user.connected %}<p>Meta logins shared with analytics + publishing:</p><ul>{% for l in meta_user.logins %}<li>{{ l.name }} — <span class="badge {{ 'bad' if l.expired else 'warn' if l.expiring else 'ok' }}">{% if l.days_left is not none %}{{ l.days_left }} days left{% else %}no expiry{% endif %}</span></li>{% endfor %}</ul>
-<p class="muted">Someone else manages other Pages? They sign in with Connect too (they need a role on the Meta app while it's in Development mode); each login adds the accounts it manages. Long-lived Meta tokens last ~60 days.</p>
-{% else %}<p><span class="badge warn">not connected — ops Instagram/Facebook analytics are paused until someone connects Meta</span></p>{% endif %}{% endif %}
-<p class="muted">Redirect URL to register:<br><code>{{ a.redirect_uri }}</code></p>
-<p class="muted">Scopes: {{ a.p.scopes|join(', ') }}</p>
-<p class="muted">{{ a.p.review_note }} <a href="{{ a.p.console }}" target="_blank" rel="noopener">Developer console ↗</a></p>
-<details><summary>{{ 'Replace' if a.configured else 'Save' }} app credentials</summary>
-<form method="post" action="{{ base }}/oauth/app/{{ a.p.key }}" autocomplete="off">
-<label>Client id <input name="client_id" required></label>
-<label>Client secret <input name="client_secret" type="password" required></label><button>Save</button></form></details>
-{% if a.p.key == 'meta' and a.configured %}<form method="post" action="{{ base }}/oauth/app/meta/config"><label>Facebook Login for Business configuration ID <input name="config_id" value="{{ a.config_id }}" size="20" placeholder="e.g. 1234567890123456"></label><button>Save</button>
-<span class="muted">From the Meta app → Facebook Login for Business → Configurations. Leave blank to use the classic permission list.</span></form>{% endif %}
-<table>{% for r in a.accounts %}<tr><td>{{ r.username_original or r.account_id }}<br><span class="muted">{{ r.platform }} · {{ r.verification_status }}{% if r.stable_platform_id %} · id {{ r.stable_platform_id }}{% endif %}</span></td>
-<td>{% if a.configured %}<a class="btn" target="_top" href="{{ base }}/oauth/start/{{ a.p.key }}?account={{ r.account_id|urlencode }}">{{ 'Reconnect' if r.verification_status == 'oauth_connected' else 'Connect' }}</a>{% else %}<span class="muted">save app first</span>{% endif %}</td></tr>{% endfor %}</table>
-</div>{% endfor %}</div>
-<div class="card tablewrap"><h3>Portfolio ({{ rows|length }} accounts)</h3>
-<table><tr><th>account id</th><th>handle</th><th>platform</th><th>role</th><th>verification</th><th>live publish</th></tr>
-{% for a in rows %}<tr><td>{{ a.account_id }}<br><span class="muted">{{ a.brand_id }} → {{ a.canonical_brand_id }}</span></td><td>{{ a.username_original or '(not supplied)' }}</td><td>{{ a.platform }}</td><td>{{ a.role }}</td>
-<td>{{ a.verification_status }}{% if a.ownership_owner %}<br><span class="muted">{{ a.ownership_owner }}</span>{% endif %}{% if a.hard_block_reason %}<br><span class="badge bad">{{ a.hard_block_reason }}</span>{% endif %}</td>
-<td>{% if a.live_ok %}<span class="badge ok">yes</span>{% else %}<span class="muted">{{ a.reasons|join(' · ') }}</span>{% endif %}</td></tr>{% endfor %}</table>
-<p class="muted">Tokens live in AWS Secrets Manager; the database keeps only a reference. Publishing authorization is a separate audited step (pln accounts authorize).</p></div>
-<div class="grid">{% for p, c in caps.items() %}<div class="card"><h3>{{ p }}</h3><ul>{% for r in c.requirements %}<li>{{ r }}</li>{% endfor %}</ul>{% for b in c.app_review_blockers %}<div class="badge warn">{{ b }}</div>{% endfor %}</div>{% endfor %}</div>
+{% extends "base.html" %}{% block title %}Accounts{% endblock %}{% block body %}
+{% set connected = rows|selectattr('verification_status','equalto','oauth_connected')|list %}{% set live = rows|selectattr('live_ok')|list %}
+<div class="ph"><div class="t"><div class="eyebrow">Admin</div><h1>Accounts</h1>
+<p>Every brand account, whether it's connected, and whether it can publish live. Connecting never turns on publishing — that's a separate, audited step per account, behind the global switch.</p></div>
+<div class="acts"><form method="post" action="{{ base }}/accounts/confirm-ownership" class="inline"><button>Confirm PLN owns all unverified accounts</button></form></div></div>
+<div class="kpis"><div class="kpi"><div class="v">{{ rows|length }}</div><div class="l">Accounts</div></div><div class="kpi ok"><div class="v">{{ connected|length }}</div><div class="l">Connected</div></div>
+<div class="kpi {{ 'warn' if live else '' }}"><div class="v">{{ live|length }}</div><div class="l">Allowed to publish live</div></div>
+<div class="kpi {{ 'warn' if not meta_user.connected else '' }}"><div class="v" style="font-size:18px">{{ 'Connected' if meta_user.connected else 'Not connected' }}</div><div class="l">Meta (Facebook + Instagram)</div>{% if meta_user.connected %}<div class="h">{{ meta_user.logins|length }} login(s)</div>{% endif %}</div></div>
+<div class="card flush"><div class="ch"><h2>Portfolio</h2></div><div class="tw"><table class="stack"><thead><tr><th>Account</th><th>Brand</th><th>Role</th><th>Connection</th><th>Live publishing</th><th></th></tr></thead><tbody>
+{% for r in rows %}{% set app = (apps|selectattr('p.key','equalto',r.provider)|list or [none])[0] %}<tr>
+<td><b>{{ r.account_id|acct(false) if r.username_original else '(handle not supplied)' }}</b><span class="sub">{{ r.platform|platform }}{% if r.stable_platform_id %} · id {{ r.stable_platform_id }}{% endif %}</span></td>
+<td>{{ r.brand_id|brand }}{% if r.canonical_brand_id != r.brand_id %}<span class="sub">→ {{ r.canonical_brand_id|brand }}</span>{% endif %}</td><td class="small">{{ r.role|label }}</td>
+<td>{{ chip(r.verification_status) }}{% if r.ownership_owner %}<span class="sub">{{ r.ownership_owner }}</span>{% endif %}{% if r.hard_block_reason %}<div>{{ chip('x','bad',r.hard_block_reason) }}</div>{% endif %}</td>
+<td>{% if r.live_ok %}{{ chip('ok','ok','Allowed') }}{% else %}<details><summary>{{ chip('x','muted','Simulated') }}</summary>{% for x in r.reasons %}<div class="small muted">• {{ x }}</div>{% endfor %}</details>{% endif %}</td>
+<td class="act">{% if app and app.configured %}<a class="btn sm" target="_top" href="{{ base }}/oauth/start/{{ app.p.key }}?account={{ r.account_id|urlencode }}">{{ 'Reconnect' if r.verification_status == 'oauth_connected' else 'Connect' }}</a>{% elif app %}<span class="faint small">Save the {{ app.p.label.split(' ')[0] }} app first</span>{% endif %}</td></tr>{% endfor %}</tbody></table></div>
+<p class="faint small" style="padding:8px 16px 12px">Tokens live in AWS Secrets Manager; the database keeps only a reference.</p></div>
+<div class="card"><div class="ch"><h2>Platform apps</h2><span class="faint small">One developer app per platform; one sign-in connects every account that login manages</span></div>
+<div class="grid">{% for a in apps %}<div class="card" style="margin:0;background:var(--raised)"><div class="ch"><h2>{{ a.p.label }}</h2>{% if a.configured %}{{ chip('ok','ok','App saved ' ~ a.client_id_hint) }}{% else %}{{ chip('x','warn','App not saved') }}{% endif %}</div>
+{% if a.error %}<div class="flash err small">{{ a.error }}</div>{% endif %}
+{% if a.p.key == 'meta' %}{% if meta_user.connected %}<p class="small">Meta logins used for analytics and publishing:</p><ul class="list">{% for l in meta_user.logins %}<li><div class="body">{{ l.name }}</div>{{ chip('x', 'bad' if l.expired else ('warn' if l.expiring else 'ok'), (l.days_left ~ ' days left') if l.days_left is not none else 'No expiry') }}</li>{% endfor %}</ul>
+<p class="faint small">Someone else manages other Pages? They sign in with Connect too; each login adds what it manages. Meta tokens last about 60 days.</p>
+{% else %}<div class="flash info small">Not connected — ops Instagram/Facebook analytics are paused until someone connects Meta.</div>{% endif %}{% endif %}
+<p class="small"><span class="faint">Redirect URL</span><br><span class="mono">{{ a.redirect_uri }}</span></p>
+<details><summary class="small">Scopes, review notes and credentials</summary><p class="small muted">{{ a.p.scopes|join(', ') }}</p><p class="small muted">{{ a.p.review_note }} <a href="{{ a.p.console }}" target="_blank" rel="noopener">Developer console ↗</a></p>
+<form method="post" action="{{ base }}/oauth/app/{{ a.p.key }}" autocomplete="off"><label class="field"><span>Client id</span><input name="client_id" required></label><label class="field" style="margin-top:6px"><span>Client secret</span><input name="client_secret" type="password" required></label><div style="margin-top:8px"><button class="sm">{{ 'Replace' if a.configured else 'Save' }} credentials</button></div></form>
+{% if a.p.key == 'meta' and a.configured %}<form method="post" action="{{ base }}/oauth/app/meta/config" style="margin-top:10px"><label class="field"><span>Facebook Login for Business configuration ID (blank = classic permission list)</span><input name="config_id" value="{{ a.config_id }}" placeholder="1234567890123456"></label><div style="margin-top:6px"><button class="sm">Save</button></div></form>{% endif %}</details>
+</div>{% endfor %}</div></div>
+<div class="card"><details><summary>What each platform requires before live publishing</summary><div class="grid" style="margin-top:10px">{% for pf, c in caps.items() %}<div><h3>{{ pf|platform }}</h3><ul class="small muted">{% for r in c.requirements %}<li>{{ r }}</li>{% endfor %}</ul>{% for b in c.app_review_blockers %}{{ chip('x','warn',b) }}{% endfor %}</div>{% endfor %}</div></details></div>
 {% endblock %}
