@@ -284,15 +284,7 @@ def variant(request: Request, vid: str):
     audit = d.all("audit_log", "entity_id=?", [vid], order="id DESC")
     jobs = d.all("publish_jobs", "variant_id=?", [vid])
     planned = d.one("SELECT slot_at FROM schedules WHERE variant_id=? AND state='planned'", [vid])
-    render_url = ""
-    if (v.get("render_path") or "").startswith("s3://"):
-        from ..media import resolve_media
-        render_url = resolve_media(v["render_path"])
-    elif v.get("render_path"):
-        try:
-            render_url = base(request) + "/renders/" + str(Path(v["render_path"]).relative_to(settings.render_dir))
-        except ValueError:
-            render_url = ""
+    render_url = _render_url(request, v)
     preview = get_adapter(acc["platform"], settings=settings).simulate(v, acc, "preview")
     from ..media import asset_preview
     source = asset_preview(asset, (v.get("edl") or {}).get("segments"))
@@ -503,12 +495,29 @@ def calendar(request: Request, start: str = ""):
     return page(request, "calendar.html", plan=plan, days=days, start=s.isoformat())
 
 
+def _render_url(request: Request, v: dict) -> str:
+    """A playable URL for the post's finished render (presigned when it lives in S3)."""
+    path = v.get("render_path") or ""
+    if path.startswith("s3://"):
+        from ..media import resolve_media
+        return resolve_media(path)
+    if path:
+        try:
+            return base(request) + "/renders/" + str(Path(path).relative_to(settings.render_dir))
+        except ValueError:
+            return ""
+    return ""
+
+
 @app.get("/runsheet", response_class=HTMLResponse)
 def runsheet_page(request: Request, day: str = ""):
     from .. import runsheet
     today = datetime.now(ZoneInfo(settings.timezone)).date()
     d = (today + timedelta(days=1)) if day == "tomorrow" else (date.fromisoformat(day) if day else today)
     sheet = runsheet.day_sheet(db(), settings, d)
+    for r in sheet["rows"]:  # play-in-place preview, with sound, before approving
+        v = db().get("variants", "variant_id", r["variant_id"]) or {}
+        r["render_url"] = _render_url(request, v) if v.get("render_status") == "rendered" else ""
     props = [r for r in sheet["rows"] if r["kind"] == "proposed"]
     pinned = [r for r in props if r.get("pinned")]
     # what needs a decision: posts a team challenge pinned for the day; on days without any, the planner's proposals
