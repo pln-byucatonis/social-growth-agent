@@ -152,5 +152,7 @@ def use_cut(db: DB, variant_id: str, label: str, actor: str) -> dict:
     if v["state"] == "approved":  # approvals bind to what was reviewed: a new cut needs a new review
         db.insert("approvals", {"variant_id": variant_id, "decision": "revoke", "reviewer": actor,
                                 "note": f"cut changed to {label}", "caption_hash": v["caption_hash"], "at": now_iso()})
+    from .workflow import refresh_validation
+    refresh_validation(db, variant_id)  # duration and other checks follow the new cut
     db.audit(actor, "variant_cut_changed", "variants", variant_id, {"cut": label, "previous_state": v["state"]})
     return db.get("variants", "variant_id", variant_id)

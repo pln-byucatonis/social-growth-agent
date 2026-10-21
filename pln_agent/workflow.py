@@ -64,6 +64,19 @@ def revalidate(db: DB, vid: str) -> dict:
     return {"errors": errs, "rights": rights}
 
 
+def refresh_validation(db: DB, vid: str) -> str:
+    """Re-run the platform checks after the video changed (e.g. a new cut); needs_fix <-> in_review follows."""
+    v = _variant(db, vid)
+    if v["state"] not in ("in_review", "needs_fix"):
+        return v["state"]
+    res = revalidate(db, vid)
+    state = "needs_fix" if (res["errors"] or res["rights"]["blockers"]) else "in_review"
+    val = dict(v["validation"] or {})
+    val["errors"] = res["errors"]
+    db.update("variants", "variant_id", vid, {"state": state, "validation": val, "risk_flags": res["rights"], "updated_at": now_iso()})
+    return state
+
+
 def edit_variant(db: DB, vid: str, changes: dict, actor: str) -> dict:
     v = _variant(db, vid)
     if v["state"] not in PRE_PUBLISH - {"scheduled"}:

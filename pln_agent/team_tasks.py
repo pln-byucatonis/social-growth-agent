@@ -441,10 +441,14 @@ def run_schedule(db: DB, t: dict, hooks: Hooks, settings) -> None:
     tz, now = ZoneInfo(settings.timezone), datetime.now(timezone.utc)
     d = dict(t.get("detail") or {})
     slots = d.get("slots") or parse_slots(t["title"])
+    from .workflow import refresh_validation
     ready = []
     for x in _thread_render_targets(db, t["thread_id"]):
         v = db.get("variants", "variant_id", x["variant_id"])
         if v and x.get("state") == "done":
+            if v["state"] == "needs_fix":  # validated on the old edit before the cut changed
+                refresh_validation(db, v["variant_id"])
+                v = db.get("variants", "variant_id", v["variant_id"])
             ready.append(v)
     used = {s.get("variant_id") for s in slots if s.get("variant_id")}
     renders_open = any(x["kind"] == "render" and x["status"] in OPEN for x in tasks(db, t["thread_id"]))
@@ -455,7 +459,12 @@ def run_schedule(db: DB, t: dict, hooks: Hooks, settings) -> None:
                                         datetime.fromisoformat(s["slot_at"]))
         if s.get("variant_id"):
             v = db.get("variants", "variant_id", s["variant_id"]) or {}
+            if v.get("state") == "needs_fix":
+                refresh_validation(db, s["variant_id"])
+                v = db.get("variants", "variant_id", s["variant_id"]) or {}
             s["state"] = v.get("state", "")
+            if v.get("state") == "needs_fix":
+                s["problem"] = "; ".join((v.get("validation") or {}).get("errors") or [])[:200]
             continue
         pick = None
         for bid in s["brands"]:
