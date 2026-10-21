@@ -189,3 +189,13 @@ class InstagramCollectorTests(unittest.TestCase):
         self.assertIn("feed posts only", k["follows_per_1k_views"]["how"])
         self.assertAlmostEqual(k["follows_per_1k_views"]["value"], 3.0)  # 12 follows / 4,000 views
         self.assertEqual((a["follows_28d"], a["unfollows_28d"], a["accounts_engaged_28d"]), (2630, 6800, 5100))
+        self.assertEqual(k["returning_viewers"]["basis"], "unavailable")
+        self.assertEqual(k["profile_visits_per_1k_views"]["basis"], "measured")  # feed post: 90 / 4,000 views
+        self.assertAlmostEqual(k["profile_visits_per_1k_views"]["value"], 22.5)
+        self.assertAlmostEqual(k["outbound_clicks_per_1k_views"]["value"], 2.2)  # 220 taps / 100,000 reached
+        self.assertIn("per reach", k["outbound_clicks_per_1k_views"]["how"])
+        self.db.insert("metrics", {"account_id": IG, "platform": "instagram", "metric": "followers_count",
+                                   "canonical_metric": "followers", "value": 300000.0, "checkpoint": "snapshot",
+                                   "period_start": NOW.date().isoformat(), "source": "ops_social", "metric_key": "t:f"})
+        k = audience.account_kpis(self.db, IG, days=28, end=NOW.date())["kpis"]
+        self.assertAlmostEqual(k["follower_reach_rate"]["value"], 0.1)  # 30,000 of 300,000

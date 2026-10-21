@@ -15,7 +15,7 @@
 {% if r.posts == 0 %}<p class="muted">The per-post rates below need posts published in this window — there weren't any.</p>{% endif %}
 {% set t = trends[r.account_id] %}{% if t|length > 1 %}{% set lo = t|map(attribute=1)|min %}{% set hi = t|map(attribute=1)|max %}
 <svg viewBox="0 0 300 40" width="100%" height="40" role="img" aria-label="follower trend"><polyline fill="none" stroke="currentColor" stroke-width="1.5" points="{% for d, v in t %}{{ (loop.index0 / (t|length - 1) * 300)|round(1) }},{{ (38 - ((v - lo) / ((hi - lo) or 1)) * 36)|round(1) }} {% endfor %}"/></svg>{% endif %}
-<table>{% for key, label in labels.items() %}{% set k = r.kpis.get(key) %}{% if k %}<tr><td>{{ label }}</td><td><b>{{ fmt(k.value) }}</b></td><td>{{ basis(k) }}</td><td class="muted">{{ k.how }}</td></tr>{% endif %}{% endfor %}</table></div>{% endfor %}</div>
+<table>{% for key, label in labels.items() %}{% set k = r.kpis.get(key) %}{% if k %}<tr><td>{{ label }}</td><td><b>{% if key in ('non_follower_reach', 'follower_reach_rate') and k.value is not none %}{{ '%.1f'|format(k.value * 100) }}%{% else %}{{ fmt(k.value) }}{% endif %}</b></td><td>{{ basis(k) }}</td><td class="muted">{{ k.how }}</td></tr>{% endif %}{% endfor %}</table></div>{% endfor %}</div>
 <div class="grid">
 {% for title, rows2 in (("By brand", by_brand), ("By content type (inferred from captions)", by_type), ("By format", by_format)) %}
 <div class="card tablewrap"><h3>{{ title }}</h3><table><tr><th></th><th>posts</th><th>median views</th><th>shares/1k</th><th>saves/1k</th><th>engagements/1k</th></tr>

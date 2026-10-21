@@ -37,6 +37,7 @@ KPI_LABELS = {
     "avg_watch_time_s": "Average watch time (s)",
     "shares_per_1k_views": "Shares per 1,000 views",
     "returning_viewers": "Returning viewers",
+    "follower_reach_rate": "Followers reached (loyalty proxy)",
     "profile_visits_per_1k_views": "Profile visits per 1,000 views",
     "outbound_clicks_per_1k_views": "Outbound clicks per 1,000 views",
     "saves_per_1k_views": "Saves per 1,000 views",
@@ -347,13 +348,41 @@ def account_kpis(db: DB, account_id: str, days: int = 28, end: date | None = Non
         k[key] = (_k(tot(fam) / views * 1000, "measured", f"Σ{fam} ÷ Σviews over {len(measured)} posts", len(measured))
                   if views and has(fam) else _k(None, "unavailable", f"no {fam} + views reported for posts in window"))
     k["returning_viewers"] = _k(None, "unavailable", MEASURABILITY.get(acc["platform"], {}).get("returning_viewers", "not exposed"))
+
+    def latest_val(fam):
+        v = [x for d, x in _account_series(db, account_id, fam) if d <= end.isoformat()]
+        return v[-1] if v else None
+    fr_now, followers_now = latest_val("follower_reach"), (win[-1][1] if win else latest_val("followers"))
+    if fr_now is not None and followers_now:
+        k["follower_reach_rate"] = _k(fr_now / followers_now, "measured",
+                                      f"{fr_now:,.0f} of {followers_now:,.0f} followers reached in the last 28 days — "
+                                      "a loyalty proxy, not returning viewers")
+    else:
+        k["follower_reach_rate"] = _k(None, "unavailable", "needs the follower/non-follower reach split (connect the account)")
     pv = [v for d, v in _account_series(db, account_id, "profile_visits") if start.isoformat() <= d <= end.isoformat()]
-    k["profile_visits_per_1k_views"] = (_k(sum(pv) / views * 1000, "derived",
-                                           "account profile visits ÷ views of posts published in the window", len(measured))
-                                        if pv and views else _k(None, "unavailable", "no profile-visit series"))
-    k["outbound_clicks_per_1k_views"] = (_k(tot("clicks") / views * 1000, "measured", "Σclicks ÷ Σviews", len(measured))
-                                         if views and tot("clicks") else
-                                         _k(None, "unavailable", MEASURABILITY.get(acc["platform"], {}).get("outbound_clicks_per_1k_views", "not exposed")))
+    post_pv = [p for p in measured if p["metrics"].get("profile_visits") is not None]
+    if pv and views:
+        k["profile_visits_per_1k_views"] = _k(sum(pv) / views * 1000, "derived",
+                                              "account profile visits ÷ views of posts published in the window", len(measured))
+    elif post_pv:
+        pv_views = sum(p["outcomes"]["views"] for p in post_pv)
+        k["profile_visits_per_1k_views"] = _k(sum(p["metrics"]["profile_visits"] for p in post_pv) / pv_views * 1000,
+                                              "measured", f"Σ profile visits ÷ Σ views on feed posts ({len(post_pv)}); "
+                                              "Instagram doesn't report profile visits for Reels", len(post_pv))
+    else:
+        k["profile_visits_per_1k_views"] = _k(None, "unavailable",
+                                              "Instagram reports profile visits per feed post only — none in this window"
+                                              if acc["platform"] == "instagram" else "no profile-visit series")
+    clicks_w, reach_w = latest_val("clicks_window"), latest_val("reach_window")
+    if views and tot("clicks"):
+        k["outbound_clicks_per_1k_views"] = _k(tot("clicks") / views * 1000, "measured", "Σclicks ÷ Σviews", len(measured))
+    elif clicks_w is not None and reach_w:
+        k["outbound_clicks_per_1k_views"] = _k(clicks_w / reach_w * 1000, "measured",
+                                               f"{clicks_w:,.0f} bio-link / contact-button taps per 1,000 accounts reached "
+                                               "(last 28 days; per reach, not views)")
+    else:
+        k["outbound_clicks_per_1k_views"] = _k(None, "unavailable",
+                                               MEASURABILITY.get(acc["platform"], {}).get("outbound_clicks_per_1k_views", "not exposed"))
     # account-level numbers that don't depend on recent posts (all platform-reported)
     fol = [(d, v) for d, v in follows_daily if start.isoformat() <= d <= end.isoformat()]
     reach = [(d, v) for d, v in _account_series(db, account_id, "reach") if start.isoformat() <= d <= end.isoformat()]
