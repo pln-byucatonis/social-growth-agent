@@ -97,6 +97,12 @@ class CommunityTests(unittest.TestCase):
         self.assertTrue(g.posts[0][0].endswith("/c1/replies"))
         self.assertEqual(self.db.get("comments", "comment_id", cid)["status"], "replied")
 
+    def test_quiet_account_still_gets_older_posts_read(self):
+        self.db.execute("UPDATE posts SET published_at=? WHERE platform_post_id='reel1'", [D(24 * 40)])  # last post 40 days ago
+        r = cm.ingest(self.db, FakeGraph())
+        self.assertGreater(r["accounts"][IG]["comments_seen"], 0)
+        self.assertEqual(cm.summary(self.db)["days"], 14)
+
     def test_permission_error_says_what_to_add(self):
         r = cm.ingest(self.db, FakeGraph(deny=True))
         self.assertIn("instagram_manage_comments", r["errors"][IG])

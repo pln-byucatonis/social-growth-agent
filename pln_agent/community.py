@@ -34,7 +34,7 @@ PERMISSION_HINT = {
 def config(db: DB | None = None) -> dict:
     from .team_params import get
     cfg = json.loads((CONFIG_DIR / "community.json").read_text())
-    for k in ("lookback_days", "faq_min_people", "max_posts_per_account"):
+    for k in ("lookback_days", "post_lookback_days", "faq_min_people", "max_posts_per_account"):
         cfg[k] = get(db, "community", k, cfg[k])
     return cfg
 
@@ -162,7 +162,7 @@ def ingest(db: DB, transport=None, now: datetime | None = None, actor: str = "co
     now = now or datetime.now(timezone.utc)
     token_for = token_for or (lambda ref: access_token(ref))
     api = MetaComments(transport)
-    cutoff = (now - timedelta(days=cfg["lookback_days"])).replace(microsecond=0).isoformat()
+    cutoff = (now - timedelta(days=cfg["post_lookback_days"])).replace(microsecond=0).isoformat()
     out = {"accounts": {}, "errors": {}, "new": 0}
     for acc in db.all("accounts", "platform IN ('instagram','facebook') AND verification_status='oauth_connected'"):
         ref = acc.get("credential_ref") or ""
@@ -307,7 +307,8 @@ def faqs(db: DB, days: int = 30, min_people: int | None = None, now: datetime | 
     return out[:15]
 
 
-def summary(db: DB, days: int = 7, now: datetime | None = None) -> dict:
+def summary(db: DB, days: int | None = None, now: datetime | None = None) -> dict:
+    days = days or config(db)["lookback_days"]
     now = now or datetime.now(timezone.utc)
     since = (now - timedelta(days=days)).replace(microsecond=0).isoformat()
     rows = db.query("SELECT * FROM comments WHERE created_at >= ? AND is_ours=?", [since, False])

@@ -1,6 +1,7 @@
 {
-  "_note": "Community Manager rules. Categories are checked top to bottom; the first match wins. escalate=true means the agent never drafts a public reply: a person handles it. Reply templates may only use the links set here; with no link the draft is marked needs_answer instead of inventing one.",
+  "_note": "Community Manager rules. lookback_days = the comment window shown and summarised; post_lookback_days = how far back to look for posts to read comments from (the most recent max_posts_per_account of them), so quiet accounts still get their older posts checked. Categories are checked top to bottom; the first match wins. escalate=true means the agent never drafts a public reply: a person handles it. Reply templates may only use the links set here; with no link the draft is marked needs_answer instead of inventing one.",
   "lookback_days": 14,
+  "post_lookback_days": 90,
   "max_posts_per_account": 30,
   "faq_min_people": 3,
   "categories": [

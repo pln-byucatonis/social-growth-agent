@@ -89,7 +89,7 @@ def _ctx_publishing(db):
 
 def _ctx_community(db):
     from .community import faqs, summary
-    return {"last_7_days": summary(db), "faqs": faqs(db)[:6],
+    return {"recent_comments": summary(db), "faqs": faqs(db)[:6],
             "escalated": [{k: c.get(k) for k in ("account_id", "text", "escalation")} for c in db.all("comments", "status='escalated'")][:8]}
 
 
@@ -161,7 +161,8 @@ AGENTS = [
      "rules": ["Escalated categories never get a drafted public reply.",
                "Drafts use only links set in config; missing links are marked, never invented.",
                "Nothing is sent without approval; sending follows the same live gates as publishing."],
-     "params": {"lookback_days": _num("Comment lookback (days)", 14, 1, 90), "faq_min_people": _num("People asking before it's an FAQ", 3, 2, 50)},
+     "params": {"lookback_days": _num("Comment window shown (days)", 14, 1, 90),
+                "post_lookback_days": _num("How far back to read posts (days)", 90, 7, 365), "faq_min_people": _num("People asking before it's an FAQ", 3, 2, 50)},
      "context": _ctx_community},
     {"key": "competitive", "name": "Competitive Intelligence", "layer": "intelligence", "page": "/competitors",
      "mission": "Tracks benchmark accounts' public numbers and standout posts, and where our accounts differ most.",
@@ -457,8 +458,8 @@ def status_line(db: DB, agent: str) -> str:
     if agent == "cgo":
         return f"{len(c.get('actions') or [])} actions in the {c.get('week') or 'current'} brief"
     if agent == "community":
-        s = c["last_7_days"]
-        return f"{s['comments']} comments in 7 days · {s['open_escalations']} escalated · {s['awaiting_approval']} awaiting approval"
+        s = c["recent_comments"]
+        return f"{s['comments']} comments in {s['days']} days · {s['open_escalations']} escalated · {s['awaiting_approval']} awaiting approval"
     if agent == "migration":
         return f"{len(c['alerts'])} alert(s)"
     if agent == "growth_lab":
