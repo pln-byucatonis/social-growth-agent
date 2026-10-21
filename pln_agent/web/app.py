@@ -484,6 +484,48 @@ def calendar(request: Request, start: str = ""):
     return page(request, "calendar.html", plan=plan, days=days, start=s.isoformat())
 
 
+@app.get("/runsheet", response_class=HTMLResponse)
+def runsheet_page(request: Request, day: str = ""):
+    from .. import runsheet
+    d = date.fromisoformat(day) if day else datetime.now(ZoneInfo(settings.timezone)).date() + timedelta(days=1)
+    sheet = runsheet.day_sheet(db(), settings, d)
+    return page(request, "runsheet.html", s=sheet, day=d, prev=(d - timedelta(days=1)).isoformat(),
+                next=(d + timedelta(days=1)).isoformat(), bg=bg_status("runsheet"))
+
+
+@app.post("/runsheet/lock")
+def runsheet_lock(request: Request, pick: list[str] = Form([]), day: str = Form(""), actor: str = Form("")):
+    from .. import runsheet
+    try:
+        reviewer = who(request, actor)
+    except WorkflowError as e:
+        return back(request, f"/runsheet?day={day}", err=str(e))
+    picks = [tuple(p.split("|", 1)) for p in pick if "|" in p]
+    if not picks:
+        return back(request, f"/runsheet?day={day}", err="Tick at least one post to lock in.")
+
+    def work(d):
+        r = runsheet.lock(d, picks, reviewer)
+        msg = f"Scheduled {len(r['scheduled'])} post(s)"
+        if r["needs_second_approver"]:
+            msg += f"; {len(r['needs_second_approver'])} need a second approver (combat/partnership content)"
+        if r["failed"]:
+            msg += "; not scheduled: " + "; ".join(f"{f['variant_id']}: {f['error']}" for f in r["failed"][:4])
+        return msg
+    run_later("runsheet", work, reviewer)
+    return back(request, f"/runsheet?day={day}", "Locking in the selected posts…")
+
+
+@app.post("/runsheet/unschedule")
+def runsheet_unschedule(request: Request, vid: str = Form(...), day: str = Form(""), actor: str = Form("")):
+    from .. import runsheet
+    try:
+        runsheet.unschedule(db(), vid, who(request, actor))
+    except WorkflowError as e:
+        return back(request, f"/runsheet?day={day}", err=str(e))
+    return back(request, f"/runsheet?day={day}", "Unscheduled — it's back to approved.")
+
+
 @app.get("/accounts", response_class=HTMLResponse)
 def accounts(request: Request):
     from .. import oauth

@@ -177,7 +177,7 @@ def schedule(db: DB, vid: str, slot_at: datetime, actor: str) -> dict:
     if v["state"] != "approved":
         raise WorkflowError(f"only approved variants can be scheduled (state={v['state']})")
     key = idempotency_key(v)
-    if db.one("SELECT job_id FROM publish_jobs WHERE idempotency_key=?", [key]):
+    if db.one("SELECT job_id FROM publish_jobs WHERE idempotency_key=? AND state NOT IN ('cancelled')", [key]):
         raise WorkflowError("duplicate: an identical post for this account already has a publish job")
     dup = db.one("SELECT job_id FROM publish_jobs j WHERE j.account_id=? AND j.state NOT IN ('cancelled') AND "
                  "j.variant_id IN (SELECT variant_id FROM variants WHERE asset_id=?)", [v["account_id"], v["asset_id"]])
