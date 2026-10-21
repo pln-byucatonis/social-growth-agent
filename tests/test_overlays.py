@@ -102,3 +102,52 @@ class RenderQueueTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+@unittest.skipUnless(shutil.which("ffmpeg"), "needs ffmpeg")
+class ArtDirectorTests(unittest.TestCase):
+    def test_text_moves_off_a_score_bug(self):
+        import subprocess
+        from pln_agent import art_director
+        d = Path(tempfile.mkdtemp())
+        clip = d / "bug.mp4"
+        # moving footage with a static "score bug" across the top zone
+        subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "mandelbrot=size=360x640:rate=30",
+                        "-t", "6", "-vf", "drawbox=x=0:y=110:w=360:h=90:color=black:t=fill,"
+                        "drawgrid=x=0:y=110:w=24:h=18:t=3:c=white", str(clip)], check=True)
+        a = art_director.analyze(str(clip), 6.0, [3.0])
+        self.assertTrue(a["ok"])
+        self.assertGreaterEqual(art_director.zone_report(a, "top")["graphic"], art_director.GRAPHIC_COVER)
+        zone, why = art_director.choose(a, ["top", "lower"], 1.0)
+        self.assertEqual(zone, "lower")
+        self.assertIn("graphic", why)
+        v = {"variant_id": "x", "brand_id": "putt_tour", "onscreen_text": [{"start": 0, "end": 2, "text": "WAIT FOR IT", "position": "top"}]}
+        b = overlays.build(v, [], 6.0, 1080, 1920, d, 3.0, [{"kind": "payoff", "t": 3.0, "intensity": 1}], a)
+        self.assertEqual(next(p for p in b["plan"] if p["what"].startswith("hook"))["zone"], "lower")
+
+    def test_locked_off_camera_is_not_a_graphic(self):
+        import subprocess
+        from pln_agent import art_director
+        d = Path(tempfile.mkdtemp())
+        clip = d / "still.mp4"
+        subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "testsrc=size=360x640:rate=30",
+                        "-t", "4", "-vf", "drawbox=x=0:y=0:w=360:h=30:color=black:t=fill", str(clip)], check=True)
+        a = art_director.analyze(str(clip), 4.0)
+        self.assertEqual(art_director.choose(a, ["top", "lower"], 1.0)[0], "top")
+
+    def test_animation_and_timing_rules(self):
+        d = Path(tempfile.mkdtemp())
+        v = {"variant_id": "y", "brand_id": "carjitsu", "onscreen_text": [{"start": 0, "end": 2, "text": "NO WAY OUT", "position": "top"}]}
+        # payoff 0.3 s before the end: too late for a word
+        b = overlays.build(v, [], 10.0, 1080, 1920, d, 9.7, [{"kind": "finish", "t": 9.7, "intensity": 1}])
+        self.assertNotIn("payoff", b["words"])
+        self.assertTrue(any("too close to the end" in p["why"] for p in b["plan"]))
+        # entrance frames precede the held layer, and a fade closes it
+        b = overlays.build(v, [], 10.0, 1080, 1920, d, 5.0, [{"kind": "finish", "t": 5.0, "intensity": 1}])
+        names = [L["png"].name for L in b["layers"]]
+        self.assertTrue(any("_in0" in n for n in names) and any("_out1" in n for n in names))
+        # captions step aside while the payoff word is up
+        cues = [{"start": 4.5, "end": 6.5, "text": "one grip changes everything right here"}]
+        b = overlays.build(v, cues, 10.0, 1080, 1920, d, 5.0, [{"kind": "finish", "t": 5.0, "intensity": 1}])
+        caps = [L for L in b["layers"] if "ov_cap_" in L["png"].name]
+        self.assertTrue(all(L["end"] <= 5.0 or L["start"] >= 6.3 for L in caps))
