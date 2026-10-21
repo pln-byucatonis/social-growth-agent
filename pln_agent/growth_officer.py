@@ -183,6 +183,11 @@ def generate_brief(db: DB, actor: str = "chief-growth-officer", today: date | No
         actions.append({"priority": "P2", "area": "community", "text": f"{cm['awaiting_approval']} drafted comment replies are waiting for approval."})
     for f in _faqs(db)[:3]:
         actions.append({"priority": "P2", "area": "community", "text": f"{f['brand_id']}: {f['idea']}"})
+    from .competitive import gaps as _gaps
+    for gp in _gaps(db)[:4]:
+        if b_tier := tier_of(gp["brand_id"], g):
+            actions.append({"priority": "P1" if b_tier == "P0" else "P2", "area": "competitive",
+                            "text": f"{gp['account_id']} vs {gp['peers']}: " + "; ".join(gp["notes"]) + "."})
     if not exps:
         actions.append({"priority": "P2", "area": "experiments",
                         "text": "No experiments planned — plan this week's hook / duration tests once posting resumes."})

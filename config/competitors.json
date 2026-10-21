@@ -1,0 +1,13 @@
+{
+  "_note": "Benchmark set for Competitive Intelligence. Instagram handles are read through Instagram Business Discovery (public business/creator accounts only). A handle that isn't a business/creator account, or is misspelled, shows as an error on the Competitors page - edit or remove it here. 'compare_to' names our brands the benchmark is for.",
+  "min_posts": 6,
+  "benchmarks": [
+    {"handle": "powerslap", "name": "Power Slap", "compare_to": ["slapfight", "pln"], "why": "slap fighting league, short-form combat highlights"},
+    {"handle": "dudeperfect", "name": "Dude Perfect", "compare_to": ["putt_tour", "pln"], "why": "trick-shot / novelty sport entertainment"},
+    {"handle": "goodgoodgolf", "name": "Good Good Golf", "compare_to": ["putt_tour"], "why": "creator-led golf content"},
+    {"handle": "overtime", "name": "Overtime", "compare_to": ["pln", "carjitsu"], "why": "youth sports media network, original leagues"},
+    {"handle": "houseofhighlights", "name": "House of Highlights", "compare_to": ["pln"], "why": "sports highlight curation at scale"},
+    {"handle": "nitrocircus", "name": "Nitro Circus", "compare_to": ["pln", "carjitsu"], "why": "action-sport spectacle events"},
+    {"handle": "bkfc", "name": "Bare Knuckle FC", "compare_to": ["carjitsu", "slapfight"], "why": "challenger combat promotion"}
+  ]
+}

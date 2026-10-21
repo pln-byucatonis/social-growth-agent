@@ -115,7 +115,9 @@ def urllib_fetch(url: str, timeout: float = 20) -> tuple[int, str]:
 
 
 def review_sources(db: DB, fetch=urllib_fetch, actor: str = "knowledge-review", force: bool = False) -> dict:
-    entries = [e for e in db.all("knowledge", "status IN ('current','needs_review') AND source_url LIKE ?", ["https://%"])]
+    # benchmark entries are re-verified by every Business Discovery snapshot, not by fetching the profile page
+    entries = [e for e in db.all("knowledge", "status IN ('current','needs_review') AND source_url LIKE ?", ["https://%"])
+               if e.get("topic") != "benchmark"]
     by_url: dict[str, list[dict]] = {}
     for e in entries:
         by_url.setdefault(e["source_url"], []).append(e)
@@ -161,6 +163,8 @@ def review_sources(db: DB, fetch=urllib_fetch, actor: str = "knowledge-review", 
                 report["ok"].append(url)
         db.insert("knowledge_sources", rec, upsert_key="url")
     for e in db.all("knowledge", "status='current' AND level IN ('platform_rule','platform_guidance','external_research')"):
+        if e.get("topic") == "benchmark":
+            continue
         ra = str(e.get("reviewed_at") or e.get("retrieved_at") or "")
         try:
             d = datetime.fromisoformat(ra.replace("Z", "+00:00")) if "T" in ra else datetime.fromisoformat(ra + "T00:00:00+00:00")

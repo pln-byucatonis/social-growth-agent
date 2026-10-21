@@ -358,6 +358,18 @@ CREATE TABLE IF NOT EXISTS knowledge_sources (
   note TEXT
 );
 
+CREATE TABLE IF NOT EXISTS competitor_snapshots (
+  snapshot_id TEXT PRIMARY KEY,
+  handle TEXT NOT NULL,
+  platform TEXT NOT NULL,
+  name TEXT,
+  captured_at TEXT,
+  followers DOUBLE PRECISION,
+  media_count INTEGER,
+  profile JSONB,
+  compare_to JSONB
+);
+
 CREATE TABLE IF NOT EXISTS comments (
   comment_id TEXT PRIMARY KEY,
   account_id TEXT NOT NULL,
@@ -414,6 +426,8 @@ CREATE INDEX IF NOT EXISTS ix_posts_account ON posts(account_id, published_at);
 CREATE INDEX IF NOT EXISTS ix_scout_source ON scout_moments(source_id, potential);
 
 CREATE INDEX IF NOT EXISTS ix_scout_brand ON scout_moments(brand_id, potential);
+
+CREATE INDEX IF NOT EXISTS ix_competitor_handle ON competitor_snapshots(handle, captured_at);
 
 CREATE INDEX IF NOT EXISTS ix_comments_status ON comments(status, priority);
 

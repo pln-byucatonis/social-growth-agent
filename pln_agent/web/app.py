@@ -661,6 +661,26 @@ def growth_page(request: Request):
     return page(request, "growth.html", b=brief, shares=cgo.current_shares(d))
 
 
+@app.get("/competitors", response_class=HTMLResponse)
+def competitors_page(request: Request, brand: str = ""):
+    from .. import competitive as ci
+    d = db()
+    hist = {}
+    for r in d.all("competitor_snapshots", order="captured_at"):
+        hist.setdefault(r["handle"], []).append(r)
+    return page(request, "competitors.html", rows=ci.latest(d), hist=hist, gaps=ci.gaps(d), standouts=ci.standouts(d, brand),
+                cfg=ci.config(), brand=brand)
+
+
+@app.post("/competitors/refresh")
+def competitors_refresh(request: Request):
+    from .. import competitive as ci
+    _admin(request)
+    r = ci.snapshot(db(), actor=request.state.user or "dashboard")
+    return back(request, "/competitors", f"Captured {len(r['captured'])} benchmark account(s)",
+                "; ".join(f"@{k}: {v}" for k, v in list(r["errors"].items())[:4]))
+
+
 @app.get("/community", response_class=HTMLResponse)
 def community_page(request: Request, status: str = ""):
     import json as _json

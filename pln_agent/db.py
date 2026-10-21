@@ -369,6 +369,18 @@ TABLES: dict[str, list[tuple[str, str, str]]] = {
         ("status", "text", ""),  # baseline | unchanged | changed | quote_missing | unreachable
         ("note", "text", ""),
     ],
+    # Competitive Intelligence: public numbers for benchmark accounts, one row per capture.
+    "competitor_snapshots": [
+        ("snapshot_id", "text", "PRIMARY KEY"),
+        ("handle", "text", "NOT NULL"),
+        ("platform", "text", "NOT NULL"),
+        ("name", "text", ""),
+        ("captured_at", "ts", ""),
+        ("followers", "real", ""),
+        ("media_count", "int", ""),
+        ("profile", "json", ""),
+        ("compare_to", "json", ""),
+    ],
     # Community Manager: every fetched comment, its triage and the human decision on it.
     "comments": [
         ("comment_id", "text", "PRIMARY KEY"),  # <platform>:<platform comment id>
@@ -421,6 +433,7 @@ INDEXES = [
     "CREATE INDEX IF NOT EXISTS ix_posts_account ON posts(account_id, published_at)",
     "CREATE INDEX IF NOT EXISTS ix_scout_source ON scout_moments(source_id, potential)",
     "CREATE INDEX IF NOT EXISTS ix_scout_brand ON scout_moments(brand_id, potential)",
+    "CREATE INDEX IF NOT EXISTS ix_competitor_handle ON competitor_snapshots(handle, captured_at)",
     "CREATE INDEX IF NOT EXISTS ix_comments_status ON comments(status, priority)",
     "CREATE INDEX IF NOT EXISTS ix_comments_created ON comments(created_at)",
     "CREATE INDEX IF NOT EXISTS ix_jobs_state ON publish_jobs(state, next_attempt_at)",
