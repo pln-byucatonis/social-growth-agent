@@ -24,7 +24,7 @@ class LinkedInAdapter(BaseAdapter):
                     "OAuth scope w_organization_social (+ r_organization_social for analytics)",
                     "Authorizing member holds ADMINISTRATOR or CONTENT_ADMIN role on the PLN company Page",
                     "Linkedin-Version header pinned (LINKEDIN_VERSION, YYYYMM) and re-tested before sunset"]
-    app_review_blockers = ["No PLN company Page ID supplied yet", "Community Management API access requires LinkedIn approval"]
+    app_review_blockers = ["Community Management API access requires LinkedIn approval"]
 
     def plan_requests(self, v, account, media_url, token="{TOKEN}"):
         ver = getattr(self.settings, "linkedin_version", "202601")
