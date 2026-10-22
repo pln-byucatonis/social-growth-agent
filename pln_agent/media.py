@@ -100,6 +100,7 @@ def _reframe(out: dict, src_w: int, src_h: int, subject_x: float = 0.5) -> str:
 
 
 ANALYSIS_W, ANALYSIS_H, ANALYSIS_FPS = 64, 36, 4
+STACK_Y = 0.30  # stacked layout: the landscape frame starts 30% down; hook above it, words and captions below
 
 
 def motion_centroid(frames: list[bytes], w: int = ANALYSIS_W) -> tuple[float, float]:
@@ -237,10 +238,26 @@ def render_variant(db: DB, variant_id: str, settings: Settings, actor: str = "re
         if out["h"] > out["w"] and not (sw and sh and sh > sw):  # landscape (or unknown) master → vertical
             fx, framing = subject_x(src, segs)
         chain = _reframe(out, sw or out["w"], sh or out["h"], fx)
-        # pass 1: the clean, cropped edit — the Creative Director looks at these frames before placing any text
-        parts.append(f"[cv]{chain}[base]")
-        if has_audio:  # keep peaks ~1.5 dB under full scale so platform re-encoding doesn't clip (QC: true peak <= -1 dBTP)
-            parts.append("[ca]alimiter=limit=0.84:level=false[cal]")
+        layout = None
+        if out["h"] > out["w"] and sw and sh and sw > sh and "/verticals/" not in asset["media_path"]:
+            from . import art_director
+            cuts, why = art_director.crop_cuts_graphics(src, segs)
+            if cuts:  # stacked: the whole broadcast frame over a blurred fill, text in the bands above and below
+                W, H = out["w"], out["h"]
+                fh = int(round(W * sh / sw / 2)) * 2
+                y0 = int(H * STACK_Y)
+                layout = {"mode": "stack", "y0": y0, "y1": y0 + fh}
+                framing = f"stacked layout: {why}"
+        # pass 1: the clean edit — the Creative Director looks at these frames before placing any text
+        if layout:
+            W, H = out["w"], out["h"]
+            parts.append(f"[cv]split=2[sa][sb];[sa]scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},"
+                         f"boxblur=28:4,eq=brightness=-0.22[sbg];[sb]scale={W}:{layout['y1'] - layout['y0']}[sfg];"
+                         f"[sbg][sfg]overlay=0:{layout['y0']},setsar=1[base]")
+        else:
+            parts.append(f"[cv]{chain}[base]")
+        if has_audio:  # -14 LUFS (platform target), peaks ~1.5 dB under full scale so re-encoding doesn't clip
+            parts.append("[ca]loudnorm=I=-14:TP=-1.5:LRA=11,alimiter=limit=0.84:level=false[cal]")
         clean = outdir / "clean.mp4"
         video = outdir / "video.mp4"
         cmd = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", *inputs, "-filter_complex", ";".join(parts), "-map", "[base]"]
@@ -269,7 +286,8 @@ def render_variant(db: DB, variant_id: str, settings: Settings, actor: str = "re
                 # frames at each moment and through the ~1.3 s a word stays up after it
                 marks = [t for t in [payoff, *[b["t"] for b in beats]] if t is not None]
                 looks = art_director.analyze(str(clean), duration, sorted({round(m + d, 2) for m in marks for d in (0, 0.65, 1.3)}))
-                styled = overlays.build(v, build_caption_track(v, asset), duration, out["w"], out["h"], outdir, payoff, beats, looks)
+                styled = overlays.build(v, build_caption_track(v, asset), duration, out["w"], out["h"], outdir, payoff, beats, looks,
+                                        layout=layout)
                 ins, ps, final = overlays.ffmpeg_graph("base", 1, styled["layers"], styled["countdown"], out["w"], out["h"])
                 overlay_style, overlay_words, overlay_plan = styled["style_id"], styled.get("words") or {}, styled.get("plan") or []
                 graph = ";".join(["[0:v]null[base]", *ps]) if ps else "[0:v]null[ovdone]"
@@ -342,7 +360,7 @@ def render_queued(db: DB, settings: Settings, limit: int = 12, actor: str = "ren
 
 
 def render_cuts(db: DB, variant_id: str, settings: Settings, actor: str = "renderer", only: list[str] | None = None) -> list[dict]:
-    """Video Production: render every available Creative Director cut (A ≈12s / B ≈25s / C ≈40s) so they can
+    """Video Production: render every available Creative Director cut (A ≈12s / B ≈18s / C ≈40s) so they can
     be compared and tested. Results (path + QC) are stored on the treatment's duration variants."""
     v = db.get("variants", "variant_id", variant_id)
     t = dict(v.get("treatment") or {})

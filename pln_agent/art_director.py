@@ -114,7 +114,8 @@ def analyze(video: str, duration: float, moments: list[float] | None = None, n: 
         pick = {round(t, 2): f for t, f in good if round(t, 2) in {round(x, 2) for x in extra}}
         pick.update({round(t, 2): f for t, f in good[: n: 3]})
         seen = look(dict(list(sorted(pick.items()))[:14]), llm)
-    return {"ok": True, "stats": stats, "base": base_keys, "graphic": graphic, "seen": seen}
+    return {"ok": True, "stats": stats, "base": base_keys, "graphic": graphic, "seen": seen,
+            "frames": {round(t, 2): f for t, f in good}}
 
 
 def _rows(zone: str) -> range:
@@ -168,3 +169,114 @@ def choose(a: dict, candidates: list[str], t: float | tuple | None = None) -> tu
 
 def light_background(a: dict, zone: str, t: float | None) -> bool:
     return zone_report(a, zone, t)["lum"] > 0.62
+
+
+# ---- before the crop: does a 9:16 crop of this landscape footage cut a graphic in half? -----------------
+
+SRC_W, SRC_H = 320, 180
+CROP_SHARE = 9 / 16 * 9 / 16  # a 9:16 crop of 16:9 keeps 31.6% of the width
+
+CROP_PROMPT = """These are frames from a landscape (16:9) sports broadcast clip. We will post it as a vertical (9:16) video.
+A plain vertical crop keeps only the middle third of the width. Is there on-screen broadcast graphics or text — a score bug,
+timer, lower third with names, banner, title card (e.g. "HOLE IN ONE") — that runs outside the middle third of the width and
+would be cut in half by that crop? People and scenery don't count.
+Reply with JSON only: {"cut_graphics": true|false, "what": "short description"}"""
+
+
+def _src_frames(src: str, segs: list[dict], n: int = 6) -> list:
+    from PIL import Image
+    times = []
+    for s in segs:
+        a, b = s["source_in"], s["source_out"]
+        times += [a + (b - a) * f for f in (0.2, 0.5, 0.85)]
+    times = times[:n] if len(times) > n else times
+    out = []
+    with tempfile.TemporaryDirectory() as d:
+        for i, t in enumerate(times):
+            p = Path(d) / f"s{i}.png"
+            subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{max(0.0, t):.3f}", "-i", src,
+                            "-frames:v", "1", "-vf", f"scale={SRC_W}:{SRC_H}", str(p)], capture_output=True, timeout=60)
+            if p.exists():
+                out.append((round(t, 2), Image.open(p).convert("RGB")))
+    return out
+
+
+def crop_cuts_graphics(src: str, segs: list[dict], llm=None) -> tuple[bool, str]:
+    """True when a vertical crop would slice a broadcast graphic: a steady, hard-edged band across the lower part of
+    the frame wider than the crop (score bug, lower third), or — when Claude can look — any graphic or title card
+    outside the middle third. Then the Reel is laid out stacked instead of cropped."""
+    frames = _src_frames(src, segs)
+    if len(frames) < 3:
+        return False, "too few frames to judge"
+    stats = [_cells(f) for _, f in frames]
+    ncell = GRID_W * GRID_H
+    stds, edges = [], []
+    for i in range(ncell):
+        lums = [s[0][i] for s in stats]
+        mean = sum(lums) / len(lums)
+        stds.append((sum((x - mean) ** 2 for x in lums) / len(lums)) ** 0.5)
+        edges.append(sum(s[1][i] for s in stats) / len(stats))
+    med_std, med_edge = sorted(stds)[ncell // 2], sorted(edges)[ncell // 2]
+    # _cells uses a 9 x 16 grid; on a landscape frame that is 9 columns x 16 rows: look at the lower 35% of rows
+    lower_rows = range(int(GRID_H * 0.65), GRID_H)
+    cols = set()
+    for r in lower_rows:
+        for c in range(GRID_W):
+            i = r * GRID_W + c
+            if stds[i] < STATIC_STD and stds[i] < 0.35 * med_std and edges[i] > STATIC_EDGE and edges[i] > 0.6 * med_edge:
+                cols.add(c)
+    span = len(cols) / GRID_W
+    if span > CROP_SHARE + 0.1:
+        return True, f"a steady graphic runs across {int(span * 100)}% of the width low in the frame (score bug / lower third)"
+    try:  # transient graphics and title cards: ask Claude
+        import base64
+        import io
+        from . import team
+        call = llm or team._llm
+        content = []
+        for t, img in frames[:4]:
+            buf = io.BytesIO()
+            img.save(buf, "JPEG", quality=70)
+            content += [{"type": "text", "text": f"t={t}s"},
+                        {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg",
+                                                     "data": base64.b64encode(buf.getvalue()).decode()}}]
+        content.append({"type": "text", "text": CROP_PROMPT})
+        data = team._json(call("You check broadcast frames before a vertical crop. JSON only.", [{"role": "user", "content": content}], 300))
+        if data.get("cut_graphics"):
+            return True, "a crop would cut " + (data.get("what") or "an on-screen graphic")
+    except Exception:  # noqa: BLE001 — no model access: the measurement alone decides
+        pass
+    return False, "no graphic outside the crop"
+
+
+HOOK_PROMPT = """These frames are the first seconds of a vertical sports clip. Our opening text will be: "{hook}".
+Does that text contradict anything the frames show — a game clock, time left, score, round, or count? Only judge numbers and
+facts you can read in the frames; if nothing on screen relates to the text, it does not contradict.
+Reply with JSON only: {{"contradicts": true|false, "why": "short reason"}}"""
+
+
+def hook_contradicts(a: dict, hook: str, t0: float, t1: float, llm=None) -> tuple[bool, str]:
+    """Claude reads the clock / score in the frames while the hook is up. Only asked when the hook states a number."""
+    import re
+    if not re.search(r"\d|\b(one|two|three|four|five|six|seven|eight|nine|ten|seconds?|minutes?|points?)\b", hook.lower()):
+        return False, ""
+    frames = {t: f for t, f in (a.get("frames") or {}).items() if t0 - 0.1 <= t <= t1 + 0.6}
+    if not frames:
+        return False, ""
+    try:
+        import base64
+        import io
+        from . import team
+        call = llm or team._llm
+        content = []
+        for t, img in sorted(frames.items())[:3]:
+            buf = io.BytesIO()
+            img.save(buf, "JPEG", quality=70)
+            content += [{"type": "text", "text": f"t={t}s"},
+                        {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg",
+                                                     "data": base64.b64encode(buf.getvalue()).decode()}}]
+        content.append({"type": "text", "text": HOOK_PROMPT.format(hook=hook)})
+        data = team._json(call("You fact-check on-screen text against video frames. JSON only.", [{"role": "user", "content": content}], 200))
+        return bool(data.get("contradicts")), data.get("why") or ""
+    except Exception:  # noqa: BLE001
+        return False, ""

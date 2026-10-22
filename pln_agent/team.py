@@ -149,7 +149,7 @@ AGENTS = [
      "mission": "Builds the platform-native treatment for each post: hook, opening beat, A/B/C cuts, captions and CTA.",
      "rules": ["Uses only facts in the source footage and metadata; no invented names, scores or claims.",
                "Prefers what PLN evidence shows works for that brand and platform; otherwise the platform guidance; otherwise flags it as a hypothesis.",
-               "Offers three cuts (≈12s / ≈25s / ≈40s) and says honestly when the footage can't support one."],
+               "Offers three cuts (≈12s / ≈18s / ≈40s) and says honestly when the footage can't support one."],
      "params": {}, "context": _ctx_creative},
     {"key": "video", "name": "Video Production", "layer": "creative", "page": "/queue",
      "mission": "Renders the cuts — through the ops vertical pipeline (MediaConvert smart crop) where available, FFmpeg otherwise — and checks quality.",

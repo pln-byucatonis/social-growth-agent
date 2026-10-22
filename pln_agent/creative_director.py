@@ -9,7 +9,7 @@ make it creative rather than a caption exercise:
   payoff      — the reason to keep watching, and when it lands
   conversion  — why someone follows after watching
 
-plus three duration variants cut around the payoff — A ≈12s immediate action, B ≈25s action + setup,
+plus three duration variants cut around the payoff — A ≈12s immediate action, B ≈18s action + setup (payoff about 8s in),
 C ≈40s full competitive storyline — and which one to run. The pick comes from PLN evidence on
 duration for that brand/platform when it exists; otherwise from the platform's starting recipe, labelled as
 a hypothesis. Every package lists the Knowledge Engine entries it relied on.
@@ -21,7 +21,7 @@ import uuid
 from .db import DB, now_iso
 from .strategists.base import tc
 
-VARIANTS = [("A", 12.0, "immediate action", 1.0), ("B", 25.0, "action plus setup", 15.0),
+VARIANTS = [("A", 12.0, "immediate action", 1.0), ("B", 18.0, "action plus setup", 8.0),
             ("C", 40.0, "complete competitive storyline", 25.0)]  # (label, target s, idea, seconds before payoff)
 BUCKET_FOR = {"A": "≤15s", "B": "16–30s", "C": "31–60s"}
 

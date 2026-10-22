@@ -5,7 +5,7 @@ The ops portal already runs AWS Elemental MediaConvert Smart Crop (subject track
     {"source_bucket", "source_key", "start_sec", "end_sec", "label"}
 and writes  s3://<assets bucket>/verticals/<label>/…_9x16.mp4  (plus a 16:9) asynchronously.
 
-So for every Creative Director cut (A ≈12s / B ≈25s / C ≈40s) of a master-based asset the agent asks ops for a
+So for every Creative Director cut (A ≈12s / B ≈18s / C ≈40s) of a master-based asset the agent asks ops for a
 subject-tracked 9:16 of exactly that window, polls S3 for the result, then renders its own on-screen text +
 captions on top (no further cropping) and runs QC. Anything ops can't do falls back to the agent's motion-centred
 crop. MediaConvert is the only vertical source: the older VerticalFn renditions are retired and never used.

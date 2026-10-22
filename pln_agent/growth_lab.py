@@ -1,7 +1,7 @@
 """Growth Experimentation: run controlled tests and turn the results into PLN evidence.
 
 Three ways an arm is decided:
-* assigned — the lab puts drafts into arms before review: `cut` (A ≈12s / B ≈25s / C ≈40s from the Creative
+* assigned — the lab puts drafts into arms before review: `cut` (A ≈12s / B ≈18s / C ≈40s from the Creative
   Director) or `hook_style` (the top hook vs an alternative style). Assignment alternates so arms get similar
   content and slots, and only touches drafts nobody has approved yet: the reviewer sees what will be posted.
 * observed — the arm is a creative variable already recorded on each post (`posting_hour_bucket`,
@@ -76,7 +76,7 @@ def propose(db: DB) -> list[dict]:
         multi_cut = [v for v in vs if sum(1 for c in ((v.get("treatment") or {}).get("duration_variants") or []) if c.get("available")) >= 2]
         if len(multi_cut) >= 4 and (aid, "cut") not in running:
             out.append({"account_id": aid, "variable": "cut", "mode": "assigned", "drafts": len(multi_cut),
-                        "arms": {"A": "short cut (≈12s)", "B": "medium cut (≈25s)"},
+                        "arms": {"A": "short cut (≈12s)", "B": "medium cut (≈18s)"},
                         "hypothesis": "A shorter cut earns more engagement per 1k views than the medium cut on this account"})
         styles = {}
         for v in vs:

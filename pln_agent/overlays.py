@@ -273,7 +273,7 @@ def _animate(layers: list, png: Path, t0: float, t1: float, cy: float, ease=EASE
 
 
 def build(v: dict, cues: list[dict], duration: float, w: int, h: int, outdir: Path, payoff_at: float | None,
-          beats: list[dict] | None = None, analysis: dict | None = None) -> dict:
+          beats: list[dict] | None = None, analysis: dict | None = None, layout: dict | None = None, llm=None) -> dict:
     """All overlay layers for one render ([{png, start, end}]), an optional countdown bar, the words used and the
     plan (what went where and why). `beats` are the clip's moments on the edited timeline ({kind, t, intensity});
     `analysis` is the art director's read of the clean render (None = no frame checks)."""
@@ -285,6 +285,10 @@ def build(v: dict, cues: list[dict], duration: float, w: int, h: int, outdir: Pa
     plan, words, busy = [], {}, []  # busy: (zone, start, end) already taken
     payoff_kind = next((b["kind"] for b in beats if payoff_at is not None and abs(b["t"] - payoff_at) < 0.6), "payoff")
     layers, hook_bottom, hook_zone = [], int(h * 0.20), None
+    stacked = bool(layout and layout.get("mode") == "stack")
+    band_cy = ((layout["y1"] + h * (1 - SAFE_BOTTOM)) / 2 / h) if stacked else None  # words sit in the band under the frame
+    if stacked:
+        plan.append({"what": "layout", "zone": "stacked", "at": "", "why": "the whole broadcast frame is kept; text sits in the bands"})
 
     def free(zone, t0, t1):
         return not any(z == zone and t0 < e and s0 < t1 for z, s0, e in busy)
@@ -300,7 +304,16 @@ def build(v: dict, cues: list[dict], duration: float, w: int, h: int, outdir: Pa
             continue
         t0, t1 = float(o.get("start", 0)), max(float(o.get("end", 3)), float(o.get("start", 0)) + 1.6)
         t1 = min(t1, duration - 0.2)
-        zone, why = ad.choose(a, ["top", "lower"], (t0, t1)) if a.get("ok") else ("top", "default position")
+        if a.get("ok"):  # a hook that states a number must agree with the clock / score on screen
+            bad, reason = ad.hook_contradicts(a, text, t0, t1, llm)
+            if bad:
+                old, text = text, _pick([x for x in bank.get("hook") or [] if not any(ch.isdigit() for ch in x)] or ["WATCH THIS"],
+                                        seed + ":hook2")
+                plan.append({"what": f"hook “{old}”", "zone": "—", "at": "", "why": f"replaced with “{text}”: {reason}"})
+        if stacked:
+            zone, why = "top", "the band above the frame"
+        else:
+            zone, why = ad.choose(a, ["top", "lower"], (t0, t1)) if a.get("ok") else ("top", "default position")
         if zone is None:
             zone, why = "top", why + " — kept at the top (a hook is essential)"
         p = outdir / f"ov_hook_{j}.png"
@@ -322,17 +335,23 @@ def build(v: dict, cues: list[dict], duration: float, w: int, h: int, outdir: Pa
         elif t1 - t0 < MIN_HOLD:
             plan.append({"what": f"payoff word “{stamp}”", "zone": "—", "at": f"{t0:.1f}s", "why": "dropped: too close to the end"})
         else:
-            cands = [z for z in ("middle", "top") if free(z, t0, t1)]
-            zone, why = ad.choose(a, cands, (t0, t1)) if a.get("ok") else ((cands or [None])[0], "default position")
+            cands = ["lower"] if stacked else [z for z in ("middle", "top") if free(z, t0, t1)]
+            if stacked:  # the word goes under the frame; still dropped when the frame celebrates the moment itself
+                own = a.get("ok") and any(ad.zone_report(a, "middle", x)["spotted"] for x in (t0, (t0 + t1) / 2, t1))
+                zone, why = (None, "frames show a graphic") if own else ("lower", "the band under the frame")
+            else:
+                zone, why = ad.choose(a, cands, (t0, t1)) if a.get("ok") else ((cands or [None])[0], "default position")
             if "frames show a graphic" in why:  # the broadcast already celebrates this moment: two graphics compete
                 zone, why = None, "the video already has its own graphic for this moment (" + why.split(";")[0] + ")"
             if zone is None:
                 plan.append({"what": f"payoff word “{stamp}”", "zone": "—", "at": f"{t0:.1f}s", "why": f"dropped: {why}"})
             else:
-                heavy = a.get("ok") and ad.light_background(a, zone, t0)
+                heavy = (not stacked) and a.get("ok") and ad.light_background(a, zone, t0)
                 p = outdir / "ov_stamp.png"
-                render_stamp(stamp, s, w, h, p, -7, ZONE_CENTRE[zone], heavy)
-                _animate(layers, p, t0, t1, ZONE_CENTRE[zone])
+                cy = band_cy if stacked else ZONE_CENTRE[zone]
+                render_stamp(stamp, s, w, h, p, -4 if stacked else -7, cy, heavy,
+                             size=int((h * (1 - SAFE_BOTTOM) - layout["y1"]) * 0.75) if stacked else None)
+                _animate(layers, p, t0, t1, cy)
                 busy.append((zone, t0, t1))
                 stamp_win = (t0, t1)
                 words["payoff"] = stamp
@@ -350,17 +369,24 @@ def build(v: dict, cues: list[dict], duration: float, w: int, h: int, outdir: Pa
             if t1 - t0 < MIN_HOLD:
                 plan.append({"what": f"reaction word “{word}”", "zone": "—", "at": f"{t0:.1f}s", "why": "dropped: too close to the end"})
             else:
-                cands = [z for z in ("middle", "top", "lower") if free(z, t0, t1)]
-                zone, why = ad.choose(a, cands, (t0, t1)) if a.get("ok") else ((cands or [None])[0], "default position")
+                if stacked:
+                    own = a.get("ok") and any(ad.zone_report(a, "middle", x)["spotted"] for x in (t0, (t0 + t1) / 2, t1))
+                    zone, why = (None, "frames show a graphic") if own else (("lower", "the band under the frame")
+                                                                             if free("lower", t0, t1) else (None, "band busy"))
+                else:
+                    cands = [z for z in ("middle", "top", "lower") if free(z, t0, t1)]
+                    zone, why = ad.choose(a, cands, (t0, t1)) if a.get("ok") else ((cands or [None])[0], "default position")
                 if "frames show a graphic" in why:
                     zone, why = None, "the video already has its own graphic here (" + why.split(";")[0] + ")"
                 if zone is None:
                     plan.append({"what": f"reaction word “{word}”", "zone": "—", "at": f"{t0:.1f}s", "why": f"dropped: {why}"})
                 else:
-                    heavy = a.get("ok") and ad.light_background(a, zone, t0)
+                    heavy = (not stacked) and a.get("ok") and ad.light_background(a, zone, t0)
                     p = outdir / "ov_reaction.png"
-                    render_stamp(word, {**s, "accent": s["text"]}, w, h, p, 6, ZONE_CENTRE[zone], heavy)
-                    _animate(layers, p, t0, t1, ZONE_CENTRE[zone])
+                    cy = band_cy if stacked else ZONE_CENTRE[zone]
+                    render_stamp(word, {**s, "accent": s["text"]}, w, h, p, 4 if stacked else 6, cy, heavy,
+                                 size=int((h * (1 - SAFE_BOTTOM) - layout["y1"]) * 0.75) if stacked else None)
+                    _animate(layers, p, t0, t1, cy)
                     busy.append((zone, t0, t1))
                     words["reaction"] = word
                     plan.append({"what": f"reaction word “{word}”", "zone": zone, "at": f"{t0:.1f}–{t1:.1f}s", "why": why})
@@ -368,7 +394,9 @@ def build(v: dict, cues: list[dict], duration: float, w: int, h: int, outdir: Pa
     # 4. captions — lower third, stepping aside while a word or the hook occupies it
     if s["captions"] in ("kinetic", "classic") and cues:
         cap_zone = "lower"
-        if a.get("ok") and ad.zone_report(a, "lower")["graphic"] >= ad.GRAPHIC_COVER:
+        if stacked:
+            pass  # the band under the frame is ours: nothing to avoid
+        elif a.get("ok") and ad.zone_report(a, "lower")["graphic"] >= ad.GRAPHIC_COVER:
             cap_zone = "middle"
             plan.append({"what": "captions", "zone": "middle", "at": "", "why": "lower third has an on-screen graphic"})
         n, skipped = 0, 0
