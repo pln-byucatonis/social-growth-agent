@@ -192,10 +192,13 @@ def schedule(db: DB, vid: str, slot_at: datetime, actor: str) -> dict:
     key = idempotency_key(v)
     if db.one("SELECT job_id FROM publish_jobs WHERE idempotency_key=? AND state NOT IN ('cancelled')", [key]):
         raise WorkflowError("duplicate: an identical post for this account already has a publish job")
+    # one post per footage, account and post type: a carousel or Story made from a Reel is its own post (tested against it)
     dup = db.one("SELECT job_id FROM publish_jobs j WHERE j.account_id=? AND j.state NOT IN ('cancelled') AND "
-                 "j.variant_id IN (SELECT variant_id FROM variants WHERE asset_id=?)", [v["account_id"], v["asset_id"]])
+                 "j.variant_id IN (SELECT variant_id FROM variants WHERE asset_id=? AND COALESCE(post_type, '')=?)",
+                 [v["account_id"], v["asset_id"], v.get("post_type") or ""])
     if dup:
-        raise WorkflowError("duplicate: this asset is already queued/published on this account")
+        raise WorkflowError("duplicate: this asset is already queued/published on this account" +
+                            (f" as a {v['post_type']}" if v.get("post_type") else ""))
     recent = db.one("SELECT j.job_id FROM publish_jobs j JOIN variants x ON x.variant_id=j.variant_id WHERE j.account_id=? "
                     "AND x.caption_hash=? AND j.state NOT IN ('cancelled')", [v["account_id"], v["caption_hash"]])
     if recent:

@@ -47,6 +47,20 @@ class MakeTests(unittest.TestCase):
         with self.assertRaises(carousel.CarouselError):
             carousel.make(self.db, f"{CJ}:carjitsu.tiktok.carjitsuchampionship", "carousel", "bill")
 
+    def test_carousel_schedules_beside_its_reel_but_only_once(self):
+        from datetime import datetime, timedelta, timezone
+        from pln_agent.workflow import WorkflowError, schedule
+        slot = datetime(2026, 10, 22, 22, 30, tzinfo=timezone.utc)
+        self.db.update("variants", "variant_id", REEL, {"state": "approved"})
+        schedule(self.db, REEL, slot, "bill")
+        vid = carousel.make(self.db, REEL, "carousel", "bill")["variant_id"]
+        self.db.update("variants", "variant_id", vid, {"state": "approved"})
+        self.assertEqual(schedule(self.db, vid, slot + timedelta(hours=3), "bill")["variant_id"], vid)
+        twin = {**self.db.get("variants", "variant_id", vid), "variant_id": vid + "2", "caption": "other", "caption_hash": "x2"}
+        self.db.insert("variants", twin)
+        with self.assertRaises(WorkflowError):
+            schedule(self.db, vid + "2", slot + timedelta(hours=6), "bill")
+
     def test_carousel_skips_video_length_checks_and_approves(self):
         vid = carousel.make(self.db, REEL, "carousel", "bill")["variant_id"]
         v = self.db.get("variants", "variant_id", vid)
