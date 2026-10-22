@@ -38,9 +38,20 @@ CRITIC = """You are the critic in a sports social writers' room. Score each draf
 specific (about THIS clip, not any clip), accurate (only facts in the clip description; 0 if anything is invented),
 payoff (makes people watch to the end or comment). Disqualify (dq=true) any draft with a number, an athlete's name,
 a brand name in the hook, or betting language.
+List in "invented" every detail a draft states that the clip description does not support (a crowd that isn't
+mentioned, a door handle, a season, a title, a rule): an empty list only if every detail is in the description.
+Stretches count; do not just dock a point. Penalise stock phrases ("stay until the end", "wait for it", "watch what
+happens") in hook and payoff.
 Clip description: {facts}
 Drafts: {drafts}
-Reply with JSON only: {{"scores": [{{"i": 0, "hook": 0, "specific": 0, "accurate": 0, "payoff": 0, "dq": false, "note": "..."}}]}}"""
+Reply with JSON only: {{"scores": [{{"i": 0, "hook": 0, "specific": 0, "accurate": 0, "payoff": 0, "dq": false, "invented": [], "note": "..."}}]}}"""
+
+# Stock phrasing the room kept reaching for (first live run: 4 of 7 winners were "stay until the end" payoff teases).
+CLICHES = re.compile(r"\b(stay (?:until|till|to) the (?:end|finish|reaction)|wait for it|watch (?:what happens|till the end|to the end|"
+                     r"until the end|it through)|you have to see|keep watching|don'?t scroll|you won'?t believe)\b", re.I)
+CLICHE_PENALTY = 1.5
+ANGLE_STREAK = 3  # once one angle has won this many of the account's last ten posts, it starts paying for it
+ANGLE_PENALTY = 0.35  # per win over the streak, up to 1.0
 
 
 def _clean(t: str) -> str:
@@ -90,8 +101,21 @@ def _counts(text: str) -> bool:
                           r"|\b(first|second|third)\s+(round|hole|period|minute|time ever)\b", text, re.I))
 
 
+def _angle_wins(db: DB, account_id: str, vid: str) -> dict[str, int]:
+    """How often each angle won on this account's last ten posts that went through the room."""
+    wins: dict[str, int] = {}
+    for r in db.all("variants", "account_id=? AND writers_status='done' AND variant_id<>?", [account_id, vid],
+                    order="updated_at DESC", limit=10):
+        room = (r.get("treatment") or {}).get("writers_room") or {}
+        i = room.get("pick", -1)
+        if 0 <= i < len(room.get("drafts") or []):
+            a = (room["drafts"][i].get("angle") or "").split(":")[0].strip().lower()
+            wins[a] = wins.get(a, 0) + 1
+    return wins
+
+
 def _score(s: dict) -> float:
-    if s.get("dq") or not s.get("accurate"):
+    if s.get("dq") or not s.get("accurate") or s.get("invented"):  # an invented detail is inaccurate, not a docked point
         return 0.0
     return round((float(s.get("hook", 0)) + float(s.get("specific", 0)) + float(s.get("accurate", 0)) + float(s.get("payoff", 0))) / 4, 2)
 
@@ -120,12 +144,20 @@ def write(db: DB, vid: str, actor: str = "writers-room", llm=None) -> dict:
     for s in crit.get("scores") or []:
         i = int(s.get("i", -1))
         if 0 <= i < len(drafts):
-            drafts[i]["scores"] = {k: s.get(k) for k in ("hook", "specific", "accurate", "payoff", "dq")}
-            drafts[i]["note"] = s.get("note", "")
+            drafts[i]["scores"] = {k: s.get(k) for k in ("hook", "specific", "accurate", "payoff", "dq", "invented")}
+            drafts[i]["note"] = s.get("note", "") + (f" — invented: {'; '.join(map(str, s['invented']))}" if s.get("invented") else "")
             drafts[i]["score"] = _score(s)
+    wins = _angle_wins(db, v["account_id"], vid)
     for d in drafts:
         d.setdefault("score", 0.0)
         copy = d["hook"] + " " + d["caption"]
+        if d["score"] and CLICHES.search(copy + " " + d["cta"]):
+            d["score"] = round(max(0.0, d["score"] - CLICHE_PENALTY), 2)
+            d["note"] = (d.get("note", "") + " — stock phrasing").strip(" —")
+        over = wins.get((d["angle"] or "").split(":")[0].strip().lower(), 0) - ANGLE_STREAK + 1
+        if d["score"] and over > 0:
+            d["score"] = round(max(0.0, d["score"] - min(1.0, ANGLE_PENALTY * over)), 2)
+            d["note"] = (d.get("note", "") + " — this angle keeps winning here").strip(" —")
         digits_bad = any(ch.isdigit() for ch in copy) and not (market and _grounded_numbers(copy, facts))
         if digits_bad or _counts(copy):
             # the rule the critic must enforce, checked again here: a number the clip may not show is an invented fact

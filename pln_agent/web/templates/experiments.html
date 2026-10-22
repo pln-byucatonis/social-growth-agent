@@ -7,7 +7,7 @@
 {% if proposals %}<div class="card"><div class="ch"><h2>Suggested tests</h2><span class="faint small">Possible with the drafts on hand</span></div><ul class="list">{% for p in proposals %}
 <li><div class="body"><b>{{ p.variable|label }}</b> on {{ p.account_id|acct }} <span class="faint small">· {{ p.drafts }} drafts</span><span class="sub">{{ p.hypothesis }} — A: {{ p.arms.A }} · B: {{ p.arms.B }}</span></div>
 <form method="post" action="{{ base }}/experiments/new" class="fbar"><input type="hidden" name="account_id" value="{{ p.account_id }}"><input type="hidden" name="variable" value="{{ p.variable }}"><input type="hidden" name="mode" value="{{ p.mode }}">
-<input type="hidden" name="arm_a" value="{{ p.arms.A }}"><input type="hidden" name="arm_b" value="{{ p.arms.B }}"><input type="hidden" name="hypothesis" value="{{ p.hypothesis }}">
+<input type="hidden" name="arm_a" value="{{ p.arms.A }}"><input type="hidden" name="arm_b" value="{{ p.arms.B }}"><input type="hidden" name="hypothesis" value="{{ p.hypothesis }}">{% if p.outcome %}<input type="hidden" name="outcome" value="{{ p.outcome }}">{% endif %}
 {% if not user %}<input name="actor" placeholder="Your name" style="width:120px">{% endif %}<button class="sm primary">Start</button></form></li>{% endfor %}</ul></div>{% endif %}
 <div class="card flush"><div class="tw"><table class="stack"><thead><tr><th>Test</th><th>Arms</th><th>Latest read</th><th>Status</th><th></th></tr></thead><tbody>
 {% for e in exps %}{% set r = e.result or {} %}{% set l = r.latest or {} %}<tr>

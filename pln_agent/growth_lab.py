@@ -23,7 +23,8 @@ from .creative_db import CONCLUSIVE_N, MIN_N, bh_adjust, evidence_class, permuta
 from .db import DB, now_iso
 
 RATE_OUTCOMES = ("engagements_per_1k_views", "shares_per_1k_views", "follows_per_1k_views", "saves_per_1k_views",
-                 "comments_per_1k_views")
+                 "comments_per_1k_views", "watch_pct")
+LAYOUTS = {"A": "crop", "B": "stack"}  # `layout`: full-bleed 9:16 crop vs the whole landscape frame stacked over a blurred fill
 DEFAULT_OUTCOME = "engagements_per_1k_views"
 MAX_WEEKS = 6  # an experiment that still lacks sample after this is closed as inconclusive
 ASSIGNABLE = ("in_review", "needs_fix")
@@ -78,6 +79,11 @@ def propose(db: DB) -> list[dict]:
             out.append({"account_id": aid, "variable": "cut", "mode": "assigned", "drafts": len(multi_cut),
                         "arms": {"A": "short cut (≈12s)", "B": "medium cut (≈18s)"},
                         "hypothesis": "A shorter cut earns more engagement per 1k views than the medium cut on this account"})
+        land = [v for v in vs if _landscape_video(db, v)]
+        if len(land) >= 2 and (aid, "layout") not in running and aid.split(".")[1] in ("instagram", "tiktok", "youtube", "facebook"):
+            out.append({"account_id": aid, "variable": "layout", "mode": "assigned", "drafts": len(land),
+                        "arms": dict(LAYOUTS), "outcome": "watch_pct",
+                        "hypothesis": "Showing the whole frame (stacked) keeps people watching longer than a full-screen crop"})
         styles = {}
         for v in vs:
             for h in (v.get("hook_candidates") or [])[:3]:
@@ -92,6 +98,15 @@ def propose(db: DB) -> list[dict]:
 
 # ---- assignment -----------------------------------------------------------------------------------
 
+def _landscape_video(db: DB, v: dict) -> bool:
+    """A Reel made from a landscape master: the only kind where crop vs stacked is a choice."""
+    if v.get("post_type") or v["platform"] not in ("instagram", "tiktok", "youtube", "facebook"):
+        return False
+    a = db.get("assets", "asset_id", v["asset_id"]) or {}
+    w, h = a.get("width"), a.get("height")
+    return not (w and h and h >= w) and "/verticals/" not in (a.get("media_path") or "")
+
+
 def _apply(db: DB, e: dict, v: dict, arm: str, actor: str) -> dict | None:
     from .creative_director import use_cut
     from .workflow import WorkflowError, edit_variant
@@ -103,6 +118,16 @@ def _apply(db: DB, e: dict, v: dict, arm: str, actor: str) -> dict | None:
         if (v.get("edl") or {}).get("variant_label") != arm:
             use_cut(db, v["variant_id"], arm, actor)
         return {"cut": arm}
+    if e["variable"] == "layout":
+        if not _landscape_video(db, v):
+            return None
+        layout = res["arms"][arm]
+        t = dict(v.get("treatment") or {})
+        if t.get("layout_arm") != layout:
+            t["layout_arm"] = layout
+            db.update("variants", "variant_id", v["variant_id"],
+                      {"treatment": t, **({"render_status": "queued"} if v.get("render_status") == "rendered" else {})})
+        return {"layout": layout}
     if e["variable"] == "hook_style":
         style = res["arms"][arm]
         cand = next((h for h in v.get("hook_candidates") or [] if h.get("style") == style), None)

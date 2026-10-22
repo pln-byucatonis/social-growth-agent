@@ -52,7 +52,7 @@ LABELS = {
     "shares_per_1k_views": "Shares / 1k views", "engagements_per_1k_views": "Engagements / 1k views",
     "follows_per_1k_views": "Follows / 1k views", "comments_per_1k_views": "Comments / 1k views",
     "saves_per_1k_views": "Saves / 1k views", "likes_per_1k_views": "Likes / 1k views", "avg_watch_time_s": "Avg watch time",
-    "posting_hour_bucket": "Posting time", "hook_style": "Hook style", "captions_burned": "Burned-in captions",
+    "posting_hour_bucket": "Posting time", "hook_style": "Hook style", "layout": "Layout (crop vs stacked)", "watch_pct": "Avg % of the Reel watched", "captions_burned": "Burned-in captions",
 }
 
 

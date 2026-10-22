@@ -278,6 +278,9 @@ def post_outcomes(db: DB, account_ids: list[str] | None = None, min_age_h: float
                                  "comments_per_1k_views": per1k("comments"), "likes_per_1k_views": per1k("likes"),
                                  "engagements_per_1k_views": per1k("engagements"),
                                  "avg_watch_time_s": m.get("avg_watch_time_s"),
+                                 # share of the Reel the average viewer watched (Instagram gives no 3-second hold)
+                                 "watch_pct": (m["avg_watch_time_s"] / p["duration_s"] * 100)
+                                 if m.get("avg_watch_time_s") is not None and p.get("duration_s") else None,
                                  "follows_per_1k_views": per1k("follows"), "completion_rate": m.get("completion_rate")}})
     return out
 

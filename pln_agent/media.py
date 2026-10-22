@@ -55,6 +55,21 @@ def asset_preview(asset: dict, segments: list[dict] | None = None) -> dict:
     return {"src": resolve_media(path, "video/mp4") + frag, "poster": asset_thumb_url(asset)}
 
 
+def _leave_layout_test(db: DB, variant_id: str, why: str) -> None:
+    """The crop arm can't be honoured without cutting graphics: the post is stacked and its arm is dropped, so the
+    test only compares posts where both layouts were a fair choice."""
+    rows = [r for r in db.query("SELECT a.experiment_id FROM experiment_arms a JOIN experiments e ON e.experiment_id=a.experiment_id "
+                                "WHERE a.variant_id=? AND e.variable='layout'", [variant_id])]
+    for r in rows:
+        db.execute("DELETE FROM experiment_arms WHERE experiment_id=? AND variant_id=?", [r["experiment_id"], variant_id])
+        db.audit("renderer", "experiment_arm_dropped", "experiments", r["experiment_id"], {"variant_id": variant_id, "why": why})
+    v = db.get("variants", "variant_id", variant_id)
+    t = dict(v.get("treatment") or {})
+    t["layout_arm"] = None
+    t["layout_forced"] = f"stacked: {why}"
+    db.update("variants", "variant_id", variant_id, {"treatment": t})
+
+
 def upload_render(outdir: Path, variant_id: str, bucket: str) -> str:
     """Persist a finished render to S3 (container disks are ephemeral). Returns the s3:// path of the video."""
     import boto3
@@ -255,6 +270,11 @@ def render_variant(db: DB, variant_id: str, settings: Settings, actor: str = "re
         if out["h"] > out["w"] and sw and sh and sw > sh and "/verticals/" not in asset["media_path"]:
             from . import art_director
             cuts, why = art_director.crop_cuts_graphics(src, segs)
+            arm = (v.get("treatment") or {}).get("layout_arm")  # growth_lab `layout` experiment
+            if arm == "stack" and not cuts:
+                cuts, why = True, "layout test: stacked arm"
+            elif arm == "crop" and cuts:  # a crop would slice the graphics: stays stacked, and leaves the test
+                _leave_layout_test(db, variant_id, why)
             if cuts:  # stacked: the whole broadcast frame over a blurred fill, text in the bands above and below
                 W, H = out["w"], out["h"]
                 fh = int(round(W * sh / sw / 2)) * 2

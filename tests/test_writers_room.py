@@ -77,6 +77,39 @@ class WritersRoomTests(unittest.TestCase):
         self.assertEqual(r.status_code, 303)
         self.assertEqual(db.get("variants", "variant_id", vid)["treatment"]["writers_room"]["pick"], -1)
 
+    def test_invented_details_zero_and_stock_phrases_cost(self):
+        db, _ = make()
+        vid = self._variant(db)
+
+        def call(system, messages, max_tokens=0):
+            if system.startswith("You score"):
+                return json.dumps({"scores": [{"i": 0, "hook": 9, "specific": 9, "accurate": 8, "payoff": 9, "invented": ["the crowd"]},
+                                              *[{"i": i, "hook": 8, "specific": 8, "accurate": 8, "payoff": 8, "invented": []} for i in (1, 2, 3, 4)]]})
+            caps = ["The crowd loses it.", "Stay until the end for this one.", "Nowhere to go. Fair finish?", "Who saw that coming?", "Thoughts?"]
+            return json.dumps({"drafts": [{"angle": a, "hook": h, "caption": c, "cta": "Tag someone"}
+                                          for a, h, c in zip(writers_room.ANGLES, GOOD, caps)]})
+        room = writers_room.write(db, vid, llm=call)
+        sc = [d["score"] for d in room["drafts"]]
+        self.assertEqual(sc[0], 0.0)
+        self.assertIn("invented: the crowd", room["drafts"][0]["note"])
+        self.assertEqual(sc[1], 8.0 - writers_room.CLICHE_PENALTY)
+        self.assertEqual(sc[2], 8.0)
+        self.assertIn(room["pick"], (2, 3, 4))
+
+    def test_an_angle_that_keeps_winning_pays_for_it(self):
+        db, _ = make()
+        vids = [v["variant_id"] for v in db.all("variants", "state='in_review'")]
+        acct = db.get("variants", "variant_id", vids[0])["account_id"]
+        same = [v for v in vids if db.get("variants", "variant_id", v)["account_id"] == acct]
+        self.assertGreaterEqual(len(same), 1)
+        for k in range(4):  # four earlier posts on this account all won with the payoff tease
+            db.insert("variants", {**db.get("variants", "variant_id", same[0]), "variant_id": f"old-{k}", "writers_status": "done",
+                                   "treatment": {"writers_room": {"pick": 0, "drafts": [{"angle": writers_room.ANGLES[4]}]}}})
+        room = writers_room.write(db, same[0], llm=fake_llm([7, 7, 7, 7, 7.5]))
+        self.assertLess(room["drafts"][4]["score"], 7.5)
+        self.assertIn("keeps winning", room["drafts"][4]["note"])
+        self.assertNotEqual(room["pick"], 4)
+
     def test_below_the_bar_goes_back(self):
         db, _ = make()
         vid = self._variant(db)
