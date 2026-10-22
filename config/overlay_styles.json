@@ -1,5 +1,5 @@
 {
-  "_doc": "On-screen text looks per brand. Fonts are free (SIL Open Font License, see assets/fonts/*-OFL.txt); swap a brand's font or colours here once the official brand kit is in. hook: knockout | pill | outline. captions: kinetic | classic. stamp: word slammed on the payoff moment ('' = none). countdown: progress bar to the payoff under the hook. family: which word bank (words.*) a brand draws its bold hook / payoff / reaction words from. Brand names never go on screen.",
+  "_doc": "On-screen text looks per brand. Fonts are free (SIL Open Font License, see assets/fonts/*-OFL.txt); swap a brand's font or colours here once the official brand kit is in. hook: knockout | pill | outline. captions: kinetic | classic. stamp: word slammed on the payoff moment ('' = none). countdown: progress bar to the payoff under the hook. family: which word bank (words.*) a brand draws its bold hook / payoff / reaction words from. Brand names never go on screen. Knockout (cut-out letters) reads only over calm footage; busy in-car and crowd shots use pill (2026-10-22 review).",
   "fonts": {
     "anton": "assets/fonts/Anton-Regular.ttf",
     "bebas": "assets/fonts/BebasNeue-Regular.ttf",
@@ -31,7 +31,7 @@
       "font": "anton",
       "primary": "#D7141A",
       "accent": "#FFD400",
-      "hook": "knockout",
+      "hook": "pill",
       "captions": "kinetic",
       "family": "combat"
     },
@@ -39,7 +39,7 @@
       "font": "anton",
       "primary": "#FF3B1F",
       "accent": "#FFE600",
-      "hook": "knockout",
+      "hook": "pill",
       "captions": "kinetic",
       "family": "slap"
     },
@@ -47,7 +47,7 @@
       "font": "anton",
       "primary": "#7B2BFF",
       "accent": "#39FF14",
-      "hook": "knockout",
+      "hook": "pill",
       "captions": "kinetic",
       "family": "street"
     },

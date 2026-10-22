@@ -89,6 +89,17 @@ def _wrap(text: str, width: int) -> str:
     return "\n".join(lines)
 
 
+def _dims(src: str) -> tuple[int | None, int | None]:
+    """(width, height) of the first video stream, from ffprobe; (None, None) when it can't be read."""
+    try:
+        out = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height",
+                              "-of", "csv=p=0", src], capture_output=True, text=True, timeout=60).stdout.strip()
+        w, h = (int(x) for x in out.split(",")[:2])
+        return w, h
+    except Exception:  # noqa: BLE001
+        return None, None
+
+
 def _reframe(out: dict, src_w: int, src_h: int, subject_x: float = 0.5) -> str:
     """Scale to cover, then crop. subject_x (0..1 across the source width) centres the crop on the
     action instead of the frame centre; the crop is clamped so it never runs off the picture."""
@@ -234,6 +245,8 @@ def render_variant(db: DB, variant_id: str, settings: Settings, actor: str = "re
                 labels.append(f"[a{i}]")
         parts.append("".join(labels) + f"concat=n={len(segs)}:v=1:a={1 if has_audio else 0}" + ("[cv][ca]" if has_audio else "[cv]"))
         sw, sh = asset.get("width"), asset.get("height")
+        if not (sw and sh):  # not recorded on the asset: read it off the file (decides crop vs stacked layout)
+            sw, sh = _dims(src)
         fx, framing = 0.5, "source already matches target orientation"
         if out["h"] > out["w"] and not (sw and sh and sh > sw):  # landscape (or unknown) master → vertical
             fx, framing = subject_x(src, segs)

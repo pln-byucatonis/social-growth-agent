@@ -14,7 +14,7 @@ class OverlayDrawingTests(unittest.TestCase):
         self.dir = Path(tempfile.mkdtemp())
 
     def test_brand_styles(self):
-        self.assertEqual(overlays.style_for("carjitsu")["hook"], "knockout")
+        self.assertEqual(overlays.style_for("carjitsu")["hook"], "pill")  # knockout is unreadable over busy in-car footage
         self.assertIn("ACE.", overlays.words_for(overlays.style_for("putt_tour"))["payoff"])
         self.assertTrue(Path(overlays.style_for("pln")["font_path"]).exists())
         self.assertEqual(overlays.style_for("carjitsu", {"hook": "pill"})["hook"], "pill")  # a post can override
@@ -22,7 +22,7 @@ class OverlayDrawingTests(unittest.TestCase):
 
     def test_knockout_letters_are_transparent_holes(self):
         from PIL import Image
-        s = overlays.style_for("carjitsu")
+        s = overlays.style_for("carjitsu", {"hook": "knockout"})
         bottom = overlays.render_hook("TWO SECONDS LEFT", s, 1080, 1920, self.dir / "k.png")
         img = Image.open(self.dir / "k.png")
         top = int(1920 * (overlays.SAFE_TOP + 0.03))
@@ -72,7 +72,7 @@ class OverlayRenderTests(unittest.TestCase):
         v = [x for x in db.all("variants", "asset_id=?", [CJ]) if x["platform"] == "instagram"][0]
         r = render_variant(db, v["variant_id"], s)
         self.assertEqual(r["status"], "rendered")
-        self.assertEqual(r["qc"]["overlay_style"], "knockout+kinetic+stamp+reaction")
+        self.assertEqual(r["qc"]["overlay_style"], "pill+kinetic+stamp+reaction")
         self.assertTrue(r["qc"]["overlay_words"].get("payoff"))
         web._db, web.BACKGROUND = db, False
         self.addCleanup(setattr, web, "BACKGROUND", True)
