@@ -295,7 +295,7 @@ def build(v: dict, cues: list[dict], duration: float, w: int, h: int, outdir: Pa
 
     # 1. hook — the first 3 seconds; top unless the frames say otherwise
     for j, o in enumerate(v.get("onscreen_text") or []):
-        text = (o.get("text") or "").strip()
+        text = re.sub(r"[*_#`]+", "", o.get("text") or "").strip()  # markdown from a writer never reaches the picture
         if (o.get("position") or "").endswith("small"):
             continue  # brand tags: cheap-looking, and the account already says who posted it
         if is_generic(text) and not ov.get("hook_custom"):

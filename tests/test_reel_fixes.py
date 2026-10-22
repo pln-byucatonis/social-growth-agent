@@ -58,3 +58,11 @@ class HookCheckTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class MarkdownGuardTests(unittest.TestCase):
+    def test_markdown_never_burns_in(self):
+        v = {"variant_id": "x", "brand_id": "carjitsu", "onscreen_text": [{"text": "**NO WAY HE ESCAPES**", "start": 0, "end": 2}],
+             "treatment": {"overlay": {"hook_custom": True}}}
+        r = overlays.build(v, [], 10.0, 1080, 1920, Path(tempfile.mkdtemp()), None)
+        self.assertEqual(r["words"]["hook"], "NO WAY HE ESCAPES")

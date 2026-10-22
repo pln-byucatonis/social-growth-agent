@@ -94,7 +94,8 @@ def _words(v: dict) -> tuple[str, str, str]:
     from . import overlays
     s = overlays.style_for(v["brand_id"])
     w = overlays.words_for(s)
-    hook = ((v.get("onscreen_text") or [{}])[0].get("text") or v.get("hook") or "").strip()
+    import re
+    hook = re.sub(r"[*_#`]+", "", (v.get("onscreen_text") or [{}])[0].get("text") or v.get("hook") or "").strip()
     if overlays.is_generic(hook):
         hook = overlays._pick(w.get("hook") or ["WATCH THIS"], v["variant_id"])
     payoff = overlays._pick(w.get("payoff") or ["NO WAY."], v["variant_id"] + ":payoff")
