@@ -69,9 +69,10 @@ def propose(db: DB) -> list[dict]:
     """Tests worth running now, per account, from what the drafts on hand make possible."""
     out = []
     running = {(e["account_id"], e["variable"]) for e in db.all("experiments", "status IN ('running','planned')")}
-    for acc in db.query("SELECT DISTINCT account_id FROM variants WHERE state IN ('in_review','needs_fix')"):
-        aid = acc["account_id"]
-        vs = db.all("variants", "account_id=? AND state IN ('in_review','needs_fix')", [aid])
+    by_acc: dict[str, list[dict]] = {}
+    for v in db.all("variants", "state IN ('in_review','needs_fix')", order="account_id"):  # one read, not one per account
+        by_acc.setdefault(v["account_id"], []).append(v)
+    for aid, vs in by_acc.items():
         multi_cut = [v for v in vs if sum(1 for c in ((v.get("treatment") or {}).get("duration_variants") or []) if c.get("available")) >= 2]
         if len(multi_cut) >= 4 and (aid, "cut") not in running:
             out.append({"account_id": aid, "variable": "cut", "mode": "assigned", "drafts": len(multi_cut),

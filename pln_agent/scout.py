@@ -178,22 +178,27 @@ def top_moments(db: DB, source_id: str = "", brand_id: str = "", n: int = 20, fi
         where.append("source_id=?"), params.append(source_id)
     if brand_id:
         where.append("brand_id=?"), params.append(brand_id)
-    rows = db.all("scout_moments", " AND ".join(where), params, order=f"{field} DESC")
-    picked: list[dict] = []
-    per_cat: dict[str, int] = {}
-    for r in rows:
-        if not include_used and r["status"] == "promoted":
-            continue
-        if any(_overlaps(r, p) for p in picked):
-            continue
-        cat = (r.get("categories") or ["uncategorised"])[0]
-        if per_cat.get(cat, 0) >= max_per_category:
-            continue
-        per_cat[cat] = per_cat.get(cat, 0) + 1
-        picked.append(r)
-        if len(picked) >= n:
-            break
-    return picked
+    # read the best few hundred first; only read further when diversity rules leave the list short
+    limit = max(300, n * 25)
+    while True:
+        rows = db.all("scout_moments", " AND ".join(where), params, order=f"{field} DESC", limit=limit)
+        picked: list[dict] = []
+        per_cat: dict[str, int] = {}
+        for r in rows:
+            if not include_used and r["status"] == "promoted":
+                continue
+            if any(_overlaps(r, p) for p in picked):
+                continue
+            cat = (r.get("categories") or ["uncategorised"])[0]
+            if per_cat.get(cat, 0) >= max_per_category:
+                continue
+            per_cat[cat] = per_cat.get(cat, 0) + 1
+            picked.append(r)
+            if len(picked) >= n:
+                break
+        if len(picked) >= n or len(rows) < limit:
+            return picked
+        limit *= 4
 
 
 def sources(db: DB, brand_id: str = "") -> list[dict]:
