@@ -585,7 +585,7 @@ def runsheet_page(request: Request, day: str = "", all: int = 0):
     from .. import runsheet
     today = datetime.now(ZoneInfo(settings.timezone)).date()
     d = (today + timedelta(days=1)) if day == "tomorrow" else (date.fromisoformat(day) if day else today)
-    sheet = runsheet.day_sheet(db(), settings, d)
+    sheet = runsheet.day_sheet(db(), settings, d, focus=not all)
     for r in sheet["rows"]:  # play-in-place preview, with sound, before approving
         v = db().get("variants", "variant_id", r["variant_id"]) or {}
         r["render_url"] = _render_url(request, v) if v.get("render_status") == "rendered" else ""

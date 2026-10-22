@@ -24,7 +24,23 @@ def _local(ts: str, tz: ZoneInfo) -> datetime:
     return (d if d.tzinfo else d.replace(tzinfo=timezone.utc)).astimezone(tz)
 
 
-def day_sheet(db: DB, settings: Settings, day: date) -> dict:
+def focus_accounts(db: DB) -> dict:
+    """Worked accounts (config/focus.json) split into connected (the run sheet proposes for these) and not yet."""
+    import json
+    from .config import CONFIG_DIR
+    try:
+        cfg = json.loads((CONFIG_DIR / "focus.json").read_text())
+    except FileNotFoundError:
+        return {}
+    accs = {a["account_id"]: a for a in db.all("accounts")}
+    worked = [accs[a] for a in cfg.get("worked") or [] if a in accs]
+    return {"connected": [a["account_id"] for a in worked if a.get("verification_status") == "oauth_connected"],
+            "waiting": [a["account_id"] for a in worked if a.get("verification_status") != "oauth_connected"]}
+
+
+def day_sheet(db: DB, settings: Settings, day: date, focus: bool = True) -> dict:
+    """focus: the planner proposes only for the worked accounts that are connected (config/focus.json); scheduled
+    posts and team-challenge pins always show."""
     from .calendar_planner import plan_week, slot_hypotheses
     from .publishing import account_slots
     from .workflow import kill_switch_on
@@ -68,11 +84,16 @@ def day_sheet(db: DB, settings: Settings, day: date) -> dict:
                      "why_time": f"Team challenge, post {p['n']}" + (f" — {p['moved']}" if p.get("moved") else ""),
                      "mode": "live" if live else "simulated", "why_not_live": why_not, "two_person": bool(flags.get("two_person_signoff")),
                      "qc": (v.get("render_qc") or {}).get("passed"), "render": v.get("render_status")})
+    fa = focus_accounts(db) if focus else {}
+    keep = set(fa.get("connected") or []) if fa else None
+    if keep is not None:
+        # scheduled posts and a team challenge's pins are commitments already made: they always show
+        rows = [r for r in rows if r["kind"] == "scheduled" or r.get("pinned") or r["account_id"] in keep]
     plan = plan_week(db, settings, day, days=1, states=("in_review", "approved"), persist=False)
     hyp = slot_hypotheses()
     for p in plan["placed"]:
         t = p["slot"].astimezone(tz)
-        if p["variant_id"] in pinned:
+        if p["variant_id"] in pinned or (keep is not None and p["account_id"] not in keep):
             continue
         if any(abs((t - x).total_seconds()) < 3600 for x in taken.get(p["account_id"], [])):
             continue  # an already-scheduled post holds that hour
@@ -88,7 +109,7 @@ def day_sheet(db: DB, settings: Settings, day: date) -> dict:
                      "why_not_live": why_not, "two_person": bool(flags.get("two_person_signoff")),
                      "qc": (v.get("render_qc") or {}).get("passed"), "render": v.get("render_status")})
     rows.sort(key=lambda r: (r["time"], r["handle"]))
-    return {"day": day.isoformat(), "timezone": settings.timezone, "rows": rows, "unplaced": plan["unplaced"][:40],
+    return {"day": day.isoformat(), "timezone": settings.timezone, "rows": rows, "unplaced": plan["unplaced"][:40], "focus": fa,
             "counts": {"scheduled": sum(r["kind"] == "scheduled" for r in rows), "proposed": sum(r["kind"] == "proposed" for r in rows),
                        "pinned": len(pinned)}}
 

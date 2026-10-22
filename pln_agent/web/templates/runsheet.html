@@ -11,7 +11,8 @@
 {% for r in rows %}{{ row(r, pick) }}{% endfor %}</tbody></table></div></div>{% endmacro %}
 
 <div class="ph"><div class="t"><div class="eyebrow">{{ 'Today' if day == today else 'Run sheet' }}</div><h1>Run sheet · {{ day.strftime('%A, %b %-d') }}</h1>
-<p>What needs your approval {{ 'today' if day == today else 'this day' }}, in time order ({{ s.timezone.split('/')[-1].replace('_',' ') }} time). Approving schedules each post at the time shown.</p></div>
+<p>What needs your approval {{ 'today' if day == today else 'this day' }}, in time order ({{ s.timezone.split('/')[-1].replace('_',' ') }} time). Approving schedules each post at the time shown.</p>
+{% if s.focus %}<p class="small muted">Priority accounts that are connected: {% for a in s.focus.connected %}{{ a|acct }}{{ ', ' if not loop.last }}{% else %}none yet{% endfor %}.{% if s.focus.waiting %} Not connected yet: {% for a in s.focus.waiting %}{{ a|acct }}{{ ', ' if not loop.last }}{% endfor %}.{% endif %} <a href="{{ base }}/runsheet?day={{ s.day }}&all=1">Show every account</a></p>{% endif %}</div>
 <div class="acts"><div class="seg"><a href="{{ base }}/runsheet?day={{ prev }}">‹ {{ prev[5:] }}</a><a href="{{ base }}/runsheet" class="{{ 'on' if day == today }}">Today</a><a href="{{ base }}/runsheet?day=tomorrow" class="{{ 'on' if (day - today).days == 1 }}">Tomorrow</a><a href="{{ base }}/runsheet?day={{ next }}">{{ next[5:] }} ›</a></div>
 <form method="get" class="inline"><input type="date" name="day" value="{{ s.day }}" onchange="this.form.submit()"></form></div></div>
 {% if dry_run or not publishing_enabled %}<div class="flash info">Publishing is simulated right now, so approved posts are rehearsed, not posted. Going live needs your explicit authorisation per account.</div>{% endif %}

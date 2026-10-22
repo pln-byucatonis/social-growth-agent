@@ -121,7 +121,7 @@ def compose(frame_path: Path, w: int, h: int):
         return bg.crop((x0, 0, x0 + w, h)) if bg.width > w else bg, (0, h)
     bg = ImageEnhance.Brightness(bg.filter(ImageFilter.GaussianBlur(28))).enhance(0.45)
     fg = im.resize((w, int(fh * w / fw)))
-    y0 = int(h * 0.40) if h < w * 1.5 else (h - fg.height) // 2  # carousel: hook band above; Story: centred
+    y0 = int(h * 0.33) if h < w * 1.5 else (h - fg.height) // 2  # carousel: hook band above; Story: centred
     y0 = max(0, min(y0, h - fg.height - int(h * 0.12)))
     bg.paste(fg, (0, y0))
     return bg, (y0, y0 + fg.height)
@@ -193,9 +193,9 @@ def build_slides(v: dict, src: str, kind: str, outdir: Path, llm=None) -> list[d
             if role == "setup":
                 overlays.render_hook(text, s, w, h, png, "top")
                 placed = "top"
-            elif y1 < h * 0.92:  # stacked: the band under the frame
-                overlays.render_stamp(text, s, w, h, png, tilt=-5 if role == "payoff" else 4, cy=min(0.9, ((y1 + h) / 2) / h),
-                                      heavy=role == "payoff")
+            elif y1 < h * 0.92:  # stacked: the band under the frame, sized to fit it (never over the score bug)
+                overlays.render_stamp(text, s, w, h, png, tilt=-3 if role == "payoff" else 3, cy=((y1 + h) / 2) / h,
+                                      heavy=role == "payoff", size=int((h - y1) * 0.8))
                 placed = "under the frame"
             else:
                 busy = seen.get(round(float(i), 2), set())

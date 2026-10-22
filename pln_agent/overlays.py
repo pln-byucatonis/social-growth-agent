@@ -178,11 +178,12 @@ def render_hook(text: str, s: dict, w: int, h: int, out: Path, zone: str = "top"
 
 
 def render_stamp(word: str, s: dict, w: int, h: int, out: Path, tilt: float = -7, cy: float = 0.44,
-                 heavy: bool = False) -> Path:
-    """A slammed word centred at cy (share of height). heavy = bright background: thicker stroke + dark glow."""
+                 heavy: bool = False, size: int | None = None) -> Path:
+    """A slammed word centred at cy (share of height). heavy = bright background: thicker stroke + dark glow.
+    size caps the type (px) when the word must fit a band, e.g. under a stacked frame."""
     from PIL import ImageDraw, ImageFilter
     img = _canvas(w, h)
-    f, _ = _fit(word, s["font_path"], int(w * 0.84), int(w * 0.30), 60, max_lines=1)
+    f, _ = _fit(word, s["font_path"], int(w * 0.84), min(int(w * 0.30), size or w), min(60, size or 60), max_lines=1)
     tw = f.getlength(word)
     asc, desc = f.getmetrics()
     x, y = (w - tw) / 2, h * cy - (asc + desc) / 2

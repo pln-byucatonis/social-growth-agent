@@ -1,0 +1,17 @@
+{
+  "_doc": "The accounts the team works now (PLN Social Strategy 2027, section 3, as amended by the founders on 2026-10-22). The run sheet proposes posts only for worked accounts that are connected; 'Show everything' lifts the filter. Mirrored accounts get automatic copies once mirroring is built; parked accounts get nothing.",
+  "worked": [
+    "carjitsu.instagram.carjitsu_championship",
+    "carjitsu.tiktok.carjitsuchampionship",
+    "carjitsu.youtube.carjitsuchampionship6540",
+    "pln.instagram.proleaguenetwork",
+    "pln.tiktok.proleaguenetwork",
+    "pln.youtube.proleaguenetwork",
+    "putt_tour.instagram.putttour"
+  ],
+  "mirrored": [
+    "carjitsu.facebook.carjitsu_championship",
+    "pln.facebook.pro_league_network",
+    "pln_picks.facebook.pln_picks"
+  ]
+}

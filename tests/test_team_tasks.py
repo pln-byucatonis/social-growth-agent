@@ -136,7 +136,7 @@ class TeamTaskTests(unittest.TestCase):
         self.assertEqual(len(pinned), 3)
         self.assertEqual(t[4]["status"], "needs_you")  # WPL covered by the schedule pin
         day = datetime.fromisoformat(pinned[0]["slot_at"]).astimezone(ZoneInfo(self.s.timezone)).date()
-        sheet = runsheet.day_sheet(self.db, self.s, day)
+        sheet = runsheet.day_sheet(self.db, self.s, day, focus=False)
         rows = [r for r in sheet["rows"] if r.get("pinned")]
         self.assertEqual({r["variant_id"] for r in rows}, {s["variant_id"] for s in pinned})
         from fastapi.testclient import TestClient
