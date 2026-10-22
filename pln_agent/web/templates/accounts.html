@@ -2,7 +2,7 @@
 {% set connected = rows|selectattr('verification_status','equalto','oauth_connected')|list %}{% set live = rows|selectattr('live_ok')|list %}
 <div class="ph"><div class="t"><div class="eyebrow">Admin</div><h1>Accounts</h1>
 <p>Every brand account, whether it's connected, and whether it can publish live. Connecting never turns on publishing — that's a separate, audited step per account, behind the global switch.</p></div>
-<div class="acts"><form method="post" action="{{ base }}/accounts/confirm-ownership" class="inline"><button>Confirm PLN owns all unverified accounts</button></form></div></div>
+<div class="acts"><a class="btn" href="{{ base }}/accounts/tiktok-export">Upload TikTok Studio export</a><form method="post" action="{{ base }}/accounts/confirm-ownership" class="inline"><button>Confirm PLN owns all unverified accounts</button></form></div></div>
 <div class="kpis"><div class="kpi"><div class="v">{{ rows|length }}</div><div class="l">Accounts</div></div><div class="kpi ok"><div class="v">{{ connected|length }}</div><div class="l">Connected</div></div>
 <div class="kpi {{ 'warn' if live else '' }}"><div class="v">{{ live|length }}</div><div class="l">Allowed to publish live</div></div>
 <div class="kpi {{ 'warn' if not meta_user.connected else '' }}"><div class="v" style="font-size:18px">{{ 'Connected' if meta_user.connected else 'Not connected' }}</div><div class="l">Meta (Facebook + Instagram)</div>{% if meta_user.connected %}<div class="h">{{ meta_user.logins|length }} login(s)</div>{% endif %}</div></div>

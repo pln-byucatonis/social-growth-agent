@@ -1,0 +1,14 @@
+{% extends "base.html" %}{% block title %}TikTok Studio export{% endblock %}{% block body %}
+<div class="ph"><div class="t"><div class="eyebrow">Accounts</div><h1>TikTok Studio export</h1>
+<p>Until the TikTok API is approved, upload what TikTok Studio exports: <b>Analytics → Download data</b> (Overview, Followers or Content; CSV or XLSX). You'll see what was read before anything is saved. Re-uploading the same file changes nothing.</p></div></div>
+<div class="card"><form method="post" action="{{ base }}/accounts/tiktok-export" enctype="multipart/form-data" class="fbar">
+<label>Account <select name="account_id">{% for a in tiktok %}<option value="{{ a.account_id }}"{% if a.account_id == account_id %} selected{% endif %}>{{ a.account_id|acct(false) }}</option>{% endfor %}</select></label>
+<label>File <input type="file" name="file" accept=".csv,.xlsx" required></label><button>Read the file</button></form></div>
+{% if parsed %}<div class="card"><div class="ch"><h2>{{ filename }} · {{ 'per video' if parsed.kind == 'videos' else 'per day' }} · {{ parsed.rows|length }} row(s)</h2>
+<div class="acts"><form method="post" action="{{ base }}/accounts/tiktok-export/save" class="inline"><input type="hidden" name="account_id" value="{{ account_id }}"><input type="hidden" name="filename" value="{{ filename }}"><input type="hidden" name="data" value="{{ data_b64 }}"><button class="sm">Save to {{ account_id|acct(false) }}</button></form></div></div>
+<p class="small muted">Columns read: {% for h, m in parsed.columns.items() %}<b>{{ h }}</b> → {{ m }}{% if not loop.last %} · {% endif %}{% endfor %}{% if parsed.skipped %} · skipped {{ parsed.skipped|length }} row(s): {{ parsed.skipped[:3]|join('; ') }}{% endif %}</p>
+<div class="tw"><table><thead><tr><th>{{ 'Video' if parsed.kind == 'videos' else 'Day' }}</th>{% for m in metric_names %}<th>{{ m }}</th>{% endfor %}</tr></thead><tbody>
+{% for r in parsed.rows[:40] %}<tr><td>{% if parsed.kind == 'videos' %}<a href="{{ r.link }}" target="_blank">{{ (r.title or r.video_id)[:60] }}</a><span class="sub">{{ r.posted or '' }}</span>{% else %}{{ r.day }}{% endif %}</td>{% for m in metric_names %}<td>{{ '{:,.0f}'.format(r.metrics[m]) if m in r.metrics else '—' }}</td>{% endfor %}</tr>{% endfor %}</tbody></table></div>
+{% if parsed.rows|length > 40 %}<p class="small muted">…and {{ parsed.rows|length - 40 }} more.</p>{% endif %}</div>{% endif %}
+{% if recent %}<div class="card"><div class="ch"><h2>Imported so far</h2></div><div class="tw"><table><thead><tr><th>When</th><th>Account</th><th>What</th><th>By</th></tr></thead><tbody>{% for e in recent %}<tr><td class="small">{{ e.at }}</td><td>{{ e.entity_id|acct(false) }}</td><td class="small">{{ e.detail.kind }} · {{ e.detail.metrics }} numbers · {{ e.detail.posts }} videos</td><td class="small">{{ e.actor }}</td></tr>{% endfor %}</tbody></table></div></div>{% endif %}
+{% endblock %}

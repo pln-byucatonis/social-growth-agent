@@ -156,6 +156,7 @@ TABLES: dict[str, list[tuple[str, str, str]]] = {
         ("render_qc", "json", ""),  # Video Production quality checks on the latest render
         ("post_type", "text", ""),  # '' = Reel / video | carousel | story (pln_agent.carousel)
         ("slides", "json", ""),  # carousel / Story items: [{kind: image|video, file, role, text, t, public_url?}]
+        ("writers_status", "text", ""),  # writers' room: pending | done | below_bar | failed ('' = not sent to the room)
         ("treatment", "json", ""),  # Creative Director: hook / edit / context / payoff / conversion + duration variants
         ("created_at", "ts", ""),
         ("updated_at", "ts", ""),

@@ -132,6 +132,7 @@ CREATE TABLE IF NOT EXISTS variants (
   render_qc JSONB,
   post_type TEXT,
   slides JSONB,
+  writers_status TEXT,
   treatment JSONB,
   created_at TEXT,
   updated_at TEXT

@@ -26,6 +26,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from .. import migration as mig
+from ..accounts import focus as acc_focus
 from ..accounts import publish_eligibility
 from ..adapters import get_adapter
 from ..calendar_planner import plan_week
@@ -428,6 +429,28 @@ def do_render(request: Request, vid: str):
     return back(request, f"/variant/{vid}", "Rendering started — this takes about a minute. Refresh to see it.")
 
 
+@app.post("/variant/{vid:path}/writers/{i}")
+def do_writers_pick(request: Request, vid: str, i: int):
+    """Switch the post to another of the writers' room drafts (re-renders with its hook)."""
+    from .. import writers_room
+    try:
+        r = writers_room.switch(db(), vid, i, request.state.user or "dashboard")
+    except (ValueError, WorkflowError) as e:
+        return back(request, f"/variant/{vid}", err=str(e))
+    if os.environ.get("PLN_TASK_RUNNER_PROJECT"):
+        _kick_team_tasks()
+    return back(request, f"/variant/{vid}", f"Using “{r['hook']}” — re-rendering.")
+
+
+@app.post("/variant/{vid:path}/writers")
+def do_writers_run(request: Request, vid: str):
+    """Send this post (back) to the writers' room; the task runner writes it."""
+    db().update("variants", "variant_id", vid, {"writers_status": "pending"})
+    if os.environ.get("PLN_TASK_RUNNER_PROJECT"):
+        _kick_team_tasks()
+    return back(request, f"/variant/{vid}", "Sent to the writers' room — five drafts in a minute or two.")
+
+
 @app.post("/variant/{vid:path}/make/{kind}")
 def do_make_slides(request: Request, vid: str, kind: str):
     """A carousel or Story version of this Reel: a new post, reviewed and approved on its own."""
@@ -670,6 +693,51 @@ def accounts(request: Request):
     except Exception as e:  # secret store unreachable
         meta_user = {"connected": False, "error": str(e)[:120]}
     return page(request, "accounts.html", rows=rows, caps=caps, apps=apps, meta_user=meta_user)
+
+
+def _tiktok_page(request: Request, **kw):
+    d = db()
+    tiktok = [a for a in d.all("accounts", "platform='tiktok'", order="account_id")
+              if a["account_id"] not in set(acc_focus().get("removed") or [])]
+    recent = d.all("audit_log", "action='tiktok_export_imported'", order="id DESC", limit=10)
+    kw.setdefault("account_id", next((a["account_id"] for a in tiktok if a["account_id"] in set(acc_focus().get("worked") or [])), ""))
+    return page(request, "tiktok_export.html", tiktok=tiktok, recent=recent, **kw)
+
+
+@app.get("/accounts/tiktok-export", response_class=HTMLResponse)
+def tiktok_export_page(request: Request):
+    return _tiktok_page(request)
+
+
+@app.post("/accounts/tiktok-export", response_class=HTMLResponse)
+async def tiktok_export_read(request: Request):
+    import base64
+    from .. import tiktok_export
+    form = await request.form()
+    f = form.get("file")
+    data = await f.read() if f is not None and hasattr(f, "read") else b""
+    if len(data) > 5_000_000:
+        return back(request, "/accounts/tiktok-export", err="That file is over 5 MB — export one tab at a time")
+    try:
+        parsed = tiktok_export.parse(f.filename or "export.csv", data)
+    except (tiktok_export.ExportError, ValueError, KeyError, IndexError) as e:
+        return back(request, "/accounts/tiktok-export", err=f"Couldn't read it: {e}")
+    names = sorted({m for r in parsed["rows"] for m in r["metrics"]})
+    return _tiktok_page(request, parsed=parsed, filename=f.filename, data_b64=base64.b64encode(data).decode(),
+                        account_id=form.get("account_id") or "", metric_names=names)
+
+
+@app.post("/accounts/tiktok-export/save")
+def tiktok_export_save(request: Request, account_id: str = Form(...), filename: str = Form(""), data: str = Form(...)):
+    import base64
+    from .. import tiktok_export
+    try:
+        parsed = tiktok_export.parse(filename, base64.b64decode(data))
+        r = tiktok_export.save(db(), account_id, parsed, request.state.user or "dashboard")
+    except (tiktok_export.ExportError, ValueError) as e:
+        return back(request, "/accounts/tiktok-export", err=str(e))
+    what = f"{r['posts']} videos, " if r["posts"] else ""
+    return back(request, "/accounts/tiktok-export", f"Saved {what}{r['metrics']} numbers for {account_id}.")
 
 
 def _admin(request: Request) -> None:

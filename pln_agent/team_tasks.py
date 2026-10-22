@@ -587,6 +587,8 @@ def pins_for_day(db: DB, day_iso: str, tz: str) -> list[dict]:
 def needs_compute(db: DB) -> bool:
     if db.one("SELECT variant_id FROM variants WHERE render_status='queued'"):
         return True  # dashboard re-renders / overlay edits
+    if db.one("SELECT variant_id FROM variants WHERE writers_status='pending' AND state IN ('in_review','needs_fix')"):
+        return True  # the writers' room has copy to write
     return any(t["kind"] in COMPUTE_KINDS and t["status"] in ("todo", "in_progress") for t in tasks(db, open_only=True))
 
 
@@ -657,6 +659,10 @@ def run_runner(settings, max_minutes: int = 50, pause_s: int = 20, idle_passes: 
     while time.time() < end:
         r = poll(own, settings.ops_assets_bucket, settings, render=False)
         from .media import render_queued
+        from .writers_room import run_pending
+        wrote = run_pending(own)  # copy first, so the render that follows burns in the room's hook
+        if wrote:
+            log.info("runner pass %s: writers' room %s", passes + 1, wrote)
         queued = render_queued(own, settings)
         out = advance(own, settings, ops)
         if queued:

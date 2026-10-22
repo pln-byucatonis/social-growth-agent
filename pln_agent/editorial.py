@@ -81,6 +81,9 @@ def generate_pack(db: DB, asset_id: str, settings: Settings, today: date | None 
                                       "series", "format", "hook", "hook_candidates", "title", "caption", "hashtags",
                                       "hashtag_rationale", "voiceover", "onscreen_text", "edl", "thumbnail", "cta", "angle",
                                       "test_hypothesis", "caption_hash", "treatment")}
+        from .accounts import focus
+        if row["account_id"] in set(focus().get("worked") or []):
+            row["writers_status"] = "pending"  # the writers' room rewrites the copy on the task runner (writers_room.py)
         row.update({"utm_url": ctx.utm_url, "score": sc["total"], "score_breakdown": sc,
                     "risk_flags": rights, "validation": v["validation"], "state": state,
                     "render_status": "not_rendered", "render_path": "", "created_at": now_iso(), "updated_at": now_iso()})
