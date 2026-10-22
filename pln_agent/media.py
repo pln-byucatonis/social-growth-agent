@@ -185,6 +185,9 @@ def render_variant(db: DB, variant_id: str, settings: Settings, actor: str = "re
     """Render the post's EDL — or, with `cut` (a Creative Director duration variant), that cut into its own
     folder without touching the post's main render. Every render gets quality checks."""
     v = db.get("variants", "variant_id", variant_id)
+    from . import carousel
+    if carousel.is_slides(v) and not cut:  # carousels and Stories are stills (or the Reel's video), not an edit
+        return carousel.render_slides(db, variant_id, settings, actor)
     asset = db.get("assets", "asset_id", v["asset_id"])
     outdir = settings.render_dir / _safe(variant_id) / (f"cut_{cut['label']}" if cut else "")
     if not cut:

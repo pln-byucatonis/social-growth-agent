@@ -130,6 +130,8 @@ CREATE TABLE IF NOT EXISTS variants (
   render_path TEXT,
   public_media_url TEXT,
   render_qc JSONB,
+  post_type TEXT,
+  slides JSONB,
   treatment JSONB,
   created_at TEXT,
   updated_at TEXT

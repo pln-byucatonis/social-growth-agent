@@ -259,8 +259,11 @@ class InstagramCollector:
                               "ORDER BY published_at DESC", [aid, cutoff])[:IG_MEDIA_MAX]
         done = 0
         for p in posts:
-            reel = (p["post_type"] or "").lower() in ("reels", "reel", "clips")
-            metrics = "ig_reels_avg_watch_time" if reel else "follows,profile_visits"
+            kind = (p["post_type"] or "").lower()
+            reel = kind in ("reels", "reel", "clips")
+            # carousels: saves and shares are what the post-type tests compare (per 1,000 views) against the Reels
+            metrics = "ig_reels_avg_watch_time" if reel else (
+                "follows,profile_visits,saved,shares,views" if "carousel" in kind else "follows,profile_visits")
             try:
                 data = self._get(f"{p['platform_post_id']}/insights", {"metric": metrics}, token).get("data") or []
             except CollectorError as e:
@@ -276,6 +279,8 @@ class InstagramCollector:
                     m("follows", "follows", v, p["platform_post_id"], ck)
                 elif d["name"] == "profile_visits":
                     m("profile_visits", "profile_visits", v, p["platform_post_id"], ck)
+                elif d["name"] in ("saved", "shares", "views"):
+                    m(d["name"], {"saved": "saves"}.get(d["name"], d["name"]), v, p["platform_post_id"], ck)
             done += 1
         n = self.db.insert_many("metrics", rows, upsert_key="metric_key")
         return {"account_id": aid, "metric_rows": n, "posts_checked": done, "notes": notes[:5]}

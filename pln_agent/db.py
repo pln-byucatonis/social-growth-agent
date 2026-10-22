@@ -152,6 +152,8 @@ TABLES: dict[str, list[tuple[str, str, str]]] = {
         ("render_path", "text", ""),
         ("public_media_url", "text", ""),  # approved render on the public CDN (platform pull-from-URL)
         ("render_qc", "json", ""),  # Video Production quality checks on the latest render
+        ("post_type", "text", ""),  # '' = Reel / video | carousel | story (pln_agent.carousel)
+        ("slides", "json", ""),  # carousel / Story items: [{kind: image|video, file, role, text, t, public_url?}]
         ("treatment", "json", ""),  # Creative Director: hook / edit / context / payoff / conversion + duration variants
         ("created_at", "ts", ""),
         ("updated_at", "ts", ""),

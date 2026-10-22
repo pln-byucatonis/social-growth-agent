@@ -144,7 +144,7 @@ def upsert_agent_post(db: DB, variant: dict, platform_post_id: str, permalink: s
     pid = f"{acc['platform']}:{platform_post_id}"
     rec = {"post_id": pid, "account_id": acc["account_id"], "brand_id": variant["brand_id"], "platform": acc["platform"],
            "platform_post_id": str(platform_post_id), "published_at": pub.replace(microsecond=0).isoformat() if pub else None,
-           "permalink": permalink or "", "post_type": variant.get("format") or "", "origin": "agent_published",
+           "permalink": permalink or "", "post_type": variant.get("post_type") or variant.get("format") or "", "origin": "agent_published",
            "variant_id": variant["variant_id"], "asset_id": variant["asset_id"], "caption": variant.get("caption") or "",
            "duration_s": dur, "creative": creative, "provenance": prov, "source_footage": footage,
            "first_seen_at": now_iso(), "updated_at": now_iso()}

@@ -99,38 +99,82 @@ class InstagramAdapter(BaseAdapter):
     def _host(self):
         return os.environ.get("IG_GRAPH_HOST", "https://graph.facebook.com")
 
+    def _items(self, v, media_url):
+        """Carousel / Story items with their public URLs (placeholders when only planning or simulating)."""
+        out = []
+        for i, sl in enumerate(v.get("slides") or [], 1):
+            ext = ".mp4" if sl.get("kind") == "video" else ".jpg"
+            out.append((sl.get("kind") or "image", sl.get("public_url") or media_url.rsplit(".", 1)[0] + f"-{i}{ext}"))
+        return out
+
     def plan_requests(self, v, account, media_url, token="{TOKEN}"):
         ver = getattr(self.settings, "meta_graph_version", "v26.0")
         ig = account.get("stable_platform_id") or "{IG_USER_ID}"
+        media = f"{self._host()}/{ver}/{ig}/media"
+        poll = HttpRequest("GET", f"{self._host()}/{ver}/{{CONTAINER_ID}}?fields=status_code", {}, None, "poll container")
+        publish = HttpRequest("POST", f"{self._host()}/{ver}/{ig}/media_publish", {},
+                              {"creation_id": "{CONTAINER_ID}", "access_token": token}, "publish container")
+        kind = v.get("post_type") or ""
+        if kind == "carousel":
+            children = []
+            for i, (k, url) in enumerate(self._items(v, media_url), 1):
+                body = ({"media_type": "VIDEO", "video_url": url} if k == "video" else {"image_url": url})
+                children.append(HttpRequest("POST", media, {}, {**body, "is_carousel_item": True, "access_token": token},
+                                            f"create carousel item {i}"))
+            parent = HttpRequest("POST", media, {}, {"media_type": "CAROUSEL", "children": "{CHILD_IDS}",
+                                                     "caption": _caption(v), "access_token": token}, "create carousel container")
+            return [*children, parent, poll, publish]
+        if kind == "story":
+            k, url = (self._items(v, media_url) or [("image", media_url)])[0]
+            body = {"video_url": url} if k == "video" else {"image_url": url}
+            return [HttpRequest("POST", media, {}, {"media_type": "STORIES", **body, "access_token": token}, "create story container"),
+                    poll, publish]
         return [
-            HttpRequest("POST", f"{self._host()}/{ver}/{ig}/media", {},
+            HttpRequest("POST", media, {},
                         {"media_type": "REELS", "video_url": media_url, "caption": _caption(v), "share_to_feed": True,
                          "access_token": token}, "create reel container"),
-            HttpRequest("GET", f"{self._host()}/{ver}/{{CONTAINER_ID}}?fields=status_code", {}, None, "poll container"),
-            HttpRequest("POST", f"{self._host()}/{ver}/{ig}/media_publish", {},
-                        {"creation_id": "{CONTAINER_ID}", "access_token": token}, "publish container"),
+            poll, publish,
         ]
 
-    def publish(self, v, account, idempotency_key):
-        token = resolve_token(account["credential_ref"])
-        ver = getattr(self.settings, "meta_graph_version", "v26.0")
-        create, _, pub = self.plan_requests(v, account, media_public_url(v), token)
-        cid = self._send(create, "instagram create container").body["id"]
+    def _wait(self, cid, token, ver):
         for _ in range(self.poll_max):
             st = self._send(HttpRequest("GET", f"{self._host()}/{ver}/{cid}?fields=status_code&access_token={token}"),
                             "instagram poll").body.get("status_code")
             if st == "FINISHED":
-                break
+                return
             if st == "ERROR":
                 raise AdapterError("validation", "instagram container processing ERROR")
             time.sleep(self.poll_seconds)
+        raise AdapterError("retryable", "instagram container not ready in time")
+
+    def publish(self, v, account, idempotency_key):
+        token = resolve_token(account["credential_ref"])
+        ver = getattr(self.settings, "meta_graph_version", "v26.0")
+        kind = v.get("post_type") or ""
+        if kind in ("carousel", "story") and not all(sl.get("public_url") for sl in v.get("slides") or []):
+            raise AdapterError("blocked", "the slides have no public links yet (created automatically when the post is scheduled)")
+        reqs = self.plan_requests(v, account, media_public_url(v), token)
+        pub = reqs[-1]
+        extra = {}
+        if kind == "carousel":
+            kids = []
+            for req in reqs[:-3]:
+                kid = self._send(req, "instagram carousel item").body["id"]
+                if req.json_body.get("media_type") == "VIDEO":
+                    self._wait(kid, token, ver)
+                kids.append(kid)
+            parent = reqs[-3]
+            parent.json_body["children"] = ",".join(kids)
+            cid = self._send(parent, "instagram carousel container").body["id"]
+            extra["children"] = kids
         else:
-            raise AdapterError("retryable", "instagram container not ready in time")
+            cid = self._send(reqs[0], "instagram create container").body["id"]
+        self._wait(cid, token, ver)
         pub.json_body["creation_id"] = cid
         mid = self._send(pub, "instagram media_publish").body["id"]
         perm = self._send(HttpRequest("GET", f"{self._host()}/{ver}/{mid}?fields=permalink&access_token={token}"),
                           "instagram permalink").body.get("permalink", "")
-        return PublishResult("published", mid, perm, {"container": cid})
+        return PublishResult("published", mid, perm, {"container": cid, **extra})
 
 
 class TikTokAdapter(BaseAdapter):

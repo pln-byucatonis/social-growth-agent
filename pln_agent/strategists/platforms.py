@@ -125,6 +125,8 @@ class Strategist:
             errs.append("missing test hypothesis")
         edl = v.get("edl") or {}
         segs = edl.get("segments", [])
+        if (v.get("post_type") or "") in ("carousel", "story"):  # stills: slide checks run on the render (carousel.qc_slides)
+            return errs
         if s.get("needs_video", True):
             if not segs:
                 errs.append("no EDL segments grounded in annotated source moments")

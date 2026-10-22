@@ -291,8 +291,12 @@ def variant(request: Request, vid: str):
     preview = get_adapter(acc["platform"], settings=settings).simulate(v, acc, "preview")
     from ..media import asset_preview
     source = asset_preview(asset, (v.get("edl") or {}).get("segments"))
+    from .. import carousel
+    slides = carousel.preview_urls(v) if carousel.is_slides(v) else []
+    siblings = {k: d.get("variants", "variant_id", f"{vid}~{k}") for k in carousel.SLIDE_TYPES} \
+        if (not carousel.is_slides(v) and v["platform"] in carousel.PLATFORMS) else {}
     return page(request, "variant.html", v=v, acc=acc, asset=asset, live_ok=ok, reasons=reasons, approvals=approvals,
-                source=source,
+                source=source, slides=slides, siblings=siblings,
                 audit=audit, jobs=jobs, planned=planned, render_url=render_url, ov=ov,
                 would_send=preview.raw["would_send"], north=NORTH_STAR.get(v["platform"], {}))
 
@@ -413,6 +417,23 @@ def do_render(request: Request, vid: str):
 
     threading.Thread(target=work, daemon=True, name=f"render-{vid[:20]}").start()
     return back(request, f"/variant/{vid}", "Rendering started — this takes about a minute. Refresh to see it.")
+
+
+@app.post("/variant/{vid:path}/make/{kind}")
+def do_make_slides(request: Request, vid: str, kind: str):
+    """A carousel or Story version of this Reel: a new post, reviewed and approved on its own."""
+    from .. import carousel
+    try:
+        r = carousel.make(db(), vid, kind, request.state.user or "dashboard")
+    except carousel.CarouselError as e:
+        return back(request, f"/variant/{vid}", err=str(e))
+    if r["created"] and os.environ.get("PLN_TASK_RUNNER_PROJECT"):
+        _kick_team_tasks()
+    elif r["created"]:
+        db().update("variants", "variant_id", r["variant_id"], {"render_status": "rendering"})
+        render_variant(db(), r["variant_id"], settings, actor=request.state.user or "dashboard")
+    note = "Created — rendering its slides (about a minute)." if r["created"] else "Already made — here it is."
+    return back(request, f"/variant/{r['variant_id']}", note)
 
 
 @app.post("/variant/{vid:path}/public-link")
