@@ -1169,8 +1169,31 @@ def experiments_page(request: Request):
     for r in d.query("SELECT experiment_id, arm, COUNT(*) AS n FROM experiment_arms GROUP BY experiment_id, arm"):
         counts.setdefault(r["experiment_id"], {})[r["arm"]] = r["n"]
     accs = [a for a in d.all("accounts", order="account_id") if not a.get("hard_block_reason")]
+    from .. import peer_cadence
+    from ..runsheet import focus_accounts
+    keep = (focus_accounts(d) or {}).get("connected") or [a["account_id"] for a in accs]
+    cadence = []
+    if d.one("SELECT 1 AS x FROM competitor_snapshots"):
+        for aid in [a for a in keep if ".instagram." in a]:
+            try:
+                cadence.append(peer_cadence.for_account(d, aid, tz=settings.timezone))
+            except Exception as e:  # noqa: BLE001 — one account's data must not break the page
+                cadence.append({"account_id": aid, "error": str(e)[:160]})
     return page(request, "experiments.html", exps=exps, counts=counts, proposals=lab.propose(d), accs=accs, bg=bg_status("experiments"),
-                outcomes=lab.RATE_OUTCOMES)
+                outcomes=lab.RATE_OUTCOMES, cadence=cadence)
+
+
+@app.post("/experiments/cadence/{account_id}")
+def experiments_cadence(request: Request, account_id: str):
+    """Timing test against the growing benchmarks' posting window + the three-week frequency test."""
+    from .. import peer_cadence
+    _admin(request)
+    try:
+        r = peer_cadence.plan_tests(db(), account_id, request.state.user or "dashboard", tz=settings.timezone)
+    except (KeyError, ValueError, WorkflowError) as e:
+        return back(request, "/experiments", err=str(e))
+    bits = ([f"timing test {r['timing']}"] if r["timing"] else []) + ([f"{len(r['frequency'])}-week frequency test"] if r["frequency"] else [])
+    return back(request, "/experiments#cadence", ("Started " + " and ".join(bits) + ". " if bits else "") + " ".join(r["notes"]))
 
 
 @app.post("/experiments/new")

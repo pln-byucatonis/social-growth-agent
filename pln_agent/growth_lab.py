@@ -24,6 +24,11 @@ from .db import DB, now_iso
 
 RATE_OUTCOMES = ("engagements_per_1k_views", "shares_per_1k_views", "follows_per_1k_views", "saves_per_1k_views",
                  "comments_per_1k_views", "watch_pct")
+# Raw counts never decide a test — except where the variable acts on how many people see the post and a per-view rate
+# can't show it: a Story alongside the Reel, the time it goes out. Those are read on reach.
+REACH_TESTS = {"story_companion": ("reach",), "post_time": ("reach",)}
+POST_TYPES = {"A": "reel", "B": "carousel"}  # `post_type`: the same moment as a Reel or as a swipe carousel (Instagram)
+STORY = {"A": "Reel only", "B": "Reel + Story"}  # `story_companion`: does a Story of the Reel lift the Reel's reach?
 LAYOUTS = {"A": "crop", "B": "stack"}  # `layout`: full-bleed 9:16 crop vs the whole landscape frame stacked over a blurred fill
 DEFAULT_OUTCOME = "engagements_per_1k_views"
 MAX_WEEKS = 6  # an experiment that still lacks sample after this is closed as inconclusive
@@ -36,7 +41,7 @@ def _res(e: dict) -> dict:
 
 def outcome_of(e: dict) -> str:
     m = (e.get("success_metric") or "").strip()
-    return m if m in RATE_OUTCOMES else _res(e).get("outcome") or DEFAULT_OUTCOME
+    return m if m in RATE_OUTCOMES + REACH_TESTS.get(e.get("variable") or "", ()) else _res(e).get("outcome") or DEFAULT_OUTCOME
 
 
 # ---- design ---------------------------------------------------------------------------------------
@@ -46,8 +51,9 @@ def create(db: DB, account_id: str, variable: str, arms: dict[str, str], hypothe
     """arms: label → description (for observed experiments, label → the creative value that defines the arm)."""
     if len(arms) < 2:
         raise ValueError("an experiment needs at least two arms")
-    if outcome not in RATE_OUTCOMES:
-        raise ValueError(f"outcome must be a per-1k-view rate: {', '.join(RATE_OUTCOMES)}")
+    if outcome not in RATE_OUTCOMES + REACH_TESTS.get(variable, ()):
+        raise ValueError(f"outcome must be a per-1k-view rate: {', '.join(RATE_OUTCOMES)}"
+                         + (f" (or {', '.join(REACH_TESTS[variable])} for this test)" if variable in REACH_TESTS else ""))
     acc = db.get("accounts", "account_id", account_id)
     if not acc:
         raise KeyError(account_id)
@@ -84,6 +90,15 @@ def propose(db: DB) -> list[dict]:
             out.append({"account_id": aid, "variable": "layout", "mode": "assigned", "drafts": len(land),
                         "arms": dict(LAYOUTS), "outcome": "watch_pct",
                         "hypothesis": "Showing the whole frame (stacked) keeps people watching longer than a full-screen crop"})
+        reels = [v for v in vs if v["platform"] == "instagram" and not v.get("post_type")]
+        if len(reels) >= 2 and (aid, "post_type") not in running:
+            out.append({"account_id": aid, "variable": "post_type", "mode": "assigned", "drafts": len(reels),
+                        "arms": dict(POST_TYPES), "outcome": "shares_per_1k_views",
+                        "hypothesis": "The same moment as a swipe carousel earns more shares per 1k views than as a Reel"})
+        if len(reels) >= 2 and (aid, "story_companion") not in running:
+            out.append({"account_id": aid, "variable": "story_companion", "mode": "assigned", "drafts": len(reels),
+                        "arms": dict(STORY), "outcome": "reach",
+                        "hypothesis": "Posting a Story of the Reel lifts the Reel's reach"})
         styles = {}
         for v in vs:
             for h in (v.get("hook_candidates") or [])[:3]:
@@ -128,6 +143,28 @@ def _apply(db: DB, e: dict, v: dict, arm: str, actor: str) -> dict | None:
             db.update("variants", "variant_id", v["variant_id"],
                       {"treatment": t, **({"render_status": "queued"} if v.get("render_status") == "rendered" else {})})
         return {"layout": layout}
+    if e["variable"] in ("post_type", "story_companion"):
+        from . import carousel
+        if v["platform"] != "instagram" or v.get("post_type"):
+            return None
+        choice = res["arms"][arm]
+        if choice in ("reel", "Reel only"):
+            return {e["variable"]: choice}
+        try:
+            made = carousel.make(db, v["variant_id"], "carousel" if e["variable"] == "post_type" else "story", actor)
+        except carousel.CarouselError:
+            return None
+        if e["variable"] == "post_type":  # this moment goes out as the carousel: the Reel steps aside, the arm is the carousel
+            db.update("variants", "variant_id", v["variant_id"], {"state": "archived", "updated_at": now_iso()})
+            db.audit(actor, "archived_for_test", "variants", v["variant_id"], {"experiment": e["experiment_id"], "posted_as": made["variant_id"]})
+            return {"post_type": "carousel", "variant_id": made["variant_id"], "reel": v["variant_id"]}
+        return {"story_companion": True, "story": made["variant_id"]}  # the Reel is the measured post; its Story rides along
+    if e["variable"] == "post_time":
+        hhmm = res["arms"][arm]
+        t = dict(v.get("treatment") or {})
+        t["slot_arm"] = hhmm
+        db.update("variants", "variant_id", v["variant_id"], {"treatment": t})
+        return {"post_time": hhmm}
     if e["variable"] == "hook_style":
         style = res["arms"][arm]
         cand = next((h for h in v.get("hook_candidates") or [] if h.get("style") == style), None)
@@ -153,15 +190,20 @@ def assign(db: DB, experiment_id: str, actor: str = "growth-lab", limit: int = 4
     for r in db.all("experiment_arms", "experiment_id=?", [experiment_id]):
         counts[r["arm"]] = counts.get(r["arm"], 0) + 1
     vs = [v for v in db.all("variants", "account_id=? AND state IN ('in_review','needs_fix')", [e["account_id"]])
-          if v["variant_id"] not in taken]
+          if v["variant_id"] not in taken and not v.get("post_type")]
     vs.sort(key=lambda v: -(v.get("score") or 0))
+    # several tests on one account share its new drafts instead of the first one taking them all
+    peers = sorted(x["experiment_id"] for x in db.all("experiments", "account_id=? AND status='running'", [e["account_id"]])
+                   if _res(x).get("mode") == "assigned")
+    if len(peers) > 1 and experiment_id in peers:  # each running test takes every n-th draft, offset by its place in the list
+        vs = vs[peers.index(experiment_id)::len(peers)]
     done = []
     for v in vs[:limit]:
         for arm in sorted(labels, key=lambda a: counts[a]):  # the arm with fewest posts first, falling back if it can't apply
             applied = _apply(db, e, v, arm, actor)
             if applied is not None:
-                db.insert("experiment_arms", {"experiment_id": experiment_id, "variant_id": v["variant_id"], "arm": arm,
-                                              "assigned_at": now_iso(), "applied": applied})
+                db.insert("experiment_arms", {"experiment_id": experiment_id, "variant_id": applied.pop("variant_id", v["variant_id"]),
+                                              "arm": arm, "assigned_at": now_iso(), "applied": applied})
                 counts[arm] += 1
                 done.append({"variant_id": v["variant_id"], "arm": arm})
                 break

@@ -38,11 +38,18 @@ def plan_week(db: DB, settings: Settings, start: date, days: int = 7, states=("i
 
     qs = ",".join("?" for _ in states)
     variants = [db.decode("variants", r) for r in db.query(
-        "SELECT variant_id, account_id, asset_id, platform, route_role, series, hook, state, score "
+        "SELECT variant_id, account_id, asset_id, platform, route_role, series, hook, state, score, treatment "
         f"FROM variants WHERE state IN ({qs})", list(states))]
     order = {"canonical": 0, "legacy_inplace": 0, "pln_b2b": 1, "pln_amplification": 2, "legacy_bridge": 3}
     variants.sort(key=lambda v: (order.get(v["route_role"], 9), -(v["score"] or 0)))
 
+    def arm_of(v: dict) -> str:  # growth_lab `post_time` test: this post goes out at its arm's time
+        return ((v.get("treatment") or {}) if isinstance(v.get("treatment"), dict) else {}).get("slot_arm") or ""
+
+    test_only: dict[str, set[str]] = {}  # a timing arm's time is used only by that arm's posts
+    for v in variants:
+        if arm_of(v):
+            test_only.setdefault(v["account_id"], set()).add(arm_of(v))
     free = {}  # (account, datetime) available slot list per account
     for v in variants:
         acc = v["account_id"]
@@ -51,6 +58,8 @@ def plan_week(db: DB, settings: Settings, start: date, days: int = 7, states=("i
         lst = []
         from .publishing import account_slots
         acc_slots, _why = account_slots(db, acc, v["platform"], slots)
+        acc_slots = list(dict.fromkeys(acc_slots + sorted(test_only.get(acc, set()) - set(acc_slots))))
+        test_only[acc] = test_only.get(acc, set()) - set(account_slots(db, acc, v["platform"], slots)[0])
         for d in range(days):
             day = start + timedelta(days=d)
             for hhmm in acc_slots:
@@ -81,6 +90,11 @@ def plan_week(db: DB, settings: Settings, start: date, days: int = 7, states=("i
         canon_times = [t for t, _, _, r in prior if r in ("canonical", "legacy_inplace")]
         chosen = None
         for t in free[acc]:
+            hhmm = t.strftime("%H:%M")
+            if arm_of(v) and hhmm != arm_of(v):
+                continue
+            if not arm_of(v) and hhmm in test_only.get(acc, set()):
+                continue
             if per_day.get((acc, t.date()), 0) >= caps.get(plat, 1):
                 continue
             if any(abs((t - pt).total_seconds()) < gap_h * 3600 for pt, *_ in prior):
