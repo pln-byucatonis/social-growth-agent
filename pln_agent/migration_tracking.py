@@ -39,8 +39,14 @@ def _change(series: list[tuple[date, float]], days: int, today: date) -> float |
 
 
 def _latest_metric(db: DB, account_id: str, fam: str) -> float | None:
-    r = db.query("SELECT value FROM metrics WHERE account_id=? AND canonical_metric=? AND platform_post_id IS NULL "
-                 "ORDER BY period_end DESC, captured_at DESC", [account_id, fam])[:1]
+    if db._rc() is None:
+        r = db.query("SELECT value FROM metrics WHERE account_id=? AND canonical_metric=? AND platform_post_id IS NULL "
+                     "ORDER BY period_end DESC, captured_at DESC LIMIT 1", [account_id, fam])
+    else:  # on a page: one read per account (every metric at once), not one per metric
+        rows = db.memo(f"latest:{account_id}", lambda: db.query(
+            "SELECT canonical_metric, value FROM metrics WHERE account_id=? AND platform_post_id IS NULL "
+            "ORDER BY period_end DESC, captured_at DESC", [account_id]))
+        r = [x for x in rows if x["canonical_metric"] == fam][:1]
     return r[0]["value"] if r else None
 
 

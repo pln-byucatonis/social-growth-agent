@@ -6,8 +6,10 @@ is supported through psycopg when installed and PLN_DATABASE_URL starts with pos
 """
 from __future__ import annotations
 
+import contextvars
 import json
 import sqlite3
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
@@ -561,6 +563,13 @@ def render_ddl(dialect: str = "sqlite", indexes: bool = True) -> str:
     return "\n\n".join(out) + "\n"
 
 
+# One page = one read cache. On the Aurora Data API every statement is an HTTPS round trip (~40 ms), so a page that
+# looks up the same setting or account twenty times pays for it twenty times. Inside DB.request_cache() identical
+# SELECTs are answered from memory, small tables are read once, and any write empties the cache.
+_REQUEST = contextvars.ContextVar("pln_db_request_cache", default=None)
+SMALL_TABLES = {"accounts", "settings_kv", "cadence"}
+
+
 def now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
@@ -724,7 +733,54 @@ class DB:
             return [Jsonb(json.loads(p.v)) if isinstance(p, _J) else p for p in params]
         return [p.v if isinstance(p, _J) else p for p in params]
 
+    # --- per-request read cache ------------------------------------------------------------
+    @contextmanager
+    def request_cache(self):
+        token = _REQUEST.set({"db": id(self), "q": {}, "memo": {}})
+        try:
+            yield
+        finally:
+            _REQUEST.reset(token)
+
+    def _rc(self) -> dict | None:
+        c = _REQUEST.get()
+        return c if c is not None and c["db"] == id(self) else None
+
+    def memo(self, key: str, fn):
+        """fn() once per request (when a request cache is active), else every time."""
+        c = self._rc()
+        if c is None:
+            return fn()
+        if key not in c["memo"]:
+            c["memo"][key] = fn()
+        return c["memo"][key]
+
+    @staticmethod
+    def _qkey(sql: str, params: list) -> tuple:
+        return sql, tuple(repr(p.v if isinstance(p, _J) else p) for p in params)
+
+    def prefetch(self, table: str, key: str, values: Iterable[Any]) -> None:
+        """Load many rows in one statement so later get(table, key, v) calls are answered from the request cache."""
+        c = self._rc()
+        vals = [v for v in dict.fromkeys(values) if v is not None]
+        if c is None or not vals:
+            return
+        sql = f"SELECT * FROM {table} WHERE {key}=?"
+        todo = [v for v in vals if self._qkey(sql, [v]) not in c["q"]]
+        for i in range(0, len(todo), 200):
+            part = todo[i:i + 200]
+            rows = self._raw_query(f"SELECT * FROM {table} WHERE {key} IN ({', '.join('?' for _ in part)})", part)
+            by = {}
+            for r in rows:
+                by.setdefault(r[key], []).append(r)
+            for v in part:
+                c["q"][self._qkey(sql, [v])] = by.get(v, [])
+
     def execute(self, sql: str, params: Iterable[Any] = ()) -> Any:
+        c = self._rc()
+        if c is not None:  # any write: what was read before may be stale now
+            c["q"].clear()
+            c["memo"].clear()
         params = list(params)
         if self.dialect == "sqlite":
             cur = self.conn.execute(sql, tuple(self._adapt(params)))
@@ -738,6 +794,15 @@ class DB:
 
     def query(self, sql: str, params: Iterable[Any] = ()) -> list[dict]:
         params = list(params)
+        c = self._rc()
+        if c is not None and sql.lstrip().lower().startswith(("select", "with")):
+            k = self._qkey(sql, params)
+            if k not in c["q"]:
+                c["q"][k] = self._raw_query(sql, params)
+            return [dict(r) for r in c["q"][k]]
+        return self._raw_query(sql, params)
+
+    def _raw_query(self, sql: str, params: list) -> list[dict]:
         if self.dialect == "sqlite":
             return [dict(r) for r in self.conn.execute(sql, tuple(self._adapt(params))).fetchall()]
         if self.dialect == "rdsdata":
@@ -808,14 +873,20 @@ class DB:
         self.execute(f"UPDATE {table} SET {sets} WHERE {key}=?", [*changes.values(), key_value])
 
     def get(self, table: str, key: str, value: Any) -> dict | None:
+        if table in SMALL_TABLES and self._rc() is not None:  # read the whole (small) table once per request
+            rows = self.memo(f"table:{table}", lambda: self.query(f"SELECT * FROM {table}"))
+            hit = next((r for r in rows if r.get(key) == value), None)
+            return self.decode(table, dict(hit)) if hit else None
         return self.decode(table, self.one(f"SELECT * FROM {table} WHERE {key}=?", [value]))
 
-    def all(self, table: str, where: str = "", params: Iterable[Any] = (), order: str = "") -> list[dict]:
+    def all(self, table: str, where: str = "", params: Iterable[Any] = (), order: str = "", limit: int | None = None) -> list[dict]:
         sql = f"SELECT * FROM {table}"
         if where:
             sql += f" WHERE {where}"
         if order:
             sql += f" ORDER BY {order}"
+        if limit:
+            sql += f" LIMIT {int(limit)}"
         return [self.decode(table, r) for r in self.query(sql, params)]
 
     # --- audit + kv ----------------------------------------------------------------------
@@ -824,8 +895,18 @@ class DB:
                                   "entity_id": entity_id, "detail": detail or {}})
 
     def kv_get(self, key: str, default: str | None = None) -> str | None:
+        if self._rc() is not None:
+            r = self.get("settings_kv", "key", key)
+            return r["value"] if r else default
         r = self.one("SELECT value FROM settings_kv WHERE key=?", [key])
         return r["value"] if r else default
+
+    def kv_prefix(self, prefix: str) -> list[dict]:
+        """settings_kv rows whose key starts with prefix."""
+        if self._rc() is not None:
+            rows = self.memo("table:settings_kv", lambda: self.query("SELECT * FROM settings_kv"))
+            return [dict(r) for r in rows if str(r["key"]).startswith(prefix)]
+        return self.query("SELECT key, value FROM settings_kv WHERE key LIKE ?", [prefix + "%"])
 
     def kv_set(self, key: str, value: str, actor: str = "system") -> None:
         self.insert("settings_kv", {"key": key, "value": value, "updated_at": now_iso(), "updated_by": actor},

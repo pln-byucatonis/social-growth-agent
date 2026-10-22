@@ -51,8 +51,10 @@ def day_sheet(db: DB, settings: Settings, day: date, focus: bool = True) -> dict
     ks = kill_switch_on(db)
     rows = []
     taken: dict[str, list[datetime]] = {}
-    for s in db.all("schedules", "state IN ('scheduled','done','missed') AND slot_at >= ? AND slot_at < ?",
-                    [start.replace(microsecond=0).isoformat(), end.replace(microsecond=0).isoformat()]):
+    day_scheds = db.all("schedules", "state IN ('scheduled','done','missed') AND slot_at >= ? AND slot_at < ?",
+                        [start.replace(microsecond=0).isoformat(), end.replace(microsecond=0).isoformat()])
+    db.prefetch("variants", "variant_id", [s["variant_id"] for s in day_scheds])
+    for s in day_scheds:
         v = db.get("variants", "variant_id", s["variant_id"]) or {}
         job = (db.query("SELECT state, mode, last_error FROM publish_jobs WHERE variant_id=? ORDER BY created_at DESC", [s["variant_id"]]) or [{}])[0]
         acc = accs.get(s["account_id"], {})
@@ -67,7 +69,9 @@ def day_sheet(db: DB, settings: Settings, day: date, focus: bool = True) -> dict
     # posts a team challenge's schedule task pinned to this day (you lock them like any proposal)
     from .team_tasks import pins_for_day
     pinned = set()
-    for p in pins_for_day(db, day.isoformat(), settings.timezone):
+    pins = pins_for_day(db, day.isoformat(), settings.timezone)
+    db.prefetch("variants", "variant_id", [p["variant_id"] for p in pins])
+    for p in pins:
         v = db.get("variants", "variant_id", p["variant_id"]) or {}
         if v.get("state") in ("scheduled", "publishing", "published", "simulated"):
             continue
@@ -90,6 +94,7 @@ def day_sheet(db: DB, settings: Settings, day: date, focus: bool = True) -> dict
         # scheduled posts and a team challenge's pins are commitments already made: they always show
         rows = [r for r in rows if r["kind"] == "scheduled" or r.get("pinned") or r["account_id"] in keep]
     plan = plan_week(db, settings, day, days=1, states=("in_review", "approved"), persist=False)
+    db.prefetch("variants", "variant_id", [p["variant_id"] for p in plan["placed"]])
     hyp = slot_hypotheses()
     for p in plan["placed"]:
         t = p["slot"].astimezone(tz)

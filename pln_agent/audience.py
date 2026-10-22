@@ -283,8 +283,14 @@ def post_outcomes(db: DB, account_ids: list[str] | None = None, min_age_h: float
 
 
 def _account_series(db: DB, account_id: str, fam: str) -> list[tuple[str, float]]:
-    rows = db.query("SELECT period_start, value FROM metrics WHERE account_id=? AND canonical_metric=? AND "
-                    "platform_post_id IS NULL AND checkpoint='snapshot' ORDER BY period_start", [account_id, fam])
+    if db._rc() is None:
+        rows = db.query("SELECT period_start, value FROM metrics WHERE account_id=? AND canonical_metric=? AND "
+                        "platform_post_id IS NULL AND checkpoint='snapshot' ORDER BY period_start", [account_id, fam])
+    else:  # on a page: one read per account (every metric at once), not one per metric
+        allrows = db.memo(f"snapshots:{account_id}", lambda: db.query(
+            "SELECT canonical_metric, period_start, value FROM metrics WHERE account_id=? AND platform_post_id IS NULL "
+            "AND checkpoint='snapshot' ORDER BY period_start", [account_id]))
+        rows = [r for r in allrows if r["canonical_metric"] == fam]
     seen: dict[str, float] = {}
     for r in rows:
         if r["period_start"]:

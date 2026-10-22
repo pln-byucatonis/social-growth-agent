@@ -73,6 +73,15 @@ def _warm():
 
 
 @app.middleware("http")
+async def read_cache(request: Request, call_next):
+    """Pages read through one per-request cache: on the Data API every statement is a ~40 ms round trip."""
+    if request.method not in ("GET", "HEAD") or request.url.path in ("/healthz", "/internal/tick"):
+        return await call_next(request)
+    with db().request_cache():
+        return await call_next(request)
+
+
+@app.middleware("http")
 async def auth(request: Request, call_next):
     request.state.user = None
     request.state.admin = False

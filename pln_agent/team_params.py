@@ -27,7 +27,7 @@ def get(db: DB | None, agent: str, name: str, default):
 
 def overrides(db: DB, agent: str) -> dict:
     pre = f"team:param:{agent}:"
-    return {r["key"][len(pre):]: json.loads(r["value"]) for r in db.query("SELECT key, value FROM settings_kv WHERE key LIKE ?", [pre + "%"])}
+    return {r["key"][len(pre):]: json.loads(r["value"]) for r in db.kv_prefix(pre)}
 
 
 def put(db: DB, agent: str, name: str, value, actor: str) -> None:

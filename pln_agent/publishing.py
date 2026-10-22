@@ -114,8 +114,10 @@ def plan_frequency_test(db: DB, account_id: str, start: date | None = None, acto
 def frequency_arm(db: DB, account_id: str, today: date | None = None) -> float | None:
     today = today or datetime.now(timezone.utc).date()
     wk = (today - timedelta(days=today.weekday())).isoformat()
-    r = db.one("SELECT result FROM experiments WHERE account_id=? AND variable='frequency' AND week_start=? "
-               "AND status IN ('planned','running')", [account_id, wk])
+    week = db.memo(f"freq:{wk}", lambda: db.query(
+        "SELECT account_id, result FROM experiments WHERE variable='frequency' AND week_start=? "
+        "AND status IN ('planned','running')", [wk]))  # every account's arm in one read per page
+    r = next((x for x in week if x["account_id"] == account_id), None)
     if not r:
         return None
     res = r["result"] if isinstance(r["result"], dict) else json.loads(r["result"] or "{}")

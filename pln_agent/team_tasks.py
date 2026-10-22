@@ -134,7 +134,7 @@ def resolve_clips(db: DB, text: str, limit: int = 300) -> list[dict]:
     """Scout moments an action names ("Davidson seatbelt choke 89.5"), in the order the action lists them.
     When a score follows the name it must be that moment's score; otherwise the best match near the name wins."""
     low = text.lower()
-    rows = db.all("scout_moments", "status <> 'dismissed'", order="potential DESC")[:limit]
+    rows = db.memo(f"scout_top:{limit}", lambda: db.all("scout_moments", "status <> 'dismissed'", order="potential DESC", limit=limit))
     hits: dict[str, tuple[int, float, dict]] = {}
     for m in rows:
         pot = f"{float(m.get('potential') or 0):.1f}"
