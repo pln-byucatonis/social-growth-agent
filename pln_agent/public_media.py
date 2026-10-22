@@ -31,7 +31,8 @@ def _copy(src_bucket: str, src_key: str, bucket: str, key: str, content_type: st
                                    MetadataDirective="REPLACE")
 
 
-def publish_render(db: DB, variant_id: str, actor: str, copier=_copy) -> str:
+def publish_render(db: DB, variant_id: str, actor: str, copier=None) -> str:
+    copier = copier or _copy
     v = db.get("variants", "variant_id", variant_id)
     if not v:
         raise PublicMediaError(f"unknown post {variant_id}")

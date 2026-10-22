@@ -152,7 +152,7 @@ class InstagramAdapter(BaseAdapter):
         ver = getattr(self.settings, "meta_graph_version", "v26.0")
         kind = v.get("post_type") or ""
         if kind in ("carousel", "story") and not all(sl.get("public_url") for sl in v.get("slides") or []):
-            raise AdapterError("blocked", "the slides have no public links yet (created automatically when the post is scheduled)")
+            raise AdapterError("blocked", "the slides have no public links (the publisher creates them just before posting)")
         reqs = self.plan_requests(v, account, media_public_url(v), token)
         pub = reqs[-1]
         extra = {}

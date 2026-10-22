@@ -351,7 +351,8 @@ def run_publisher(db: DB, settings: Settings, now: datetime | None = None, trans
         if acc["platform"] in ("instagram", "facebook", "tiktok") and not v.get("public_media_url"):
             from .public_media import PublicMediaError, publish_render
             try:
-                v["public_media_url"] = publish_render(db, v["variant_id"], actor)
+                publish_render(db, v["variant_id"], actor)
+                v = _variant(db, v["variant_id"])  # fresh: a carousel's per-slide links were written to its slides just now
             except PublicMediaError as e:
                 _finish(db, job, v, "blocked", {"problems": [str(e)]}, str(e))
                 results.append({"job_id": job["job_id"], "state": "blocked", "reason": [str(e)]})

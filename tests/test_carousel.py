@@ -210,6 +210,53 @@ class PublishTests(unittest.TestCase):
         self.assertNotIn("caption", reqs[0].json_body)
 
 
+class LivePublishTests(unittest.TestCase):
+    """The publisher creates the slides' public links at publish time, then posts them (the first live carousel
+    failed because the adapter was handed the post as read before the links existed)."""
+
+    def test_scheduled_carousel_publishes_with_the_links_made_just_before(self):
+        from dataclasses import replace
+        from datetime import timedelta
+        from unittest import mock
+        from pln_agent.workflow import run_publisher, schedule
+        from tests.helpers import SLOT, go_live
+        db, s = make(packs=True)
+        live = replace(s, dry_run=False, publishing_enabled=True)
+        acct = "putt_tour.instagram.putttour"
+        go_live(db, acct)
+        vid = carousel.make(db, REEL, "carousel", "t")["variant_id"]
+        slides = [{"kind": "image", "file": f"s3://pln-dam/r/slide_{i}.jpg", "role": r, "text": "", "t": None}
+                  for i, r in enumerate(("setup", "payoff", "reaction", "cta"), 1)]
+        db.update("variants", "variant_id", vid, {"slides": slides, "render_status": "rendered", "render_path": slides[0]["file"],
+                                                  "render_qc": {"passed": True}, "state": "in_review"})
+        approve(db, vid, "editor")
+        schedule(db, vid, SLOT + timedelta(days=1), "t")
+        os.environ["PLN_MEDIA_PUBLIC_BUCKET"] = "pub"
+        os.environ["PLN_MEDIA_PUBLIC_BASE_URL"] = "https://media.example.invalid"
+        self.addCleanup(os.environ.pop, "PLN_MEDIA_PUBLIC_BUCKET", None)
+        self.addCleanup(os.environ.pop, "PLN_MEDIA_PUBLIC_BASE_URL", None)
+        sent = []
+
+        def transport(req):
+            sent.append(req)
+            if req.method == "GET" and "status_code" in req.url:
+                return HttpResponse(200, {"status_code": "FINISHED"})
+            if req.method == "GET":
+                return HttpResponse(200, {"permalink": "https://www.instagram.com/p/xyz/"})
+            if req.url.endswith("/media_publish"):
+                return HttpResponse(200, {"id": "media-9"})
+            return HttpResponse(200, {"id": f"c{len(sent)}"})
+        with mock.patch("pln_agent.public_media._copy", lambda *a, **k: None), \
+                mock.patch("pln_agent.adapters.providers.resolve_token", lambda ref: "tok"):
+            r = run_publisher(db, live, now=SLOT + timedelta(days=1, minutes=1), transport=transport)
+        mine = [x for x in r if x.get("job_id") and db.get("publish_jobs", "job_id", x["job_id"])["variant_id"] == vid]
+        self.assertEqual(mine[0]["state"], "published", r)
+        children = [q for q in sent if q.method == "POST" and q.json_body.get("is_carousel_item")]
+        self.assertEqual(len(children), 4)
+        self.assertTrue(all(q.json_body["image_url"].startswith("https://media.example.invalid/v/") for q in children))
+        self.assertEqual(db.get("variants", "variant_id", vid)["state"], "published")
+
+
 class PageTests(unittest.TestCase):
     def test_variant_page_offers_carousel_and_story(self):
         from fastapi.testclient import TestClient
