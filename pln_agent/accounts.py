@@ -235,9 +235,24 @@ def publish_eligibility(acc: dict, settings: Settings, kill_switch: bool) -> tup
     return (not reasons), reasons
 
 
+def focus() -> dict:
+    """config/focus.json: which accounts are worked, bridged, mirrored, removed (everything else is parked)."""
+    import os
+    if os.environ.get("PLN_FOCUS_DISABLED") == "1":
+        return {}
+    try:
+        return json.loads((CONFIG_DIR / "focus.json").read_text())
+    except FileNotFoundError:
+        return {}
+
+
 def planning_eligible(acc: dict) -> bool:
     """Accounts may be PLANNED for even when unverified (drafts only); creator/secondary accounts are excluded
-    from routing entirely until ownership is confirmed, so we don't waste creative on them."""
+    from routing entirely until ownership is confirmed, so we don't waste creative on them. With a focus list
+    (config/focus.json) only worked and bridge accounts get drafts: parked, mirrored and removed accounts get none."""
     if acc["role"] in ("secondary_unverified", "creator_unverified") and acc["hard_block_reason"]:
         return False
+    f = focus()
+    if f.get("worked"):
+        return acc["account_id"] in set(f["worked"]) | set(f.get("bridge") or [])
     return True

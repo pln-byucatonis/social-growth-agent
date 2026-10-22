@@ -345,7 +345,7 @@ def do_schedule(request: Request, vid: str, actor: str = Form(""), slot_at: str 
         at = datetime.fromisoformat(slot_at)
         at = at if at.tzinfo else at.replace(tzinfo=ZoneInfo(settings.timezone))
         j = schedule(db(), vid, at, who(request, actor))
-        return back(request, f"/variant/{vid}", f"Scheduled job {j['job_id']}")
+        return back(request, f"/variant/{vid}", f"Scheduled job {j['job_id']}" + (f" — {j['moved']}" if j.get("moved") else ""))
     except (WorkflowError, ValueError) as e:
         return back(request, f"/variant/{vid}", err=str(e))
 
@@ -629,6 +629,8 @@ def runsheet_lock(request: Request, pick: list[str] = Form([]), day: str = Form(
         msg = f"Scheduled {len(r['scheduled'])} post(s)"
         if r["needs_second_approver"]:
             msg += f"; {len(r['needs_second_approver'])} need a second approver (rights policy)"
+        if r["moved"]:
+            msg += "; moved a day (daily limit): " + "; ".join(m["variant_id"] for m in r["moved"][:4])
         if r["failed"]:
             msg += "; not scheduled: " + "; ".join(f"{f['variant_id']}: {f['error']}" for f in r["failed"][:4])
         return msg

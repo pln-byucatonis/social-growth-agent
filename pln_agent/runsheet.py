@@ -122,7 +122,7 @@ def day_sheet(db: DB, settings: Settings, day: date, focus: bool = True) -> dict
 def lock(db: DB, picks: list[tuple[str, str]], reviewer: str) -> dict:
     """picks: (variant_id, ISO slot). Approve where needed, then schedule at the slot."""
     from .workflow import WorkflowError, approve, schedule
-    out = {"scheduled": [], "needs_second_approver": [], "failed": []}
+    out = {"scheduled": [], "needs_second_approver": [], "failed": [], "moved": []}
     for vid, slot in picks:
         try:
             v = db.get("variants", "variant_id", vid)
@@ -131,8 +131,10 @@ def lock(db: DB, picks: list[tuple[str, str]], reviewer: str) -> dict:
                 if r["state"] != "approved":
                     out["needs_second_approver"].append(vid)
                     continue
-            schedule(db, vid, datetime.fromisoformat(slot), reviewer)
+            job = schedule(db, vid, datetime.fromisoformat(slot), reviewer)
             out["scheduled"].append(vid)
+            if job.get("moved"):
+                out["moved"].append({"variant_id": vid, "why": job["moved"]})
         except (WorkflowError, KeyError, ValueError) as e:
             out["failed"].append({"variant_id": vid, "error": str(e)[:200]})
     db.audit(reviewer, "runsheet_locked", "schedules", "", {k: len(v) for k, v in out.items()})

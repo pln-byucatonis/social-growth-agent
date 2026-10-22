@@ -143,6 +143,48 @@ def reject(db: DB, vid: str, reviewer: str, note: str) -> None:
     db.audit(reviewer, "variant_rejected", "variants", vid, {"note": note})
 
 
+OPEN_DRAFT_STATES = ("in_review", "needs_fix", "approved")
+
+
+def archive_drafts(db: DB, actor: str, reason: str, keep: set[str] | frozenset = frozenset()) -> int:
+    """Move every open draft (not scheduled, not a carousel/Story, not in `keep`) to 'archived'. Nothing is deleted:
+    restore_archived() brings them back to review."""
+    ids = [r["variant_id"] for r in db.query(
+        f"SELECT variant_id FROM variants WHERE state IN ({', '.join('?' for _ in OPEN_DRAFT_STATES)}) "
+        "AND COALESCE(post_type, '') = ''", list(OPEN_DRAFT_STATES)) if r["variant_id"] not in keep]
+    for i in range(0, len(ids), 200):
+        part = ids[i:i + 200]
+        db.execute(f"UPDATE variants SET state='archived', updated_at=? WHERE variant_id IN ({', '.join('?' for _ in part)})",
+                   [now_iso(), *part])
+    db.audit(actor, "drafts_archived", "variants", "", {"count": len(ids), "reason": reason, "kept": sorted(keep)})
+    return len(ids)
+
+
+def restore_archived(db: DB, actor: str, variant_ids: list[str] | None = None) -> int:
+    """Archived drafts back to review (their checks re-run)."""
+    rows = db.all("variants", "state='archived'") if variant_ids is None else \
+        [v for v in (db.get("variants", "variant_id", x) for x in variant_ids) if v and v["state"] == "archived"]
+    for v in rows:
+        db.update("variants", "variant_id", v["variant_id"], {"state": "in_review", "updated_at": now_iso()})
+        refresh_validation(db, v["variant_id"])
+    db.audit(actor, "drafts_restored", "variants", "", {"count": len(rows)})
+    return len(rows)
+
+
+def remove_accounts(db: DB, account_ids: list[str], reason: str, actor: str) -> list[str]:
+    """Block accounts in the agent (no drafts, no posts). The accounts on the platforms are not touched."""
+    done = []
+    for aid in account_ids:
+        acc = db.get("accounts", "account_id", aid)
+        if not acc:
+            continue
+        db.update("accounts", "account_id", aid, {"hard_block_reason": reason, "publishing_authorized": False,
+                                                  "updated_at": now_iso()})
+        done.append(aid)
+    db.audit(actor, "accounts_removed", "accounts", "", {"accounts": done, "reason": reason})
+    return done
+
+
 BULK_MAX = 100
 
 
@@ -203,17 +245,38 @@ def schedule(db: DB, vid: str, slot_at: datetime, actor: str) -> dict:
                     "AND x.caption_hash=? AND j.state NOT IN ('cancelled')", [v["account_id"], v["caption_hash"]])
     if recent:
         raise WorkflowError("duplicate: identical caption already used on this account")
+    # the daily limit is enforced here, where a person sees it, not at publish time (which used to hold a post 12h)
+    asked, moved = slot_at, ""
+    cap = allocation()["max_posts_per_account_per_day"].get(v["platform"], 1)
+    for _ in range(14):
+        if _posts_on_day(db, v["account_id"], slot_at) < cap:
+            break
+        slot_at = slot_at + timedelta(days=1)
+    if slot_at != asked:
+        moved = (f"{v['platform']} allows {cap} post(s) a day on this account and that day is full: "
+                 f"moved to the same time on {slot_at.astimezone(timezone.utc).date().isoformat()} (UTC)")
     job = {"job_id": f"job-{uuid.uuid4().hex[:10]}", "variant_id": vid, "account_id": v["account_id"],
            "idempotency_key": key, "state": "queued", "mode": "pending", "attempts": 0,
            "next_attempt_at": slot_at.astimezone(timezone.utc).replace(microsecond=0).isoformat(),
-           "created_at": now_iso(), "updated_at": now_iso()}
+           "last_error": moved, "created_at": now_iso(), "updated_at": now_iso()}
     db.insert("publish_jobs", job)
     db.insert("schedules", {"schedule_id": f"sch-{uuid.uuid4().hex[:10]}", "variant_id": vid, "account_id": v["account_id"],
                             "slot_at": job["next_attempt_at"], "state": "scheduled", "reason": "approved + scheduled",
                             "created_at": now_iso()})
     db.update("variants", "variant_id", vid, {"state": "scheduled", "updated_at": now_iso()})
-    db.audit(actor, "variant_scheduled", "variants", vid, {"job_id": job["job_id"], "slot_at": job["next_attempt_at"]})
-    return job
+    db.audit(actor, "variant_scheduled", "variants", vid, {"job_id": job["job_id"], "slot_at": job["next_attempt_at"],
+                                                            **({"moved": moved} if moved else {})})
+    return {**job, "moved": moved}
+
+
+def _posts_on_day(db: DB, account_id: str, at: datetime) -> int:
+    """Posts that went out, or are queued, for the account on the UTC day of `at` (the publisher's daily window)."""
+    start = datetime.combine(at.astimezone(timezone.utc).date(), datetime.min.time(), timezone.utc)
+    lo, hi = start.isoformat(), (start + timedelta(days=1)).isoformat()
+    r = db.one("SELECT COUNT(*) AS n FROM publish_jobs WHERE account_id=? AND ("
+               "(state IN ('queued','publishing') AND next_attempt_at>=? AND next_attempt_at<?) OR "
+               "(state IN ('published','simulated') AND updated_at>=? AND updated_at<?))", [account_id, lo, hi, lo, hi])
+    return r["n"] if r else 0
 
 
 def cancel(db: DB, vid: str, actor: str, reason: str) -> None:
@@ -261,8 +324,15 @@ def run_publisher(db: DB, settings: Settings, now: datetime | None = None, trans
         if qc and not qc.get("passed", True):
             problems.append("render failed quality checks: " + "; ".join(qc.get("errors", [])))
         if _published_today(db, acc["account_id"], now) >= caps.get(acc["platform"], 1):
-            db.update("publish_jobs", "job_id", job["job_id"], {"next_attempt_at": (now + timedelta(hours=12)).replace(microsecond=0).isoformat(),
-                                                               "last_error": "daily rate cap reached; deferred", "updated_at": now_iso()})
+            due = datetime.fromisoformat(str(job["next_attempt_at"]).replace("Z", "+00:00"))
+            nxt = (due if due.tzinfo else due.replace(tzinfo=timezone.utc)) + timedelta(days=1)
+            db.update("publish_jobs", "job_id", job["job_id"], {"next_attempt_at": nxt.replace(microsecond=0).isoformat(),
+                                                               "last_error": f"daily limit reached; moved to the same time tomorrow ({nxt.date().isoformat()} UTC)",
+                                                               "updated_at": now_iso()})
+            for sch in db.all("schedules", "variant_id=? AND state='scheduled'", [job["variant_id"]]):
+                db.update("schedules", "schedule_id", sch["schedule_id"], {"slot_at": nxt.replace(microsecond=0).isoformat(),
+                                                                           "reason": "daily limit reached: moved a day"})
+            db.audit("publisher", "job_deferred", "publish_jobs", job["job_id"], {"to": nxt.isoformat(), "why": "daily limit"})
             results.append({"job_id": job["job_id"], "state": "deferred", "reason": "rate cap"})
             continue
         if problems:

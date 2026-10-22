@@ -1,4 +1,6 @@
 import os
+
+os.environ.setdefault("PLN_FOCUS_DISABLED", "1")  # most tests draft for every fixture account; focus tests opt in
 import tempfile
 from dataclasses import replace
 from datetime import date, datetime, timezone

@@ -300,3 +300,62 @@ def collect_instagram(db: DB, transport=None, actor: str = "insights") -> dict:
             out["errors"][acc["account_id"]] = str(e)
     db.audit(actor, "instagram_insights_collected", "metrics", "", out)
     return out
+
+
+FOLLOWER_FIELDS = {"instagram": "followers_count", "facebook": "followers_count,fan_count"}
+
+
+def snapshot_followers(db: DB, transport=None, today: date | None = None, actor: str = "insights") -> dict:
+    """Today's follower count for every connected priority account (worked + mirrored in config/focus.json).
+
+    Platforms keep no follower history, so a day missed is a day lost: this runs once a day from the worker tick.
+    YouTube subscriber counts come with collect_youtube once a channel is connected."""
+    from .accounts import focus
+    from .oauth import META_VERSION, access_token
+    today = today or datetime.now(timezone.utc).date()
+    f = focus()
+    wanted = set(f.get("worked") or []) | set(f.get("mirrored") or []) | set(f.get("bridge") or [])
+    send = transport or urllib_transport
+    out = {"day": today.isoformat(), "saved": {}, "errors": {}}
+    rows = []
+    for acc in db.all("accounts", "verification_status='oauth_connected'"):
+        if (wanted and acc["account_id"] not in wanted) or acc["platform"] not in FOLLOWER_FIELDS:
+            continue
+        ref = acc.get("credential_ref") or ""
+        if not ref.startswith("vault:") or not acc.get("stable_platform_id"):
+            out["errors"][acc["account_id"]] = "not connected through the Accounts page"
+            continue
+        try:
+            token = access_token(ref[len("vault:"):])
+            q = urllib.parse.urlencode({"fields": FOLLOWER_FIELDS[acc["platform"]], "access_token": token})
+            resp = send(HttpRequest("GET", f"https://graph.facebook.com/{META_VERSION}/{acc['stable_platform_id']}?{q}",
+                                    {"Accept": "application/json"}, purpose="follower snapshot"))
+            if resp.status >= 300:
+                raise CollectorError(f"HTTP {resp.status} {((resp.body or {}).get('error') or {}).get('message') or resp.body}"[:200])
+            body = resp.body or {}
+            n = body.get("followers_count", body.get("fan_count"))
+            if n is None:
+                raise CollectorError("no follower count returned")
+        except (CollectorError, LookupError, PermissionError, OSError) as e:
+            out["errors"][acc["account_id"]] = str(e)[:200]
+            continue
+        d = today.isoformat()
+        rows.append({"account_id": acc["account_id"], "variant_id": None, "platform_post_id": None, "platform": acc["platform"],
+                     "metric": "followers_count", "canonical_metric": "followers", "value": float(n), "checkpoint": "snapshot",
+                     "period_start": d, "period_end": d, "source": "platform_api", "captured_at": now_iso(),
+                     "metric_key": f"{acc['platform']}:acct:{acc['stable_platform_id']}:{d}:followers"})
+        out["saved"][acc["account_id"]] = int(n)
+    if rows:
+        db.insert_many("metrics", rows, upsert_key="metric_key")
+    db.audit(actor, "followers_snapshot", "metrics", "", out)
+    return out
+
+
+def snapshot_followers_due(db: DB, actor: str = "worker") -> dict | str:
+    """Once a day (UTC): the worker tick calls this every minute; it only does work on the first call of the day."""
+    day = datetime.now(timezone.utc).date().isoformat()
+    if db.kv_get("followers:last_day") == day:
+        return "done today"
+    db.kv_set("followers:last_day", day, actor)  # one attempt a day; failures are in the audit log and on the Accounts page
+    r = snapshot_followers(db, actor=actor)
+    return {"saved": len(r["saved"]), "errors": len(r["errors"])}
