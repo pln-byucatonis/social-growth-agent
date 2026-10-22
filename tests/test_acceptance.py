@@ -249,7 +249,14 @@ class GateTests(unittest.TestCase):
         r = approve(self.db, self.cj_tt, "editor2")
         self.assertEqual(r["approvers"], ["editor2"])  # old approval no longer counts
 
-    def test_two_person_signoff_for_paid_partnership(self):
+    def test_one_approver_for_paid_partnership(self):
+        self.assertEqual(approve(self.db, f"{PUTT}:putt_tour.instagram.putttour", "a")["state"], "approved")
+
+    def test_two_person_signoff_when_policy_lists_the_flag(self):
+        from unittest import mock
+        from pln_agent import rights
+        mock.patch.object(rights, "SENSITIVE", {"paid_partnership"}).start()
+        self.addCleanup(mock.patch.stopall)
         vid = f"{PUTT}:putt_tour.instagram.putttour"
         self.assertEqual(approve(self.db, vid, "a")["state"], "in_review")
         self.assertEqual(approve(self.db, vid, "a")["state"], "in_review")

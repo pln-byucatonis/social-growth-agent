@@ -19,9 +19,12 @@ def _policy() -> dict:
         return {}
 
 
-# flags that need two different approvers; combat is flagged and labelled but takes one (rights_policy.json)
-SENSITIVE = set(_policy().get("two_person_flags") or
-                {"gambling", "paid_partnership", "combat", "injury", "minors", "ai_generated_person", "likeness_unreleased"})
+# flags that need two different approvers (rights_policy.json); an empty list means one approver for everything.
+# Flags still label the post and add their checklist either way.
+_DEFAULT_TWO_PERSON = {"gambling", "paid_partnership", "combat", "injury", "minors", "ai_generated_person", "likeness_unreleased"}
+SENSITIVE = set(_policy().get("two_person_flags", _DEFAULT_TWO_PERSON))
+# flags whose posts are never bulk-approved from the queue: one person still approves them, on the post's own page
+OWN_PAGE = _DEFAULT_TWO_PERSON - {"combat"}
 
 
 def likeness_releases_on_file() -> bool:
@@ -60,6 +63,10 @@ class RightsResult:
     @property
     def needs_two_person(self) -> bool:
         return any(f in SENSITIVE for f in self.review_flags)
+
+    @property
+    def needs_own_page(self) -> bool:
+        return self.needs_two_person or any(f in OWN_PAGE for f in self.review_flags)
 
     def as_dict(self) -> dict:
         return {"ok": self.ok, "blockers": self.blockers, "review_flags": self.review_flags,

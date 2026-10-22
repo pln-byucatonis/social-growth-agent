@@ -149,7 +149,7 @@ BULK_MAX = 100
 def bulk_review(db: DB, picks: list[tuple[str, str]], reviewer: str, decision: str, note: str = "") -> dict:
     """Approve or reject several posts at once from the queue. Each pick carries the caption hash the
     reviewer saw: a post whose copy changed since the page loaded is skipped (approval binds to copy).
-    Posts needing two-person sign-off are never bulk-approved; they need their own review page."""
+    Flagged posts (gambling, partnership, injury, minors, AI people) are never bulk-approved; they need their own review page."""
     if decision not in ("approve", "reject"):
         raise WorkflowError(f"unknown bulk decision {decision!r}")
     if decision == "reject" and not note.strip():
@@ -168,8 +168,8 @@ def bulk_review(db: DB, picks: list[tuple[str, str]], reviewer: str, decision: s
         try:
             if decision == "approve":
                 asset = db.get("assets", "asset_id", v["asset_id"])
-                if evaluate(asset).as_dict()["two_person_signoff"]:
-                    skipped[vid] = "sensitive content: needs two-person review on its own page"
+                if evaluate(asset).needs_own_page:
+                    skipped[vid] = "flagged content: approve it on its own page"
                     continue
                 approve(db, vid, reviewer, note or "bulk approval from queue")
             else:

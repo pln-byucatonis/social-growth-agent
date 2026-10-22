@@ -21,7 +21,7 @@
 <form method="post" action="{{ base }}/runsheet/lock"><input type="hidden" name="day" value="{{ s.day }}">
 <div class="ch" style="margin:4px 0 8px"><h2>Needs your approval</h2></div>
 {% if approve %}{{ table(approve, True, True) }}
-<div class="bulkbar"><b id="bulkn"></b>{% if not user %}<input name="actor" placeholder="Your name" required>{% endif %}<button class="primary">Approve &amp; schedule selected</button><span class="faint small">Combat and partnership posts stay in review until a second approver signs off.</span></div>
+<div class="bulkbar"><b id="bulkn"></b>{% if not user %}<input name="actor" placeholder="Your name" required>{% endif %}<button class="primary">Approve &amp; schedule selected</button><span class="faint small">One approver for every post (rights policy).</span></div>
 {% else %}<div class="card"><div class="empty">Nothing waiting for you {{ 'today' if day == today else 'on this day' }}.</div></div>{% endif %}
 
 {% if scheduled %}<details class="card" style="margin-top:12px"><summary><b>Already scheduled ({{ scheduled|length }})</b></summary><div style="margin-top:8px">{{ table(scheduled, False) }}</div></details>{% endif %}

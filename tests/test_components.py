@@ -184,8 +184,7 @@ class DashboardTests(unittest.TestCase):
             self.assertEqual(c.get(u).status_code, 200, u)
         vid = f"{PUTT}:putt_tour.instagram.putttour"
         r = c.post(f"/variant/{vid}/approve", data={"reviewer": "a"}, follow_redirects=False)
-        self.assertIn("1%2F2", r.headers["location"])
-        c.post(f"/variant/{vid}/approve", data={"reviewer": "b"})
+        self.assertIn("1%2F1", r.headers["location"])  # one approver for everything (rights_policy.json)
         self.assertEqual(db.get("variants", "variant_id", vid)["state"], "approved")
         r = c.post(f"/variant/{SLAP}:slapfight.x.slapfightusa/approve", data={"reviewer": "a"}, follow_redirects=False)
         self.assertIn("err=", r.headers["location"])

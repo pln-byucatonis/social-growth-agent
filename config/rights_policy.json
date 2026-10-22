@@ -2,6 +2,6 @@
   "_doc": "Standing rights decisions made by PLN management. Changing a value changes who must approve; keep a note of who decided and when.",
   "likeness_releases_on_file": true,
   "likeness_releases_note": "All PLN athletes sign a likeness release (confirmed by by@proleaguenetwork.com, 2026-10-21).",
-  "two_person_flags": ["gambling", "paid_partnership", "injury", "minors", "ai_generated_person", "likeness_unreleased"],
-  "two_person_note": "Combat removed from two-person sign-off by by@proleaguenetwork.com on 2026-10-21: combat posts are still flagged and labelled, one approver."
+  "two_person_flags": [],
+  "two_person_note": "One approver for every post, all flags included, decided by by@proleaguenetwork.com on 2026-10-22. Flags still label posts and add their checklist. (2026-10-21: combat removed from two-person sign-off.)"
 }

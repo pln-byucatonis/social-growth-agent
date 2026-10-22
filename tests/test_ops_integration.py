@@ -176,14 +176,14 @@ class BulkReviewTests(unittest.TestCase):
     def test_bulk_approve_skips_sensitive_and_changed_copy(self):
         from pln_agent.workflow import bulk_review, edit_variant
         ok = "carjitsu-sample-001:carjitsu.tiktok.carjitsuchampionship"
-        sensitive = "putt-sample-002:putt_tour.instagram.putttour"   # paid partnership → two-person
+        sensitive = "putt-sample-002:putt_tour.instagram.putttour"   # paid partnership → own page
         changed = "carjitsu-sample-001:carjitsu.x.carjitsuusa"
         picks = [self._pick(ok), self._pick(sensitive), self._pick(changed)]
         v = self.db.get("variants", "variant_id", changed)
         edit_variant(self.db, changed, {"caption": v["caption"] + " Watch it again."}, "editor")
         r = bulk_review(self.db, picks, "by@pln", "approve")
         self.assertEqual(r["done"], [ok])
-        self.assertIn("two-person", r["skipped"][sensitive])
+        self.assertIn("own page", r["skipped"][sensitive])
         self.assertIn("copy changed", r["skipped"][changed])
         self.assertEqual(self.db.get("variants", "variant_id", ok)["state"], "approved")
         self.assertEqual(self.db.get("variants", "variant_id", sensitive)["state"], "in_review")

@@ -598,7 +598,7 @@ def runsheet_lock(request: Request, pick: list[str] = Form([]), day: str = Form(
         r = runsheet.lock(d, picks, reviewer)
         msg = f"Scheduled {len(r['scheduled'])} post(s)"
         if r["needs_second_approver"]:
-            msg += f"; {len(r['needs_second_approver'])} need a second approver (combat/partnership content)"
+            msg += f"; {len(r['needs_second_approver'])} need a second approver (rights policy)"
         if r["failed"]:
             msg += "; not scheduled: " + "; ".join(f"{f['variant_id']}: {f['error']}" for f in r["failed"][:4])
         return msg
