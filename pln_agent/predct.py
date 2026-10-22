@@ -86,7 +86,10 @@ def scan(db: DB, lister=_list, actor: str = "predct") -> dict:
                 if len(parts) == 3 and parts[2].endswith(".ts"):
                     sessions.setdefault((parts[0], parts[1]), []).append(o)
             for (channel, start), segs in sessions.items():
-                show = (src.get("channels") or {}).get(channel, "other")
+                chans = src.get("channels") or {}
+                if channel in chans and chans[channel] is None:  # e.g. the encoder's copy-test
+                    continue
+                show = chans.get(channel, "other")
                 segs = sorted(segs, key=lambda o: o["key"])
                 cid = _cid(src["bucket"], src["prefix"], channel, start)
                 seen += 1
@@ -220,7 +223,7 @@ def make_preview(db: DB, cid: str, bucket: str) -> dict:
         _ff("-i", str(src), "-vf", f"scale={PREVIEW_W}:-2", "-c:v", "libx264", "-preset", "veryfast", "-crf", "30",
             "-c:a", "aac", "-b:a", "96k", "-movflags", "+faststart", str(prev))
         _ff("-ss", str(min(5.0, info["duration"] / 2)), "-i", str(src), "-frames:v", "1", "-vf", f"scale={PREVIEW_W}:-2", str(thumb))
-        base = f"predct/previews/{cid}"
+        base = f"social-agent/predct/previews/{cid}"
         upd = {"preview_path": _put(prev, bucket, f"{base}/preview.mp4", "video/mp4"),
                "thumb_path": _put(thumb, bucket, f"{base}/thumb.jpg", "image/jpeg"),
                "duration_s": round(info["duration"], 2), "preview_status": "ready", "updated_at": now_iso()}
@@ -269,7 +272,7 @@ def make_pick(db: DB, cid: str, pid: str, settings, bucket: str, actor: str = "p
         info = _probe(str(out))
         _ff("-ss", str(min(info["duration"] / 2, (p["payoff_at"] or p["start"]) - p["start"] or 1.0)), "-i", str(out),
             "-frames:v", "1", str(thumb))
-        base = f"predct/masters/{pid}"
+        base = f"social-agent/predct/masters/{pid}"
         master = _put(out, bucket, f"{base}/master.mp4", "video/mp4")
         thumb_path = _put(thumb, bucket, f"{base}/thumb.jpg", "image/jpeg")
     row = asset_row(c, p, master, info, thumb_path)

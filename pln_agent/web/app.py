@@ -741,7 +741,7 @@ async def predct_add(request: Request):
             if not bucket:
                 raise predct.CurationError("uploads need PLN_RENDER_BUCKET (paste an s3:// link instead)")
             name = re.sub(r"[^A-Za-z0-9._-]+", "-", f.filename)[-80:]
-            key = f"predct/inbox/{show}/{uuid.uuid4().hex[:8]}-{name}"
+            key = f"social-agent/predct/inbox/{show}/{uuid.uuid4().hex[:8]}-{name}"
             with tempfile.NamedTemporaryFile() as tmp:
                 size = 0
                 while chunk := await f.read(1 << 20):

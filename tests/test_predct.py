@@ -18,7 +18,8 @@ def lister(bucket, prefix):
     if prefix == "encoder-copy/":
         return [{"key": f"encoder-copy/engine-mz/20261013-145315/20261013-1453{m:02d}.ts", "size": 1, "modified": "2026-10-13T14:53:00+00:00"}
                 for m in (16, 27)] + [{"key": "encoder-copy/engine-mz/20261013-143146/20261013-143146.ts", "size": 1,
-                                       "modified": "2026-10-13T14:31:00+00:00"}, {"key": "encoder-copy/junk.txt", "size": 1, "modified": ""}]
+                                       "modified": "2026-10-13T14:31:00+00:00"}, {"key": "encoder-copy/junk.txt", "size": 1, "modified": ""},
+                                      {"key": "encoder-copy/copy-test/20261012-140200/20261012-140200.ts", "size": 1, "modified": ""}]
     if prefix == "films/five-hole/":
         return [{"key": "films/five-hole/ep1/v1.webm", "size": 1, "modified": "2026-10-20T00:00:00+00:00"}]
     return []
