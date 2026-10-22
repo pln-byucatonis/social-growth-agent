@@ -422,6 +422,38 @@ TABLES: dict[str, list[tuple[str, str, str]]] = {
         ("created_at", "ts", ""),
         ("result", "json", ""),
     ],
+    # Monday brief (pln_agent/trend_brief.py): YouTube breakouts on watched channels, prediction-market movers.
+    "yt_videos": [
+        ("video_id", "text", "PRIMARY KEY"),
+        ("channel_id", "text", ""),
+        ("handle", "text", ""),
+        ("title", "text", ""),
+        ("url", "text", ""),
+        ("published_at", "ts", ""),
+        ("views", "real", ""),
+        ("captured_at", "ts", ""),
+    ],
+    "market_snapshots": [
+        ("snap_id", "text", "PRIMARY KEY"),  # <source>:<market id>:<day>
+        ("day", "text", ""),
+        ("source", "text", ""),  # kalshi | polymarket
+        ("market_id", "text", ""),
+        ("title", "text", ""),
+        ("category", "text", ""),
+        ("price", "real", ""),  # chance of YES, 0-1
+        ("change_1d", "real", ""),  # as the venue reports it (points of 0-1)
+        ("change_7d", "real", ""),  # Polymarket reports it; Kalshi's comes from our own snapshots
+        ("volume", "real", ""),  # USD traded in the venue's window (24h Kalshi, 7d Polymarket)
+        ("url", "text", ""),
+        ("end_date", "text", ""),
+        ("captured_at", "ts", ""),
+    ],
+    "trend_briefs": [
+        ("week_start", "text", "PRIMARY KEY"),  # the Monday
+        ("created_at", "ts", ""),
+        ("items", "json", ""),  # {make: [...], clip: [...], formats: [...], sources: {...}}
+        ("status", "text", ""),
+    ],
     # Trend Scout: raw signals from each source, and the trend cards built from them.
     "trend_signals": [
         ("signal_id", "text", "PRIMARY KEY"),

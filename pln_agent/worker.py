@@ -58,6 +58,11 @@ def _tick(db: DB, settings: Settings, do_ops: bool) -> dict:
         out["followers"] = snapshot_followers_due(db)
     except Exception as e:  # noqa: BLE001 — never let it stop the publisher loop
         out["followers"] = {"error": str(e)[:200]}
+    try:  # Monday brief: YouTube feeds + market prices once a day, the brief on Monday morning
+        from . import team, trend_brief
+        out["trend_brief"] = trend_brief.run_due(db, llm=team._llm)
+    except Exception as e:  # noqa: BLE001
+        out["trend_brief"] = {"error": str(e)[:200]}
     out["planned"] = plan_new_clear_assets(db, settings)
     out["video"] = start_video_poll(settings)
     from .team_tasks import start as start_team_tasks

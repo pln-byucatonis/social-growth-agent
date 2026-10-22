@@ -1348,7 +1348,9 @@ def trends_page(request: Request, show: str = ""):
     brands = {b["brand_id"]: b["name"] for b in load_brands()}
     recent = d.all("trend_signals", order="seen_at DESC")[:30]
     import json as _json
-    return page(request, "trends.html", cards=cards, brands=brands, recent=recent, show=show,
+    from .. import trend_brief
+    brief = trend_brief.latest(d)
+    return page(request, "trends.html", cards=cards, brands=brands, recent=recent, show=show, brief=brief,
                 sources=_json.loads(d.kv_get("trend_scout:sources") or "{}"), bg=bg_status("trends"))
 
 
@@ -1359,6 +1361,20 @@ def trends_refresh(request: Request):
     run_later("trends", lambda d: "Trend scan: " + ", ".join(f"{k} {v}" for k, v in trend_scout.refresh(d)["sources"].items()),
               request.state.user or "dashboard")
     return back(request, "/trends", "Scanning sources — refresh in a minute.")
+
+
+@app.post("/trends/brief")
+def trends_brief(request: Request):
+    """Build this week's Monday brief now: fresh YouTube feeds and market prices, then the list."""
+    from .. import team, trend_brief
+    _admin(request)
+
+    def work(d):
+        trend_brief.collect(d)
+        b = trend_brief.build(d, llm=team._llm, actor=request.state.user or "dashboard")
+        return f"Monday brief: {len(b['make'])} to make, {len(b['clip'])} to clip"
+    run_later("trends", work, request.state.user or "dashboard")
+    return back(request, "/trends", "Building this week's brief — refresh in a minute.")
 
 
 @app.post("/trends/manual")

@@ -1,6 +1,7 @@
 import os
 
 os.environ.setdefault("PLN_FOCUS_DISABLED", "1")  # most tests draft for every fixture account; focus tests opt in
+os.environ.setdefault("PLN_TREND_BRIEF_DISABLED", "1")  # the worker tick never fetches YouTube / markets in tests
 import tempfile
 from dataclasses import replace
 from datetime import date, datetime, timezone

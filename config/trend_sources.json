@@ -16,5 +16,83 @@
     "format": 10,
     "topic": 3
   },
-  "window_days": 7
+  "window_days": 7,
+  "_doc_watch": "youtube_watch: channels whose breakout uploads (views well above the channel's own median) are worth copying the format of; read from YouTube's public channel feeds (no key). markets: Kalshi + Polymarket movers for PREDCT; a daily snapshot makes the 7-day move.",
+  "youtube_watch": [
+    {
+      "handle": "@dudeperfect",
+      "channel_id": "UCRijo3ddMTht_IHyNSNXpNQ",
+      "brands": [
+        "putt_tour",
+        "pln"
+      ]
+    },
+    {
+      "handle": "@GoodGood",
+      "channel_id": "UCfi-mPMOmche6WI-jkvnGXw",
+      "brands": [
+        "putt_tour"
+      ]
+    },
+    {
+      "handle": "@overtime",
+      "channel_id": "UCPHKMJbis1c0R7d7WJQ35tA",
+      "brands": [
+        "pln",
+        "carjitsu"
+      ]
+    },
+    {
+      "handle": "@houseofhighlights",
+      "channel_id": "UCqQo7ewe87aYAe7ub5UqXMw",
+      "brands": [
+        "pln"
+      ]
+    },
+    {
+      "handle": "@NitroCircus",
+      "channel_id": "UC9UGYdMSKasjY0mhU1lG4lQ",
+      "brands": [
+        "pln",
+        "carjitsu"
+      ]
+    },
+    {
+      "handle": "@powerslap",
+      "channel_id": "UCX5jqLi06mE3M3L_lAdj-eQ",
+      "brands": [
+        "carjitsu",
+        "pln"
+      ]
+    },
+    {
+      "handle": "@bleacherreport",
+      "channel_id": "UC9-OpMMVoNP5o10_Iyq7Ndw",
+      "brands": [
+        "pln"
+      ]
+    },
+    {
+      "handle": "@SportsCenter",
+      "channel_id": "UCrKucnER_1PdAw7Fc-4-nrA",
+      "brands": [
+        "pln"
+      ]
+    },
+    {
+      "handle": "@Kalshi",
+      "channel_id": "UC0CiL_Is0UnZvS2hmjO0fJg",
+      "brands": [
+        "pln_picks"
+      ]
+    }
+  ],
+  "outlier_min": 3.0,
+  "markets": {
+    "polymarket_limit": 200,
+    "kalshi_pages": 3,
+    "min_move_pts": 8,
+    "min_volume_usd": 25000,
+    "top": 8
+  }
 }

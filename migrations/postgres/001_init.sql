@@ -410,6 +410,40 @@ CREATE TABLE IF NOT EXISTS team_threads (
   result JSONB
 );
 
+CREATE TABLE IF NOT EXISTS yt_videos (
+  video_id TEXT PRIMARY KEY,
+  channel_id TEXT,
+  handle TEXT,
+  title TEXT,
+  url TEXT,
+  published_at TEXT,
+  views DOUBLE PRECISION,
+  captured_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS market_snapshots (
+  snap_id TEXT PRIMARY KEY,
+  day TEXT,
+  source TEXT,
+  market_id TEXT,
+  title TEXT,
+  category TEXT,
+  price DOUBLE PRECISION,
+  change_1d DOUBLE PRECISION,
+  change_7d DOUBLE PRECISION,
+  volume DOUBLE PRECISION,
+  url TEXT,
+  end_date TEXT,
+  captured_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS trend_briefs (
+  week_start TEXT PRIMARY KEY,
+  created_at TEXT,
+  items JSONB,
+  status TEXT
+);
+
 CREATE TABLE IF NOT EXISTS trend_signals (
   signal_id TEXT PRIMARY KEY,
   source TEXT NOT NULL,
