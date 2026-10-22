@@ -1,0 +1,25 @@
+{
+  "_note": "PREDCT curation queue (pln_agent/predct.py). Hand-picked first: nothing is clipped or posted until a person picks a moment. 'accounts' get the drafts; add the @predct Instagram / TikTok here once the handles exist.",
+  "accounts": ["pln_picks.facebook.pln_picks"],
+  "shows": {
+    "five_hole": {"label": "Five Hole", "about": "animated hockey comedy about the prices on tonight's games"},
+    "bottle_jobs": {"label": "Bottle Jobs", "about": "animated football comedy: Micky and Deano at the bar arguing about the prices"},
+    "wall_st_ext": {"label": "WALL ST EXT.", "about": "animated markets comedy"},
+    "marketzone_live": {"label": "MarketZone live", "about": "MarketZone's live markets desk with AI hosts"},
+    "pnn_live": {"label": "PNN live", "about": "PNN's live prediction-markets show"},
+    "other": {"label": "Other", "about": "PREDCT footage"}
+  },
+  "sources": [
+    {"bucket": "marketzone-host-video-975050328168", "prefix": "encoder-copy/", "kind": "recording",
+     "channels": {"engine-mz": "marketzone_live", "engine-pnn": "pnn_live", "pnn": "pnn_live", "marketzone": "marketzone_live"}},
+    {"bucket": "marketzone-host-video-975050328168", "prefix": "films/five-hole/", "kind": "file", "show": "five_hole"},
+    {"bucket": "marketzone-host-video-975050328168", "prefix": "films/bottle-jobs/", "kind": "file", "show": "bottle_jobs"},
+    {"bucket": "marketzone-host-video-975050328168", "prefix": "films/wall-st-ext/", "kind": "file", "show": "wall_st_ext"}
+  ],
+  "voice": "PREDCT: sharp, funny, curious about what the markets are saying. Prices are information, never advice: describe what the market thinks and let people argue about it. Never tell anyone to bet, buy, take a side or sign up.",
+  "never_say": ["bet now", "place your bet", "place a bet", "lock of the", "a lock", "free money", "can't lose", "cant lose",
+                "sure thing", "guaranteed", "hammer", "smash the", "tail this", "fade", "parlay", "sign up", "use code",
+                "promo code", "odds boost", "deposit", "risk-free", "risk free", "easy money", "get in now", "buy now",
+                "take the over", "take the under", "pick of the day", "best bet"],
+  "disclaimer": "Prices are information, not advice."
+}

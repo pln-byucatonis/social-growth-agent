@@ -52,10 +52,26 @@ def facts_for(db: DB, v: dict) -> dict:
     a = db.get("assets", "asset_id", v["asset_id"]) or {}
     clip = (a.get("probe") or {}).get("ops_clip") or {}
     m = db.one("SELECT caption, content_type FROM scout_moments WHERE clip_id=?", [clip.get("id") or ""]) if clip.get("id") else None
+    pr = (a.get("probe") or {}).get("predct")
+    if pr:  # PREDCT: the curator's note is the clip description; say which show it is
+        from .predct import policy
+        clip = {**clip, "source_title": f"{clip.get('source_title')}: {policy()['shows'].get(pr['show'], {}).get('about', '')}"}
     return {"moment": (m or {}).get("caption"), "type": (m or {}).get("content_type"),
             "title": clip.get("source_title"), "machine_caption": clip.get("machine_caption"),
             "transcript": (clip.get("transcript") or "")[:700],
             "moments": [{k: x.get(k) for k in ("kind", "description")} for x in (a.get("moments") or [])][:6]}
+
+
+def _predct_rules() -> str:
+    from .predct import policy
+    pol = policy()
+    return (f"{pol['voice']} Numbers: you may use a price or percentage only if it appears exactly in the clip description. "
+            f"Never use any of: {', '.join(pol.get('never_say') or [])}. Never say 'odds'.")
+
+
+def _grounded_numbers(text: str, facts: dict) -> bool:
+    corpus = json.dumps(facts)
+    return all(n in corpus for n in re.findall(r"\d+(?:[.,]\d+)?", text))
 
 
 def _voice(brand_id: str, account_id: str) -> str:
@@ -89,8 +105,12 @@ def write(db: DB, vid: str, actor: str = "writers-room", llm=None) -> dict:
     original = (((v.get("treatment") or {}).get("writers_room") or {}).get("original")
                 or {"angle": "original", "hook": v.get("hook") or "", "caption": v.get("caption") or "", "cta": v.get("cta") or ""})
     facts = facts_for(db, v)
-    raw = call(WRITER.format(angles="; ".join(ANGLES)),
-               [{"role": "user", "content": f"Voice: {_voice(v['brand_id'], v['account_id'])}\nPlatform: {v['platform']}\n"
+    asset = db.get("assets", "asset_id", v["asset_id"]) or {}
+    market = bool((asset.get("flags") or {}).get("gambling"))  # PREDCT / PLN Picks
+    voice = _predct_rules() if market else _voice(v["brand_id"], v["account_id"])
+    raw = call(WRITER.format(angles="; ".join(ANGLES)) + ("\nPREDCT overrides the digits rule above: a number from the clip "
+                                                          "description is allowed, any other number is not." if market else ""),
+               [{"role": "user", "content": f"Voice: {voice}\nPlatform: {v['platform']}\n"
                                             f"Clip description: {json.dumps(facts)}"}], 1400)
     drafts = [{k: _clean(d.get(k, "")) for k in ("angle", "hook", "caption", "cta")} for d in (team._json(raw).get("drafts") or [])][:5]
     if not drafts:
@@ -105,9 +125,16 @@ def write(db: DB, vid: str, actor: str = "writers-room", llm=None) -> dict:
             drafts[i]["score"] = _score(s)
     for d in drafts:
         d.setdefault("score", 0.0)
-        if any(ch.isdigit() for ch in d["hook"] + d["caption"]) or _counts(d["hook"] + " " + d["caption"]):
+        copy = d["hook"] + " " + d["caption"]
+        digits_bad = any(ch.isdigit() for ch in copy) and not (market and _grounded_numbers(copy, facts))
+        if digits_bad or _counts(copy):
             # the rule the critic must enforce, checked again here: a number the clip may not show is an invented fact
             d["score"], d["note"] = 0.0, (d.get("note", "") + " — has a number").strip(" —")
+        if market:
+            from .predct import never_said
+            bad = never_said(copy + " " + d["cta"]) + (["odds"] if re.search(r"\bodds\b", copy.lower()) else [])
+            if bad:
+                d["score"], d["note"] = 0.0, (d.get("note", "") + f" — tout language: {', '.join(bad)}").strip(" —")
     pick = max(range(len(drafts)), key=lambda i: drafts[i]["score"])
     room = {"status": "done", "drafts": drafts, "pick": pick, "bar": BAR, "at": now_iso(), "original": original}
     apply_draft(db, vid, drafts[pick], room, actor)

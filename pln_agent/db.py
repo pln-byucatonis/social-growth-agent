@@ -312,6 +312,24 @@ TABLES: dict[str, list[tuple[str, str, str]]] = {
         ("first_seen_at", "ts", ""),
         ("updated_at", "ts", ""),
     ],
+    # PREDCT curation queue (pln_agent/predct.py): footage waiting for a person to pick moments from it.
+    "predct_candidates": [
+        ("cand_id", "text", "PRIMARY KEY"),
+        ("show", "text", ""),  # config/predct.json shows
+        ("kind", "text", ""),  # recording (1-minute stream segments) | file (one video)
+        ("title", "text", ""),
+        ("sources", "json", ""),  # s3:// paths, in play order (a recording session's segments)
+        ("recorded_at", "ts", ""),
+        ("duration_s", "real", ""),
+        ("preview_path", "text", ""),  # browser-playable low-res MP4 (recordings are MPEG-TS, which browsers won't play)
+        ("thumb_path", "text", ""),
+        ("preview_status", "text", ""),  # pending | ready | failed
+        ("status", "text", ""),  # new | picked | dismissed
+        ("picks", "json", ""),  # [{pick_id, start, end, note, payoff_at, status: pending|done|failed, asset_id, error}]
+        ("note", "text", ""),
+        ("created_at", "ts", ""),
+        ("updated_at", "ts", ""),
+    ],
     # Viral Content Scout: every library clip scored for creative potential (own property + PLN crossover).
     "scout_moments": [
         ("clip_id", "text", "PRIMARY KEY"),

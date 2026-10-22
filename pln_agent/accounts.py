@@ -249,10 +249,11 @@ def focus() -> dict:
 def planning_eligible(acc: dict) -> bool:
     """Accounts may be PLANNED for even when unverified (drafts only); creator/secondary accounts are excluded
     from routing entirely until ownership is confirmed, so we don't waste creative on them. With a focus list
-    (config/focus.json) only worked and bridge accounts get drafts: parked, mirrored and removed accounts get none."""
+    (config/focus.json) only worked, bridge and curated (PREDCT: hand-picked moments only) accounts get drafts: parked,
+    mirrored and removed accounts get none."""
     if acc["role"] in ("secondary_unverified", "creator_unverified") and acc["hard_block_reason"]:
         return False
     f = focus()
     if f.get("worked"):
-        return acc["account_id"] in set(f["worked"]) | set(f.get("bridge") or [])
+        return acc["account_id"] in set(f["worked"]) | set(f.get("bridge") or []) | set(f.get("curated") or [])
     return True

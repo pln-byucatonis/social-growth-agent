@@ -589,6 +589,9 @@ def needs_compute(db: DB) -> bool:
         return True  # dashboard re-renders / overlay edits
     if db.one("SELECT variant_id FROM variants WHERE writers_status='pending' AND state IN ('in_review','needs_fix')"):
         return True  # the writers' room has copy to write
+    from .predct import pending as predct_pending
+    if predct_pending(db):
+        return True  # PREDCT previews to make / picked moments to cut
     return any(t["kind"] in COMPUTE_KINDS and t["status"] in ("todo", "in_progress") for t in tasks(db, open_only=True))
 
 
@@ -660,6 +663,12 @@ def run_runner(settings, max_minutes: int = 50, pause_s: int = 20, idle_passes: 
         r = poll(own, settings.ops_assets_bucket, settings, render=False)
         from .media import render_queued
         from .writers_room import run_pending
+        import os
+        if os.environ.get("PLN_RENDER_BUCKET"):
+            from . import predct
+            made = predct.run_pending(own, settings, os.environ["PLN_RENDER_BUCKET"])  # previews + picked PREDCT moments
+            if made:
+                log.info("runner pass %s: predct %s", passes + 1, made)
         wrote = run_pending(own)  # copy first, so the render that follows burns in the room's hook
         if wrote:
             log.info("runner pass %s: writers' room %s", passes + 1, wrote)

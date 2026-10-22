@@ -56,8 +56,9 @@ def routes_for_asset(db: DB, asset: dict, include_extended: bool = True) -> tupl
         else:
             routes.append(Route(a, "canonical", "canonical brand account", 0))
 
-    # 2) PLN amplification (different angle) + PLN LinkedIn B2B for every property
-    if brand_id != "pln":
+    # 2) PLN amplification (different angle) + PLN LinkedIn B2B for every property — except gambling-adjacent brands
+    #    (PREDCT / PLN Picks): market content stays on its own accounts, never on the network's
+    if brand_id != "pln" and not (asset.get("flags") or {}).get("gambling"):
         for a in accounts:
             if a["brand_id"] != "pln" or not ok_platform(a["platform"]) or not planning_eligible(a):
                 if a["brand_id"] == "pln" and not planning_eligible(a):

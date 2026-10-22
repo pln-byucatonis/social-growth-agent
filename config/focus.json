@@ -11,8 +11,7 @@
   ],
   "mirrored": [
     "carjitsu.facebook.carjitsu_championship",
-    "pln.facebook.pro_league_network",
-    "pln_picks.facebook.pln_picks"
+    "pln.facebook.pro_league_network"
   ],
   "bridge": [
     "world_putting_league.instagram.worldputtingleague",
@@ -28,5 +27,9 @@
     "slapfight.youtube.slapfightchampionship",
     "world_footgolf_tour.tiktok.ezz_abde"
   ],
-  "removed_reason": "removed from the agent by the 2027 social strategy (SlapFIGHT separation; @ezz.abde is a creator's account)"
+  "removed_reason": "removed from the agent by the 2027 social strategy (SlapFIGHT separation; @ezz.abde is a creator's account)",
+  "curated": [
+    "pln_picks.facebook.pln_picks"
+  ],
+  "curated_reason": "PREDCT (PLN Picks until the page is renamed): drafts only from moments a person picks in the PREDCT curation queue (config/predct.json)."
 }

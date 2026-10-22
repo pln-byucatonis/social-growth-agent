@@ -298,6 +298,24 @@ CREATE TABLE IF NOT EXISTS posts (
   updated_at TEXT
 );
 
+CREATE TABLE IF NOT EXISTS predct_candidates (
+  cand_id TEXT PRIMARY KEY,
+  show TEXT,
+  kind TEXT,
+  title TEXT,
+  sources JSONB,
+  recorded_at TEXT,
+  duration_s DOUBLE PRECISION,
+  preview_path TEXT,
+  thumb_path TEXT,
+  preview_status TEXT,
+  status TEXT,
+  picks JSONB,
+  note TEXT,
+  created_at TEXT,
+  updated_at TEXT
+);
+
 CREATE TABLE IF NOT EXISTS scout_moments (
   clip_id TEXT PRIMARY KEY,
   source_id TEXT,

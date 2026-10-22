@@ -197,4 +197,8 @@ def common_violations(text: str, ctx: CreativeContext) -> list[str]:
         errs.append(f"numbers not found in verified source material: {bad}")
     if any(w in low for w in WATERMARK_WORDS):
         errs.append("references third-party watermark/logo")
+    if (ctx.asset.get("flags") or {}).get("gambling"):
+        from ..predct import never_said
+        if bad := never_said(text):
+            errs.append(f"wagering / tout language not allowed: {', '.join(bad)}")
     return errs

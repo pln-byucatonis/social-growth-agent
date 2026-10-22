@@ -695,6 +695,93 @@ def accounts(request: Request):
     return page(request, "accounts.html", rows=rows, caps=caps, apps=apps, meta_user=meta_user)
 
 
+@app.get("/predct", response_class=HTMLResponse)
+def predct_page(request: Request, show: str = "", view: str = "new"):
+    """PREDCT curation queue: watch the footage, pick the moments, write what happens. Nothing posts without a pick."""
+    from .. import predct
+    from ..media import resolve_media
+    d = db()
+    where = {"new": "status IN ('new','picked')", "picked": "status='picked'", "dismissed": "status='dismissed'"}.get(view, "status IN ('new','picked')")
+    params: list = []
+    if show:
+        where += " AND show=?"
+        params.append(show)
+    rows = d.all("predct_candidates", where, params, order="recorded_at DESC", limit=60)
+    for r in rows:
+        r["preview_url"] = resolve_media(r["preview_path"], "video/mp4") if r.get("preview_path") else ""
+        r["thumb_url"] = resolve_media(r["thumb_path"], "image/jpeg") if r.get("thumb_path") else ""
+    pol = predct.policy()
+    accts = [d.get("accounts", "account_id", a) or {"account_id": a, "verification_status": "missing"} for a in pol["accounts"]]
+    counts = {r["status"]: r["n"] for r in d.query("SELECT status, COUNT(*) AS n FROM predct_candidates GROUP BY status")}
+    return page(request, "predct.html", rows=rows, shows=pol["shows"], show=show, view=view, accts=accts, counts=counts,
+                never_say=pol.get("never_say") or [], voice=pol.get("voice", ""))
+
+
+@app.post("/predct/scan")
+def predct_scan(request: Request):
+    from .. import predct
+    r = predct.scan(db(), actor=request.state.user or "dashboard")
+    if r["new"] and os.environ.get("PLN_TASK_RUNNER_PROJECT"):
+        _kick_team_tasks()
+    return back(request, "/predct", f"Found {len(r['new'])} new — previews in a few minutes." if r["new"] else "Nothing new.")
+
+
+@app.post("/predct/add")
+async def predct_add(request: Request):
+    """Upload a show file (stored in the render bucket's PREDCT inbox) or register an s3:// link."""
+    import tempfile
+    import uuid
+    from .. import predct
+    form = await request.form()
+    show, link, title = form.get("show") or "other", (form.get("link") or "").strip(), (form.get("title") or "").strip()
+    f = form.get("file")
+    try:
+        if f is not None and getattr(f, "filename", ""):
+            bucket = os.environ.get("PLN_RENDER_BUCKET")
+            if not bucket:
+                raise predct.CurationError("uploads need PLN_RENDER_BUCKET (paste an s3:// link instead)")
+            name = re.sub(r"[^A-Za-z0-9._-]+", "-", f.filename)[-80:]
+            key = f"predct/inbox/{show}/{uuid.uuid4().hex[:8]}-{name}"
+            with tempfile.NamedTemporaryFile() as tmp:
+                size = 0
+                while chunk := await f.read(1 << 20):
+                    size += len(chunk)
+                    if size > 1_500_000_000:
+                        raise predct.CurationError("over 1.5 GB: trim it first")
+                    tmp.write(chunk)
+                tmp.flush()
+                import boto3
+                boto3.client("s3").upload_file(tmp.name, bucket, key, ExtraArgs={"ContentType": f.content_type or "video/mp4"})
+            link = f"s3://{bucket}/{key}"
+        cid = predct.add_file(db(), link, show, title or (getattr(f, "filename", "") or ""), request.state.user or "dashboard")
+    except predct.CurationError as e:
+        return back(request, "/predct", err=str(e))
+    if os.environ.get("PLN_TASK_RUNNER_PROJECT"):
+        _kick_team_tasks()
+    return back(request, f"/predct#{cid}", "Added — the preview is being made.")
+
+
+@app.post("/predct/{cid}/pick")
+def predct_pick(request: Request, cid: str, start: float = Form(...), end: float = Form(...), note: str = Form(...),
+                payoff_at: str = Form("")):
+    from .. import predct
+    try:
+        r = predct.pick(db(), cid, start, end, note, request.state.user or "dashboard",
+                        float(payoff_at) if payoff_at.strip() else None)
+    except (predct.CurationError, ValueError) as e:
+        return back(request, f"/predct#{cid}", err=str(e))
+    if os.environ.get("PLN_TASK_RUNNER_PROJECT"):
+        _kick_team_tasks()
+    return back(request, f"/predct#{cid}", f"Picked ({r['pick_id']}) — cutting it and drafting the posts; they'll be in Approvals.")
+
+
+@app.post("/predct/{cid}/dismiss")
+def predct_dismiss(request: Request, cid: str):
+    from .. import predct
+    predct.dismiss(db(), cid, request.state.user or "dashboard")
+    return back(request, "/predct", "Dismissed")
+
+
 def _tiktok_page(request: Request, **kw):
     d = db()
     tiktok = [a for a in d.all("accounts", "platform='tiktok'", order="account_id")

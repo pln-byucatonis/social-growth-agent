@@ -1,0 +1,30 @@
+{% extends "base.html" %}{% block title %}PREDCT curation{% endblock %}{% block body %}
+<div class="ph"><div class="t"><div class="eyebrow">Content</div><h1>PREDCT curation queue</h1>
+<p>Hand-picked first. Watch the footage, mark the moment (5–90 s), and write what happens and which market it's about. That note is all the writers may state as fact. The team cuts the moment, drafts the posts under PREDCT's rules and puts them in Approvals, each on its own page.</p></div>
+<div class="acts"><form method="post" action="{{ base }}/predct/scan" class="inline"><button>Look for new footage</button></form></div></div>
+<div class="kpis"><div class="kpi"><div class="v">{{ counts.get('new', 0) }}</div><div class="l">Waiting to be watched</div></div>
+<div class="kpi ok"><div class="v">{{ counts.get('picked', 0) }}</div><div class="l">Picked from</div></div>
+{% for a in accts %}<div class="kpi {{ '' if a.verification_status == 'oauth_connected' else 'warn' }}"><div class="v" style="font-size:16px">{{ a.account_id|acct(false) if a.username_original else a.account_id }}</div><div class="l">Posts go to · {{ a.verification_status|label }}</div></div>{% endfor %}</div>
+<div class="card"><div class="ch"><h2>Add a show file</h2></div>
+<form method="post" action="{{ base }}/predct/add" enctype="multipart/form-data" class="fbar">
+<label>Show <select name="show">{% for k, s in shows.items() %}<option value="{{ k }}">{{ s.label }}</option>{% endfor %}</select></label>
+<label>File <input type="file" name="file" accept="video/*"></label><span class="muted small">or</span>
+<label>s3:// link <input name="link" placeholder="s3://bucket/key.mp4" size="34"></label>
+<label>Title <input name="title" placeholder="optional" size="18"></label><button>Add</button></form>
+<details class="small muted"><summary>PREDCT's rules for the writers</summary><p>{{ voice }}</p><p>Never: {{ never_say|join(' · ') }} · "odds". Numbers only if they're in your note.</p></details></div>
+<div class="fbar"><a class="btn sm{{ ' on' if not show }}" href="{{ base }}/predct?view={{ view }}">All shows</a>{% for k, s in shows.items() %}<a class="btn sm{{ ' on' if show == k }}" href="{{ base }}/predct?show={{ k }}&view={{ view }}">{{ s.label }}</a>{% endfor %}
+<span class="muted small">·</span>{% for v, n in [('new', 'To watch'), ('picked', 'Picked'), ('dismissed', 'Dismissed')] %}<a class="btn sm{{ ' on' if view == v }}" href="{{ base }}/predct?view={{ v }}{% if show %}&show={{ show }}{% endif %}">{{ n }}</a>{% endfor %}</div>
+{% for r in rows %}<div class="card" id="{{ r.cand_id }}"><div class="ch"><h2>{{ r.title }}</h2><div class="acts"><span class="chip">{{ shows.get(r.show, {}).get('label', r.show) }}</span>{% if r.duration_s %}<span class="chip">{{ (r.duration_s // 60)|int }}:{{ '%02d'|format((r.duration_s % 60)|int) }}</span>{% endif %}{% if r.status != 'dismissed' %}<form method="post" action="{{ base }}/predct/{{ r.cand_id }}/dismiss" class="inline"><button class="sm">Dismiss</button></form>{% endif %}</div></div>
+{% if r.preview_url %}<video id="v-{{ r.cand_id }}" src="{{ r.preview_url }}" poster="{{ r.thumb_url }}" controls preload="metadata" style="width:100%;max-width:640px;border-radius:8px"></video>
+<form method="post" action="{{ base }}/predct/{{ r.cand_id }}/pick" class="fbar" style="margin-top:8px">
+<label>In <input name="start" id="in-{{ r.cand_id }}" size="6" required></label><button type="button" class="sm" onclick="setT('{{ r.cand_id }}','in')">⇤ now</button>
+<label>Payoff <input name="payoff_at" id="po-{{ r.cand_id }}" size="6"></label><button type="button" class="sm" onclick="setT('{{ r.cand_id }}','po')">★ now</button>
+<label>Out <input name="end" id="out-{{ r.cand_id }}" size="6" required></label><button type="button" class="sm" onclick="setT('{{ r.cand_id }}','out')">⇥ now</button>
+<label style="flex:1 1 100%">What happens · which market <input name="note" style="width:100%" required placeholder="e.g. Marcus can't believe the Chiefs are only 58% to win at home; Jordan says the market's right"></label>
+<button>Pick this moment</button></form>
+{% elif r.preview_status == 'failed' %}<p class="small muted">Couldn't make a preview: {{ r.note }}</p>
+{% else %}<p class="small muted">Making the preview…</p>{% endif %}
+{% if r.picks %}<div class="small" style="margin-top:6px">{% for p in r.picks %}<div>• {{ p.start }}–{{ p.end }}s — {{ p.note }} — {% if p.status == 'done' %}<a href="{{ base }}/asset/{{ p.asset_id }}">drafted</a>{% elif p.status == 'failed' %}<b>failed</b>: {{ p.error }}{% else %}being cut…{% endif %}</div>{% endfor %}</div>{% endif %}
+</div>{% else %}<div class="card"><p class="muted">Nothing here. "Look for new footage" checks MarketZone's recordings and published films; or add a file above.</p></div>{% endfor %}
+<script>function setT(id, which){var v=document.getElementById('v-'+id);document.getElementById(which+'-'+id).value=v.currentTime.toFixed(1);}</script>
+{% endblock %}
