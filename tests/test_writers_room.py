@@ -44,6 +44,39 @@ class WritersRoomTests(unittest.TestCase):
         self.assertEqual(room["drafts"][0]["score"], 0.0)
         self.assertNotEqual(room["pick"], 0)
 
+    def test_spelled_out_counts_are_disqualified_too(self):
+        db, _ = make()
+        vid = self._variant(db)
+        room = writers_room.write(db, vid, llm=fake_llm([10, 7, 7, 7, 7], ["TEN SECONDS TO SURVIVE"] + GOOD[1:]))
+        self.assertEqual(room["drafts"][0]["score"], 0.0)
+        self.assertFalse(writers_room._counts("One touch ends it"))
+
+    def test_reviewer_can_go_back_to_the_original(self):
+        db, _ = make()
+        vid = self._variant(db)
+        before = db.get("variants", "variant_id", vid)["hook"]
+        writers_room.write(db, vid, llm=fake_llm([5, 9, 6, 7, 4]))
+        writers_room.write(db, vid, llm=fake_llm([5, 6, 9, 7, 4]))  # a rewrite keeps the very first copy as the original
+        writers_room.switch(db, vid, -1, "reviewer")
+        v = db.get("variants", "variant_id", vid)
+        self.assertEqual(v["hook"].lower(), before.lower())
+        self.assertEqual(v["treatment"]["writers_room"]["pick"], -1)
+
+    def test_post_page_shows_the_room(self):
+        from fastapi.testclient import TestClient
+        from pln_agent.web import app as web
+        db, s = make()
+        web._db, web.settings = db, s
+        vid = self._variant(db)
+        writers_room.write(db, vid, llm=fake_llm([5, 9, 6, 7, 4]))
+        c = TestClient(web.app)
+        r = c.get(f"/variant/{vid}")
+        self.assertIn("Writers&#39; room", r.text.replace("'", "&#39;"))
+        self.assertIn("before the room", r.text)
+        r = c.post(f"/variant/{vid}/writers/-1", follow_redirects=False)
+        self.assertEqual(r.status_code, 303)
+        self.assertEqual(db.get("variants", "variant_id", vid)["treatment"]["writers_room"]["pick"], -1)
+
     def test_below_the_bar_goes_back(self):
         db, _ = make()
         vid = self._variant(db)

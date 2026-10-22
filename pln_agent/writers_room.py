@@ -67,6 +67,13 @@ def _voice(brand_id: str, account_id: str) -> str:
     return ((brands.get(brand_id) or {}).get("voice") or {}).get("tone") or VOICE_FALLBACK
 
 
+def _counts(text: str) -> bool:
+    """Spelled-out counts and times ("ten seconds", "three holes"), not figures of speech ("one move", "half the crowd")."""
+    return bool(re.search(r"\b(two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|twenty|thirty|forty|fifty|hundred|thousand)\b"
+                          r"|\b(one|a|half a?)\s+(second|seconds|minute|minutes|hole|holes|round|rounds|point|points)\b"
+                          r"|\b(first|second|third)\s+(round|hole|period|minute|time ever)\b", text, re.I))
+
+
 def _score(s: dict) -> float:
     if s.get("dq") or not s.get("accurate"):
         return 0.0
@@ -79,6 +86,8 @@ def write(db: DB, vid: str, actor: str = "writers-room", llm=None) -> dict:
     from .workflow import edit_variant, refresh_validation
     call = llm or team._llm
     v = db.get("variants", "variant_id", vid)
+    original = (((v.get("treatment") or {}).get("writers_room") or {}).get("original")
+                or {"angle": "original", "hook": v.get("hook") or "", "caption": v.get("caption") or "", "cta": v.get("cta") or ""})
     facts = facts_for(db, v)
     raw = call(WRITER.format(angles="; ".join(ANGLES)),
                [{"role": "user", "content": f"Voice: {_voice(v['brand_id'], v['account_id'])}\nPlatform: {v['platform']}\n"
@@ -96,10 +105,11 @@ def write(db: DB, vid: str, actor: str = "writers-room", llm=None) -> dict:
             drafts[i]["score"] = _score(s)
     for d in drafts:
         d.setdefault("score", 0.0)
-        if any(ch.isdigit() for ch in d["hook"] + d["caption"]):  # the rule the critic must enforce, checked again here
+        if any(ch.isdigit() for ch in d["hook"] + d["caption"]) or _counts(d["hook"] + " " + d["caption"]):
+            # the rule the critic must enforce, checked again here: a number the clip may not show is an invented fact
             d["score"], d["note"] = 0.0, (d.get("note", "") + " — has a number").strip(" —")
     pick = max(range(len(drafts)), key=lambda i: drafts[i]["score"])
-    room = {"status": "done", "drafts": drafts, "pick": pick, "bar": BAR, "at": now_iso()}
+    room = {"status": "done", "drafts": drafts, "pick": pick, "bar": BAR, "at": now_iso(), "original": original}
     apply_draft(db, vid, drafts[pick], room, actor)
     if drafts[pick]["score"] < BAR:
         val = dict(db.get("variants", "variant_id", vid).get("validation") or {})
@@ -136,15 +146,19 @@ def switch(db: DB, vid: str, i: int, actor: str) -> dict:
     v = db.get("variants", "variant_id", vid)
     room = dict((v.get("treatment") or {}).get("writers_room") or {})
     drafts = room.get("drafts") or []
-    if not 0 <= i < len(drafts):
+    if i == -1 and room.get("original"):  # back to the copy the post had before the room
+        d = room["original"]
+    elif 0 <= i < len(drafts):
+        d = drafts[i]
+    else:
         raise ValueError("no such draft")
     room["pick"], room["status"] = i, "done"
-    apply_draft(db, vid, drafts[i], room, actor)
+    apply_draft(db, vid, d, room, actor)
     from .workflow import refresh_validation
     if v["state"] == "needs_fix":
         db.update("variants", "variant_id", vid, {"state": "in_review"})
     refresh_validation(db, vid)
-    return {"pick": i, "hook": drafts[i]["hook"]}
+    return {"pick": i, "hook": d["hook"]}
 
 
 def run_pending(db: DB, limit: int = 8, actor: str = "writers-room", llm=None) -> list[dict]:
