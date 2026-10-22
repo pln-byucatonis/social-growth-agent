@@ -27,6 +27,8 @@ POLY = [{"id": "1", "question": "Will the Fed cut rates in December?", "outcomeP
          "volume1wk": 500000, "events": [{"slug": "pres-2028"}]},
         {"id": "4", "question": "Small market", "outcomePrices": "[\"0.50\"]", "oneWeekPriceChange": 0.40, "volume1wk": 100,
          "events": [{"slug": "tiny"}]},
+        {"id": "6", "question": "Spread: Bears (-3.5)", "outcomePrices": "[\"0.44\"]", "oneWeekPriceChange": 0.20, "volume1wk": 400000,
+         "events": [{"slug": "nfl-ne-chi"}]},
         {"id": "5", "question": "Will the Maple Leafs win the Stanley Cup?", "outcomePrices": "[\"0.20\"]", "oneWeekPriceChange": 0.02,
          "volume1wk": 300000, "events": [{"slug": "cup"}]}]
 
@@ -73,6 +75,7 @@ class BriefTests(unittest.TestCase):
         self.assertIn("Will the Fed cut rates in December?", titles)
         self.assertNotIn("Will the Fed hold rates in December?", titles)  # same event: one storyline
         self.assertNotIn("Small market", titles)  # not enough money in it
+        self.assertNotIn("Spread: Bears (-3.5)", titles)  # a betting line, not a storyline
         self.assertNotIn("Will the Maple Leafs win the Stanley Cup?", titles)  # didn't move
         tor = next(m for m in ms if m["source"] == "kalshi")
         self.assertEqual((tor["move"], tor["window"], tor["category"], tor["show"]), (15, "7d", "hockey", "Five Hole"))
@@ -88,6 +91,18 @@ class BriefTests(unittest.TestCase):
         db.execute("UPDATE market_snapshots SET change_1d=0.10 WHERE source='kalshi'")
         tor = [m for m in tb.movers(db, date(2026, 10, 26)) if m["source"] == "kalshi"][0]
         self.assertEqual(tor["window"], "24h")
+
+    def test_kalshi_falls_back_to_events_when_the_list_is_all_combos(self):
+        def fetch(url, timeout=15):
+            if "/events" in url:
+                return json.dumps({"events": [{"event_ticker": "KXNHLGAME-X", "title": "Toronto vs Boston",
+                                               "markets": [{"ticker": "KXNHLGAME-X-TOR", "last_price_dollars": "0.6",
+                                                            "previous_price_dollars": "0.5", "volume_24h_fp": "1000"}]}]}).encode()
+            return json.dumps({"markets": [{"ticker": "KXMVECOMBO-1"}], "cursor": ""}).encode()
+        rows = tb.from_kalshi(fetch)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual((rows[0]["hint"], rows[0]["title"]), ("hockey", "Toronto vs Boston"))
+        self.assertAlmostEqual(rows[0]["change_1d"], 0.1)
 
     def test_run_due_builds_on_monday_once(self):
         db, _ = make(packs=False)

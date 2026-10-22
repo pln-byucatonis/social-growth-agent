@@ -28,7 +28,12 @@ from .trend_scout import _blocked, _get, sources
 
 YT_FEED = "https://www.youtube.com/feeds/videos.xml?channel_id="
 POLY = "https://gamma-api.polymarket.com/markets?active=true&closed=false&order=volume1wk&ascending=false&limit={n}"
-KALSHI = "https://api.elections.kalshi.com/trade-api/v2/markets?status=open&limit=1000"
+KALSHI = "https://api.elections.kalshi.com/trade-api/v2/markets?status=open&limit=1000&mve_filter=exclude"
+KALSHI_EVENTS = "https://api.elections.kalshi.com/trade-api/v2/events?status=open&limit=200&with_nested_markets=true"
+BRANDS = {"pln": "Pro League Network: a network of real but unusual pro leagues (CarJitsu, Putt Tour, SlapFIGHT, STR33T)",
+          "carjitsu": "CarJitsu: jiu-jitsu grappling matches fought inside a parked car (no driving)",
+          "putt_tour": "Putt Tour: a professional putting tour (formerly the World Putting League)",
+          "pln_picks": "PREDCT: entertainment about what prediction markets think, never betting advice"}
 NS = {"a": "http://www.w3.org/2005/Atom", "yt": "http://www.youtube.com/xml/schemas/2015", "m": "http://search.yahoo.com/mrss/"}
 BRIEF_HOUR_UTC = 12  # Monday 8 am Eastern
 
@@ -54,6 +59,7 @@ CATEGORIES = [  # first match wins
 SHOWS = {"hockey": "Five Hole", "soccer": "Bottle Jobs", "sports": "MarketZone sports desk", "economy": "WALL ST EXT. / MarketZone",
          "crypto": "PNN / MarketZone", "weather": "MarketZone weather desk", "culture": "MarketZone",
          "politics": "PNN (not Instagram)", "geopolitics": "not for social", "other": "MarketZone"}
+BETTING_LINE = re.compile(r"^(spread|total|o/u)\b|\bover/under\b|\b(o|u) \d+(\.5)?\b|\(([+-])\d+(\.5)?\)", re.I)
 SENSITIVE = {"politics", "geopolitics"}  # marked, at most two, never on Instagram
 
 
@@ -181,28 +187,41 @@ def _kalshi_price(m: dict, key: str) -> float | None:
     return v
 
 
-def from_kalshi(fetch=_get) -> list[dict]:
+def _kalshi_markets(fetch) -> list[dict]:
+    """Open single markets. The plain list is crowded with multi-leg combos, so they are excluded at the source; if a
+    venue change ever empties it, the events list (markets nested under each event) is read instead."""
     pages = int((_cfg().get("markets") or {}).get("kalshi_pages", 3))
-    rows, cursor = [], ""
+    out, cursor = [], ""
     for _ in range(pages):
         body = json.loads(fetch(KALSHI + (f"&cursor={cursor}" if cursor else "")))
-        for m in body.get("markets") or []:
-            t = m.get("ticker") or ""
-            if t.startswith("KXMVE"):  # multi-leg combos: not a storyline
-                continue
-            last, prev = _kalshi_price(m, "last_price"), _kalshi_price(m, "previous_price")
-            vol = _num(m.get("volume_24h_fp")) or _num(m.get("volume_24h"))
-            title = m.get("title") or ""
-            if m.get("yes_sub_title") and m["yes_sub_title"].lower() not in title.lower():
-                title = f"{title} — {m['yes_sub_title']}"
-            series = (m.get("event_ticker") or t).split("-")[0].lower()
-            rows.append({"source": "kalshi", "market_id": t, "title": title, "price": last, "hint": kalshi_category(series),
-                         "change_1d": (last - prev) if last is not None and prev else None, "change_7d": None,
-                         "volume": (vol * last) if vol and last else None,  # contracts x price ~ dollars
-                         "url": f"https://kalshi.com/markets/{series}", "end_date": (m.get("close_time") or "")[:10]})
+        out += [m for m in body.get("markets") or [] if not (m.get("ticker") or "").startswith("KXMVE")]
         cursor = body.get("cursor") or ""
         if not cursor:
             break
+    if not out:
+        body = json.loads(fetch(KALSHI_EVENTS))
+        for ev in body.get("events") or []:
+            out += [{**m, "event_ticker": m.get("event_ticker") or ev.get("event_ticker"),
+                     "title": m.get("title") or ev.get("title")} for m in ev.get("markets") or []]
+    return out
+
+
+def from_kalshi(fetch=_get) -> list[dict]:
+    rows = []
+    for m in _kalshi_markets(fetch):
+        t = m.get("ticker") or ""
+        if t.startswith("KXMVE"):  # multi-leg combos: not a storyline
+            continue
+        last, prev = _kalshi_price(m, "last_price"), _kalshi_price(m, "previous_price")
+        vol = _num(m.get("volume_24h_fp")) or _num(m.get("volume_24h"))
+        title = m.get("title") or ""
+        if m.get("yes_sub_title") and m["yes_sub_title"].lower() not in title.lower():
+            title = f"{title} — {m['yes_sub_title']}"
+        series = (m.get("event_ticker") or t).split("-")[0].lower()
+        rows.append({"source": "kalshi", "market_id": t, "title": title, "price": last, "hint": kalshi_category(series),
+                     "change_1d": (last - prev) if last is not None and prev else None, "change_7d": None,
+                     "volume": (vol * last) if vol and last else None,  # contracts x price ~ dollars
+                     "url": f"https://kalshi.com/markets/{series}", "end_date": (m.get("close_time") or "")[:10]})
     return rows
 
 
@@ -244,6 +263,8 @@ def movers(db: DB, today: date | None = None) -> list[dict]:
             move, window = r["change_1d"], "24h"
         if move is None or abs(move) < min_move or (r["volume"] or 0) < min_vol or _market_blocked(r["title"]):
             continue
+        if BETTING_LINE.search(r["title"] or ""):  # spreads and totals are betting lines, not storylines (PREDCT never sells a bet)
+            continue
         if r["price"] is not None and (r["price"] >= 0.99 or r["price"] <= 0.01):  # already settled in all but name
             continue
         cat = r["category"] or category(r["title"])
@@ -275,7 +296,8 @@ def build(db: DB, now: datetime | None = None, llm=None, actor: str = "trend-sco
         try:
             from .team import _json
             prompt = ("For each breakout YouTube upload, one line (under 20 words) on the format to copy for the listed brands — "
-                      "the structure, not the footage or the people. JSON only: {\"lines\": [\"...\"]}\n"
+                      "the structure, not the footage or the people. Our brands: " + "; ".join(BRANDS.values())
+                      + ". JSON only: {\"lines\": [\"...\"]}\n"
                       + json.dumps([{k: m[k] for k in ("title", "handle", "brands")} for m in make]))
             lines = _json(llm("You turn competitor breakouts into format ideas. JSON only.", [{"role": "user", "content": prompt}], 600)).get("lines") or []
             for m, ln in zip(make, lines):
