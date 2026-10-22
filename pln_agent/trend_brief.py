@@ -45,7 +45,8 @@ CATEGORIES = [  # first match wins
     ("hockey", r"\b(nhl|hockey|stanley cup|maple leafs|oilers|bruins|rangers|panthers|avalanche|canadiens)\b"),
     ("soccer", r"\b(premier league|epl|champions league|la liga|serie a|bundesliga|mls|world cup|arsenal|chelsea|liverpool|"
                r"man(chester)? (city|united)|tottenham|west ham|real madrid|barcelona|fc\b|ballon d'or|uefa|europa league|"
-               r"mbapp|yamal|haaland|kane)"),
+               r"mbapp|yamal|haaland|kane|bournemouth|brentford|newcastle|aston villa|everton|brighton|fulham|wolves|crystal palace|"
+               r"nottingham forest|leeds|burnley|sunderland|hoffenheim|bayern|dortmund|juventus|inter milan|psg|atletico)"),
     ("sports", r"\b(nfl|nba|mlb|wnba|ncaa|ufc|boxing|f1|formula 1|super bowl|world series|playoffs?|mvp|game \d|vs\.?|"
                r"golf|pga|masters|tennis|open|spread|moneyline|total points|bears|chiefs|eagles|cowboys|lakers|celtics|yankees|dodgers)\b"
                r"|\bwin on \d{4}-\d\d-\d\d"),
