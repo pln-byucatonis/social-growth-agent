@@ -158,15 +158,15 @@ def _cta_text(v: dict) -> str:
     return first if 6 <= len(first) <= 60 else "Follow for the next one"
 
 
-STAMP_CY = {"lower": 0.67, "middle": 0.45, "top": 0.24}  # where a word may sit on a filled slide, in order of preference
+STAMP_CY = {"lower": 0.67}  # where the payoff / reaction word sits on a filled slide
 
 
 def build_slides(v: dict, src: str, kind: str, outdir: Path, llm=None) -> list[dict]:
     """Draw the slides for a carousel (or a still Story) into outdir. Returns [{kind, file, role, text, t, placed}].
 
     Before a word goes on a filled slide, Claude looks at the slides for graphics already in the picture (a score bug,
-    a "HOLE IN ONE" card): the word moves to a clear band, or is dropped when there is none. Stacked slides put the
-    word in the band under the frame, which never covers the footage."""
+    a "HOLE IN ONE" card): when there is one, our word is dropped, as on the Reels. Stacked slides put the word in the
+    band under the frame, which never covers the footage."""
     from . import art_director, overlays
     spec = KINDS[kind]
     w, h = spec["w"], spec["h"]
@@ -199,13 +199,12 @@ def build_slides(v: dict, src: str, kind: str, outdir: Path, llm=None) -> list[d
                 placed = "under the frame"
             else:
                 busy = seen.get(round(float(i), 2), set())
-                zone = next((z for z in STAMP_CY if z not in busy), None)
-                if zone:
-                    overlays.render_stamp(text, s, w, h, png, tilt=-5 if role == "payoff" else 4, cy=STAMP_CY[zone],
-                                          heavy=role == "payoff")
-                    placed = zone + (f" (the picture has its own graphic in {', '.join(sorted(busy))})" if busy else "")
+                if busy:  # the footage celebrates the moment itself (a "HOLE IN ONE" card): ours would compete with it
+                    text, placed = "", f"dropped: the picture has its own graphic ({', '.join(sorted(busy))})"
                 else:
-                    text, placed = "", "dropped: the picture already has its own graphic everywhere"
+                    overlays.render_stamp(text, s, w, h, png, tilt=-5 if role == "payoff" else 4, cy=STAMP_CY["lower"],
+                                          heavy=role == "payoff")
+                    placed = "lower"
             if placed and not placed.startswith("dropped"):
                 img = _layer(img, png)
             f = outdir / f"slide_{len(out) + 1}.jpg"

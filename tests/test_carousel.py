@@ -91,12 +91,12 @@ class SlideTests(unittest.TestCase):
         portrait = _clip(1080, 1920)
         v = {**self.db.get("variants", "variant_id", REEL), "variant_id": "x"}
 
-        def llm(system, messages, max_tokens):  # slide 1 (payoff): graphic low; slide 2 (reaction): graphics everywhere
-            return json.dumps({"frames": [{"t": 1, "zones": ["lower"]}, {"t": 2, "zones": ["top", "middle", "lower"]}]})
+        def llm(system, messages, max_tokens):  # slide 1 (payoff): clear; slide 2 (reaction): the footage has its own card
+            return json.dumps({"frames": [{"t": 1, "zones": []}, {"t": 2, "zones": ["middle", "lower"]}]})
         out = Path(tempfile.mkdtemp())
         slides = carousel.build_slides(v, portrait, "carousel", out, llm=llm)
         by = {s["role"]: s for s in slides}
-        self.assertTrue(by["payoff"]["placed"].startswith("middle"))
+        self.assertEqual(by["payoff"]["placed"], "lower")
         self.assertEqual(by["reaction"]["text"], "")
         self.assertTrue(by["reaction"]["placed"].startswith("dropped"))
         self.assertEqual(by["setup"]["placed"], "top")
