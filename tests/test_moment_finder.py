@@ -56,25 +56,52 @@ class FinderTests(unittest.TestCase):
 
         def model(system, messages, max_tokens):
             content = messages[0]["content"]
+            text = " ".join(x.get("text", "") for x in content if x.get("type") == "text")
+            if "check it the way the editor will" in text:
+                return json.dumps({"readable": True, "why": "the tap is plain"})
             calls.append(sum(1 for x in content if x.get("type") == "image"))
             return json.dumps({"candidates": [
                 {"c": 1, "readable": False, "strength": 9, "what": "tangled"},
-                {"c": 2, "readable": True, "strength": 8, "payoff_t": 610, "what": "he taps, hand clearly on the seat"},
-                {"c": 3, "readable": True, "strength": 5, "what": "slow reset"},
-                {"c": 4, "readable": True, "strength": 9, "payoff_t": 910, "what": "escapes out of the door"},
-                {"c": 5, "readable": True, "strength": 9, "wrong_sport": True, "what": "a slap contest"}]})
+                {"c": 2, "readable": True, "clear_frame": 611, "strength": 8, "payoff_t": 610, "what": "he taps, hand clearly on the seat"},
+                {"c": 3, "readable": True, "clear_frame": 1, "strength": 5, "what": "slow reset"},
+                {"c": 4, "readable": True, "clear_frame": 911, "strength": 9, "payoff_t": 910, "what": "escapes out of the door"},
+                {"c": 5, "readable": True, "clear_frame": 1, "strength": 9, "wrong_sport": True, "what": "a slap contest"},
+                {"c": 6, "readable": True, "strength": 9, "what": "no frame named: not trusted"}]})
         team._llm = model
         made = []
         src = mf.exhausted(self.db)[0]
-        row = mf.search(self.db, self.ops, self.s, src, promote=lambda ids: made.extend(ids) or {"assets": ids}, frames_fn=sample_frames)
+        row = mf.search(self.db, self.ops, self.s, src, promote=lambda ids: made.extend(ids) or {"assets": ids}, frames_fn=sample_frames,
+                        close_fn=sample_frames)
         self.assertEqual(len(calls), 1)  # one look for the whole recording
         self.assertEqual(calls[0], mf.SURVEY)
         c = row["candidates"]
-        self.assertEqual(made, [c[3]["clip_id"], c[1]["clip_id"]])  # strongest first; unreadable, weak and wrong-sport left out
+        self.assertEqual(made, [c[3]["clip_id"], c[1]["clip_id"]])  # strongest first; unreadable, weak, wrong-sport and unnamed-frame out
+        self.assertFalse(c[5]["readable"])
         self.assertIn("made drafts from 2", row["note"])
         saved = self.db.get("moment_searches", "media_path", src["media_path"])
         self.assertEqual(saved["picked"], made)
         self.assertEqual(mf.exhausted(self.db), [])  # searched: not again for a while
+
+    def test_closer_look_turns_picks_down_and_survey_hears_earlier_drops(self):
+        prompts, verified = [], []
+
+        def model(system, messages, max_tokens):
+            content = messages[0]["content"]
+            text = " ".join(x.get("text", "") for x in content if x.get("type") == "text")
+            if "check it the way the editor will" in text:
+                verified.append(sum(1 for x in content if x.get("type") == "image"))
+                return json.dumps({"readable": False, "why": "dark, motion-blurred: the tap can't be seen"})
+            prompts.append(text)
+            return json.dumps({"candidates": [{"c": i, "readable": True, "clear_frame": 1, "strength": 8, "what": "tap"}
+                                              for i in range(1, 16)]})
+        team._llm = model
+        made = []
+        row = mf.search(self.db, self.ops, self.s, mf.exhausted(self.db)[0], promote=lambda ids: made.extend(ids) or {"assets": ids},
+                        frames_fn=sample_frames, close_fn=sample_frames)
+        self.assertEqual((made, len(verified)), ([], mf.VERIFY))  # four closer looks, none passed: no drafts
+        self.assertIn("failed the closer look", row["note"])
+        self.assertIn("dark car", prompts[0])  # the survey was told why this recording's drafts were dropped
+        self.assertEqual(row["candidates"][0]["verify_why"], "dark, motion-blurred: the tap can't be seen")
 
     def test_wrong_league_is_reported(self):
         team._llm = lambda *a: json.dumps({"candidates": [{"c": i, "readable": True, "strength": 8, "wrong_sport": True}
