@@ -315,6 +315,11 @@ def render_variant(db: DB, variant_id: str, settings: Settings, actor: str = "re
                 parts.append(f"[{n_in}:v]{slow},{zoom},split=2[rps1][rps2];"
                              f"[rps1]scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},boxblur=28:4,eq=brightness=-0.22[rpbg];"
                              f"[rps2]scale={W}:{fh}[rpfg];[rpbg][rpfg]overlay=0:{layout['y0']},setsar=1,fps={edit_fx.FPS}[rpv0]")
+            elif rp.get("focus") and sw and sh and sw > sh:  # a 9:16 window on the landscape frame, centred on the payoff
+                fxp, fyp = rp["focus"]["x"], rp["focus"]["y"]
+                cw, ch = f"ih/{z}*9/16", f"ih/{z}"
+                parts.append(f"[{n_in}:v]{slow},crop=w='{cw}':h='{ch}':x='clip({fxp}*iw-{cw}/2,0,iw-{cw})':"
+                             f"y='clip({fyp}*ih-{ch}/2,0,ih-{ch})',scale={W}:{H},setsar=1,fps={edit_fx.FPS}[rpv0]")
             else:
                 parts.append(f"[{n_in}:v]{slow},{chain},{zoom},scale={W}:{H},setsar=1,fps={edit_fx.FPS}[rpv0]")
             tag = f",drawtext=fontfile={font}:text='{rp['label']}':fontsize={int(W * 0.06)}:fontcolor=white:box=1:boxcolor=black@0.6:" \

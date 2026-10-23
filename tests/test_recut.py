@@ -78,6 +78,20 @@ class FlowTests(Base):
         self.assertGreater(m.calls[1]["images"], 0)  # and the critic watched the render
         self.assertIn("rough moments", m.calls[0]["text"])
 
+    def test_replay_crops_in_on_the_payoff(self):
+        from pln_agent.media import probe_output, render_variant
+        db, s = make()
+        recut.pull(db, "test")
+        cut = {**CUT, "payoff": {**CUT["payoff"], "focus": {"x": 0.8, "y": 0.3}, "replay_zoom": 2.2, "replay_window": [3.0, 4.0]}}
+        team._llm = Model([cut], [{"scores": GOOD, "verdict": "pass"}])
+        seen = []
+        self.assertEqual(recut.process(db, VID, s, render=lambda vid: seen.append(render_variant(db, vid, s)) or seen[-1])["outcome"], "passed")
+        ed = db.get("variants", "variant_id", VID)["treatment"]["editor"]
+        self.assertEqual((ed["replay_focus"], ed["replay_zoom"]), ({"x": 0.8, "y": 0.3}, 2.2))
+        self.assertEqual(ed["replay_window"], [10.3, 12.7])  # a window that missed the payoff is moved onto it
+        self.assertIn("punched in 2.2x", seen[0]["detail"])
+        self.assertEqual(probe_output(seen[0]["path"])["height"], 1920)
+
     def test_recut_with_notes_then_drop(self):
         db, s = make()
         recut.pull(db, "test")

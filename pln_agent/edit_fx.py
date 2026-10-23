@@ -46,8 +46,12 @@ def settings_for(v: dict) -> dict:
     ed = t.get("editor") or {}
     if not ed.get("replay_worthy") or ((t.get("critic") or {}).get("scores") or {}).get("replay_earned", 5) < 3:
         out["replay"]["enabled"] = False
-    elif ed.get("replay_window"):
-        out["replay"]["window"] = [float(x) for x in ed["replay_window"]]
+    else:
+        if ed.get("replay_window"):
+            out["replay"]["window"] = [float(x) for x in ed["replay_window"]]
+        if ed.get("replay_focus"):  # crop in on where the payoff happens (the cup, the tapping hand)
+            out["replay"]["focus"] = ed["replay_focus"]
+            out["replay"]["zoom"] = float(ed.get("replay_zoom") or out["replay"]["zoom"])
     return out
 
 
@@ -102,7 +106,7 @@ def replay_plan(segs: list[dict], payoff: float | None, fx: dict, source_duratio
     if max_total and edit + out_len > max_total:
         return None
     return {"src_in": round(a, 3), "src_out": round(b, 3), "speed": speed, "zoom": float(r["zoom"]), "out_len": out_len,
-            "starts_at": round(edit, 3), "volume": float(r["volume"]), "label": r.get("label") or ""}
+            "starts_at": round(edit, 3), "volume": float(r["volume"]), "label": r.get("label") or "", "focus": r.get("focus")}
 
 
 def punch_in_filter(payoff: float | None, fx: dict, w: int, h: int) -> str:

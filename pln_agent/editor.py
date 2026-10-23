@@ -51,12 +51,18 @@ RULES = """How to cut:
 - Shots are in story order, at least 0.8 s each, inside the window shown, not overlapping.
 - "replay_worthy" is true only for one fast, clearly visible, dramatic action whose detail is better in slow motion
   (a long putt dropping, a reversal, a crash, a tap-out where the hand and the face are both visible). Never for talking,
-  slow grappling, celebrations, or anything you had to squint at. "replay_window" is the 1.5-3 s of source to replay.
+  slow grappling, celebrations, or anything you had to squint at. "replay_window" is the 1.5-3 s of source to replay and
+  must contain the payoff itself (the ball dropping, the tap), never just the celebration after it.
+- "focus" is where the payoff happens in the full frame (x and y from 0 to 1, left/top = 0): the cup the ball drops into,
+  the hand that taps. "replay_zoom" (1.3-2.5) is how far the replay should crop in on that spot for the detail to read on
+  a phone: a small ball needs 2-2.5, a full-body action 1.3-1.6. A detail too small to see in the main shot can still be
+  readable when the replay crops in on it.
 - Times are source seconds, read from the labels printed on the frames.
 
 Reply with JSON only:
 {"readable": true, "why": "one sentence", "what_happens": "one plain sentence of the visible action, no hype",
- "payoff": {"t": 914.2, "what": "the ball drops", "strength": 8, "replay_worthy": true, "replay_window": [913.0, 915.4]},
+ "payoff": {"t": 914.2, "what": "the ball drops", "strength": 8, "replay_worthy": true, "replay_window": [913.0, 915.4],
+            "focus": {"x": 0.62, "y": 0.58}, "replay_zoom": 2.2},
  "shots": [{"in": 910.5, "out": 912.0, "role": "setup", "why": "lines up the putt"},
            {"in": 912.0, "out": 915.6, "role": "payoff", "why": "the putt"},
            {"in": 931.0, "out": 932.5, "role": "reaction", "why": "partner's reaction"}],
@@ -178,7 +184,17 @@ def check(ed: dict, a: float, b: float, spec: dict) -> dict:
     total = sum(s["out"] - s["in"] for s in clean)
     if spec.get("max_s") and total > spec["max_s"]:
         raise EditorError(f"cut is {total:.1f}s, over the {spec['max_s']}s limit")
-    p = ed.get("payoff") or {}
+    p = dict(ed.get("payoff") or {})
+    if p.get("t") is not None and p.get("replay_window"):  # the replay must hold the payoff, not only what follows it
+        t, (w0, w1) = float(p["t"]), [float(x) for x in p["replay_window"]]
+        if not (w0 - 0.2 <= t <= w1 + 0.2) or not (0.8 <= w1 - w0 <= 4.0):
+            p["replay_window"] = [round(t - 1.2, 2), round(t + 1.2, 2)]
+    if p.get("focus"):
+        f = p["focus"]
+        p["focus"] = {"x": min(1.0, max(0.0, float(f.get("x", 0.5)))), "y": min(1.0, max(0.0, float(f.get("y", 0.5))))}
+    if p.get("replay_zoom") is not None:
+        p["replay_zoom"] = min(2.5, max(1.0, float(p["replay_zoom"])))
+    ed = {**ed, "payoff": p}
     if p.get("t") is not None and not any(s["in"] - 0.3 <= float(p["t"]) <= s["out"] + 0.3 for s in clean):
         raise EditorError("the payoff isn't inside any shot")
     return {**ed, "shots": clean, "length_s": round(total, 2)}
@@ -229,7 +245,8 @@ def apply(db: DB, variant_id: str, ed: dict, actor: str = "editor") -> dict:
            "notes": "Cut by the editor from the frames: " + (ed.get("why") or "")}
     t = dict(v.get("treatment") or {})
     t["editor"] = {"what_happens": ed.get("what_happens", ""), "why": ed.get("why", ""), "payoff": p, "payoff_at_s": payoff_at,
-                   "replay_worthy": worthy, "replay_window": rw, "shots": ed["shots"], "cut_out": ed.get("cut_out") or [],
+                   "replay_worthy": worthy, "replay_window": rw, "replay_focus": p.get("focus") if worthy else None,
+                   "replay_zoom": p.get("replay_zoom") if worthy else None, "shots": ed["shots"], "cut_out": ed.get("cut_out") or [],
                    "length_s": ed.get("length_s"), "window": ed.get("window"), "at": ed.get("at") or now_iso()}
     thumb = {**(v.get("thumbnail") or {}), "source_time": float(p["t"])} if p.get("t") is not None else v.get("thumbnail")
     db.update("variants", "variant_id", variant_id, {"edl": edl, "treatment": t, "thumbnail": thumb, "updated_at": now_iso()})
