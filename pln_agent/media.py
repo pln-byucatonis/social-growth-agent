@@ -344,7 +344,7 @@ def render_variant(db: DB, variant_id: str, settings: Settings, actor: str = "re
             parts.append(f"[{alabel}]{''.join(k)}amix=inputs={1 + len(k)}:normalize=0:duration=first[amx]")
             alabel = "amx"
             fx_used.append("impact sound on the payoff" + (" + whoosh into the replay" if rp else ""))
-        bed = edit_fx.music_bed(v.get("brand_id") or "", efx) if has_audio else None
+        bed = edit_fx.music_bed(v.get("brand_id") or "", efx, db, v.get("platform") or "", variant_id) if has_audio else None
         if bed:
             inputs += ["-stream_loop", "-1", "-i", resolve_media(bed["path"])]
             parts.append(f"[{n_in}:a]volume={efx['music']['bed_volume']}[bed0]")
@@ -352,7 +352,7 @@ def render_variant(db: DB, variant_id: str, settings: Settings, actor: str = "re
                          f"[vo1][bedd]amix=inputs=2:normalize=0:duration=first[amus]")
             alabel = "amus"
             n_in += 1
-            fx_used.append(f"music bed ({bed.get('license')})")
+            fx_used.append(f"music bed: {bed.get('title') or bed['path'].rsplit('/', 1)[-1]} ({bed.get('license')})")
         if fx_used:
             framing += "; " + "; ".join(fx_used)
         if has_audio:  # -14 LUFS (platform target), peaks ~1.5 dB under full scale so re-encoding doesn't clip

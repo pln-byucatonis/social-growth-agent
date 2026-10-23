@@ -1,0 +1,18 @@
+{
+  "_note": "Music library (pln_agent/music.py). A bed reaches a post only when it is approved by ear on the Music page AND its licence clears the platform the post is going to. Generated beds (ACE-Step on the PREDCT GPU box) arrive in the inbox with a sidecar saying the model, version, licence, prompt and seed; licensed tracks are added on the page with the provider and licence.",
+  "inbox_prefix": "social-agent/music/inbox/",
+  "library_prefix": "social-agent/music/library/",
+  "generated_licenses": {
+    "apache-2.0": "Apache License 2.0: model outputs usable commercially on every platform",
+    "mit": "MIT: model outputs usable commercially on every platform"
+  },
+  "platforms": ["instagram", "facebook", "tiktok", "youtube"],
+  "moods": {
+    "carjitsu": ["tense", "driving"],
+    "putt_tour": ["upbeat", "playful"],
+    "world_putting_league": ["upbeat", "playful"],
+    "pln": ["high-energy", "driving"],
+    "predct": ["wry", "newsy"],
+    "pln_picks": ["wry", "newsy"]
+  }
+}

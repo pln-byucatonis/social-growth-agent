@@ -1,0 +1,33 @@
+{% extends "base.html" %}{% block title %}Music{% endblock %}{% block body %}
+<div class="ph"><div class="t"><div class="eyebrow">Content</div><h1>Music library</h1>
+<p>Beds that play quietly under a Reel's commentary and rise into the replay. A bed is used only after someone here has listened and approved it, and only on platforms its licence covers. Generated beds come from ACE-Step on the PREDCT GPU box, each with the model, licence, prompt and seed it was made with.</p></div>
+<div class="acts"><form method="post" action="{{ base }}/music/import" class="inline"><button>Check the inbox</button></form></div></div>
+<div class="kpis"><div class="kpi warn"><div class="v">{{ counts.get('pending', 0) }}</div><div class="l">To listen to</div></div>
+<div class="kpi ok"><div class="v">{{ counts.get('approved', 0) }}</div><div class="l">Approved</div></div>
+<div class="kpi"><div class="v">{{ counts.get('rejected', 0) }}</div><div class="l">Rejected</div></div></div>
+<div class="card"><div class="ch"><h2>What each brand can use</h2></div>
+<table><tr><th>Brand</th><th>Moods</th>{% for p in pol.platforms %}<th>{{ p|title }}</th>{% endfor %}</tr>
+{% for b, moods in pol.moods.items() %}<tr><td>{{ b }}</td><td class="muted small">{{ moods|join(', ') }}</td>{% for p in pol.platforms %}<td>{% if cover[b][p] %}{{ cover[b][p] }}{% else %}<span class="muted">none</span>{% endif %}</td>{% endfor %}</tr>{% endfor %}</table>
+<p class="small muted">Approved beds cleared for each brand on each platform. With none, that brand's posts there carry no music.</p></div>
+<div class="fbar">{% for v, n in [('pending', 'To listen to'), ('approved', 'Approved'), ('rejected', 'Rejected')] %}<a class="btn sm{{ ' on' if view == v }}" href="{{ base }}/music?view={{ v }}">{{ n }}</a>{% endfor %}</div>
+{% for r in rows %}<div class="card" id="{{ r.bed_id }}"><div class="ch"><h2>{{ r.title }}</h2><div class="acts">
+<span class="chip">{{ r.source }}</span>{% if r.mood %}<span class="chip">{{ r.mood }}</span>{% endif %}{% if r.bpm %}<span class="chip">{{ r.bpm|int }} bpm</span>{% endif %}{% if r.duration_s %}<span class="chip">{{ r.duration_s|int }} s</span>{% endif %}</div></div>
+{% if r.url %}<audio src="{{ r.url }}" controls preload="none" style="width:100%;max-width:640px"></audio>{% endif %}
+<div class="small" style="margin-top:6px"><b>From:</b> {{ r.provider }}{% if r.model_version %} {{ r.model_version }}{% endif %} · <b>Licence:</b> {% if r.license_url %}<a href="{{ r.license_url }}" target="_blank" rel="noopener">{{ r.license }}</a>{% else %}{{ r.license }}{% endif %} · <b>Cleared on:</b> {{ (r.platforms or [])|join(', ') or 'none' }} · <b>Brands:</b> {{ (r.brands or [])|join(', ') or 'any' }}</div>
+{% if r.prompt %}<div class="small muted">Prompt: "{{ r.prompt }}" · seed {{ r.seed }}{% if r.sha256 %} · sha256 {{ r.sha256[:12] }}…{% endif %}</div>{% endif %}
+{% if r.reviewed_by %}<div class="small muted">{{ r.status|title }} by {{ r.reviewed_by }} {{ r.reviewed_at[:10] }}{% if r.note %}: {{ r.note }}{% endif %}</div>{% endif %}
+<form method="post" action="{{ base }}/music/{{ r.bed_id }}/review" class="fbar" style="margin-top:8px"><input name="note" placeholder="note (optional)" size="30">
+{% if r.status != 'approved' %}<button name="decision" value="approve">Approve</button>{% endif %}{% if r.status != 'rejected' %}<button name="decision" value="reject" class="sm">Reject</button>{% endif %}</form>
+</div>{% else %}<div class="card"><p class="muted">Nothing here. "Check the inbox" picks up beds copied from the GPU box; or add a licensed track below.</p></div>{% endfor %}
+<div class="card"><div class="ch"><h2>Add a licensed track</h2></div>
+<form method="post" action="{{ base }}/music/add" class="fbar">
+<label>s3:// link <input name="path" placeholder="s3://pln-dam/social-agent/music/library/track.mp3" size="40" required></label>
+<label>Title <input name="title" size="18"></label>
+<label>Library <input name="provider" placeholder="e.g. Epidemic Sound" size="16" required></label>
+<label>Licence <input name="license" placeholder="plan / account / licence id" size="20" required></label>
+<label>Licence link <input name="license_url" size="20"></label>
+<label>Mood <input name="mood" size="10"></label>
+<span class="small">Licence covers:</span>{% for p in pol.platforms %}<label><input type="checkbox" name="platforms" value="{{ p }}"> {{ p|title }}</label>{% endfor %}
+<span class="small">Brands (none = any):</span>{% for b in pol.moods %}<label><input type="checkbox" name="brands" value="{{ b }}"> {{ b }}</label>{% endfor %}
+<button>Add</button></form></div>
+{% endblock %}

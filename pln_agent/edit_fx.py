@@ -5,8 +5,8 @@
   the post would run past the platform's limit, or when the post or brand switches it off.
 * Punch-in on the payoff — a quick zoom (1.12x) as the decisive moment hits, held under half a second.
 * Sound — an impact hit on the payoff and a whoosh into the replay. Both are synthesised by FFmpeg here, so there is
-  no third-party audio to clear. Music beds come only from a licensed library listed in the config, ducked under the
-  commentary; none are listed yet, so posts carry no music until someone adds one.
+  no third-party audio to clear. Music beds come only from the Music library (approved by ear, licence cleared for the
+  platform; pln_agent/music.py) or a licensed bed listed in the config, ducked under the commentary.
 
 Every choice is written to the render's detail so the post page and the Creative DB can see what each post had.
 """
@@ -120,9 +120,15 @@ def make_sfx(outdir: Path) -> dict:
     return {"hit": hit, "whoosh": whoosh}
 
 
-def music_bed(brand_id: str, fx: dict) -> dict | None:
+def music_bed(brand_id: str, fx: dict, db=None, platform: str = "", key: str = "") -> dict | None:
+    """An approved, licence-cleared bed from the Music library (pln_agent/music.py), else one listed in the config."""
     m = fx["music"]
     if not m["enabled"]:
         return None
+    if db is not None:
+        from . import music
+        bed = music.pick(db, brand_id, platform, key)
+        if bed:
+            return bed
     return next((b for b in m.get("beds") or [] if b.get("path") and b.get("license")
                  and (not b.get("brands") or brand_id in b["brands"])), None)

@@ -330,6 +330,31 @@ TABLES: dict[str, list[tuple[str, str, str]]] = {
         ("created_at", "ts", ""),
         ("updated_at", "ts", ""),
     ],
+    # Music library (pln_agent/music.py): beds a person has heard and approved, with where each one came from.
+    "music_beds": [
+        ("bed_id", "text", "PRIMARY KEY"),
+        ("path", "text", ""),  # s3:// audio file
+        ("title", "text", ""),
+        ("brands", "json", ""),  # [] = any brand
+        ("mood", "text", ""),
+        ("bpm", "real", ""),
+        ("duration_s", "real", ""),
+        ("source", "text", ""),  # generated | licensed
+        ("provider", "text", ""),  # e.g. ACE-Step 1.5 (generated) or the library / account (licensed)
+        ("model_version", "text", ""),
+        ("license", "text", ""),
+        ("license_url", "text", ""),
+        ("platforms", "json", ""),  # platforms the licence clears: instagram | facebook | tiktok | youtube
+        ("prompt", "text", ""),
+        ("seed", "text", ""),  # text: ACE-Step seeds can exceed 32 bits
+        ("sha256", "text", ""),
+        ("status", "text", ""),  # pending | approved | rejected
+        ("reviewed_by", "text", ""),
+        ("reviewed_at", "ts", ""),
+        ("note", "text", ""),
+        ("created_at", "ts", ""),
+        ("updated_at", "ts", ""),
+    ],
     # Viral Content Scout: every library clip scored for creative potential (own property + PLN crossover).
     "scout_moments": [
         ("clip_id", "text", "PRIMARY KEY"),

@@ -316,6 +316,31 @@ CREATE TABLE IF NOT EXISTS predct_candidates (
   updated_at TEXT
 );
 
+CREATE TABLE IF NOT EXISTS music_beds (
+  bed_id TEXT PRIMARY KEY,
+  path TEXT,
+  title TEXT,
+  brands JSONB,
+  mood TEXT,
+  bpm DOUBLE PRECISION,
+  duration_s DOUBLE PRECISION,
+  source TEXT,
+  provider TEXT,
+  model_version TEXT,
+  license TEXT,
+  license_url TEXT,
+  platforms JSONB,
+  prompt TEXT,
+  seed TEXT,
+  sha256 TEXT,
+  status TEXT,
+  reviewed_by TEXT,
+  reviewed_at TEXT,
+  note TEXT,
+  created_at TEXT,
+  updated_at TEXT
+);
+
 CREATE TABLE IF NOT EXISTS scout_moments (
   clip_id TEXT PRIMARY KEY,
   source_id TEXT,

@@ -798,6 +798,57 @@ def predct_dismiss(request: Request, cid: str):
     return back(request, "/predct", "Dismissed")
 
 
+@app.get("/music", response_class=HTMLResponse)
+def music_page(request: Request, view: str = "pending"):
+    """Music library: listen, approve or reject; add a licensed track. Only approved, licence-cleared beds play."""
+    from .. import music
+    from ..media import resolve_media
+    d = db()
+    rows = d.all("music_beds", "status=?", [view if view in ("pending", "approved", "rejected") else "pending"],
+                 order="created_at DESC", limit=200)
+    for r in rows:
+        r["url"] = resolve_media(r["path"]) if r.get("path") else ""
+    counts = {r["status"]: r["n"] for r in d.query("SELECT status, COUNT(*) AS n FROM music_beds GROUP BY status")}
+    approved = d.all("music_beds", "status='approved'")
+    pol = music.policy()
+    cover = {b: {p: sum(1 for x in approved if music.cleared(x, b, p)) for p in pol["platforms"]} for b in pol["moods"]}
+    return page(request, "music.html", rows=rows, view=view, counts=counts, pol=pol, cover=cover)
+
+
+@app.post("/music/import")
+def music_import(request: Request):
+    from .. import music
+    try:
+        r = music.import_inbox(db(), actor=request.state.user or "dashboard")
+    except music.MusicError as e:
+        return back(request, "/music", err=str(e))
+    why = f" Skipped {len(r['skipped'])}: {r['skipped'][0]['why']}" if r["skipped"] else ""
+    return back(request, "/music", f"{len(r['added'])} new bed(s) to listen to.{why}")
+
+
+@app.post("/music/add")
+async def music_add(request: Request):
+    from .. import music
+    f = await request.form()
+    try:
+        music.add_licensed(db(), (f.get("path") or "").strip(), (f.get("title") or "").strip(), f.get("provider") or "",
+                           f.get("license") or "", f.getlist("platforms"), f.getlist("brands"), f.get("mood") or "",
+                           request.state.user or "dashboard", (f.get("license_url") or "").strip())
+    except music.MusicError as e:
+        return back(request, "/music", err=str(e))
+    return back(request, "/music", "Added: listen to it below and approve it.")
+
+
+@app.post("/music/{bid}/review")
+def music_review(request: Request, bid: str, decision: str = Form(...), note: str = Form("")):
+    from .. import music
+    try:
+        music.review(db(), bid, decision == "approve", request.state.user or "dashboard", note)
+    except music.MusicError as e:
+        return back(request, "/music", err=str(e))
+    return back(request, "/music", "Approved: posts can use it now." if decision == "approve" else "Rejected")
+
+
 def _tiktok_page(request: Request, **kw):
     d = db()
     tiktok = [a for a in d.all("accounts", "platform='tiktok'", order="account_id")
