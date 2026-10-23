@@ -307,8 +307,11 @@ def render_variant(db: DB, variant_id: str, settings: Settings, actor: str = "re
             z = rp["zoom"]
             zoom = f"crop=iw/{z}:ih/{z}:(iw-iw/{z})/2:(ih-ih/{z})/2"
             slow = f"setpts=PTS-STARTPTS,setpts={1 / rp['speed']:.4f}*PTS"
-            if layout:  # the whole frame, punched in, over the same blurred fill
+            if layout:  # the frame punched in, over the same blurred fill
                 fh = layout["y1"] - layout["y0"]
+                # anchored to the top: the score bug / lower third that made this post stack leaves the frame
+                # whole instead of being sliced by a centred zoom
+                zoom = f"crop=iw/{z}:ih/{z}:(iw-iw/{z})/2:0"
                 parts.append(f"[{n_in}:v]{slow},{zoom},split=2[rps1][rps2];"
                              f"[rps1]scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},boxblur=28:4,eq=brightness=-0.22[rpbg];"
                              f"[rps2]scale={W}:{fh}[rpfg];[rpbg][rpfg]overlay=0:{layout['y0']},setsar=1,fps={edit_fx.FPS}[rpv0]")

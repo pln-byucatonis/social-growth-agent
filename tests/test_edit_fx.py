@@ -19,6 +19,12 @@ class PlanTests(unittest.TestCase):
         self.assertEqual(r["out_len"], 4.0)
         self.assertEqual(r["starts_at"], 12.0)
 
+    def test_putting_replays_the_roll_not_just_the_stroke(self):
+        fx = edit_fx.settings_for({"brand_id": "putt_tour", "treatment": {}})
+        r = edit_fx.replay_plan(SEGS, 8.0, fx, 60.0, 90)
+        self.assertEqual((r["src_in"], r["src_out"]), (13.4, 16.4))
+        self.assertEqual(r["out_len"], 6.0)
+
     def test_replay_skipped_when_off_too_long_or_no_payoff(self):
         self.assertIsNone(edit_fx.replay_plan(SEGS, 8.0, self.fx(replay=False), 60.0, 90))
         self.assertIsNone(edit_fx.replay_plan(SEGS, 8.0, self.fx(), 60.0, 14))  # 12 s edit + 4 s replay > 14 s limit

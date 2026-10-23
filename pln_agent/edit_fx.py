@@ -36,6 +36,9 @@ def settings_for(v: dict) -> dict:
         out[k] = c
     if v.get("brand_id") in (out["replay"].get("skip_brands") or []):
         out["replay"]["enabled"] = False
+    for k, val in ((out["replay"].get("brands") or {}).get(v.get("brand_id") or "") or {}).items():
+        if not k.startswith("_"):  # per-brand replay window (a putt lands seconds after the stroke)
+            out["replay"][k] = val
     return out
 
 
