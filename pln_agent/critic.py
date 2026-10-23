@@ -5,11 +5,13 @@ would: frames at 2 a second across the whole post, tiled into contact sheets wit
 them, alongside the hook, the on-screen text with its timings, the editor's account of what happens, and the hooks
 this account has used lately. It scores the post on a short checklist and gives a verdict:
 
-* pass  — goes to Approvals;
-* recut — the editor gets one more go, with the critic's notes;
-* kill  — dropped (archived, nothing deleted): the moment isn't worth a post.
+* pass    — goes to Approvals;
+* recut   — the cut is the problem: the editor gets one more go, with the critic's notes;
+* rewrite — the cut is fine but the hook or text isn't (it repeats recent posts, doesn't match the shot): the writers'
+            room rewrites the copy with the critic's notes, once;
+* kill    — dropped (archived, nothing deleted): the moment isn't worth a post.
 
-A pass needs the verdict and every score at 3 or more, with the payoff clearly visible (4+). A replay that scores
+A pass needs the critic's own pass and every score at 3 or more, with the payoff clearly visible (4+). A replay that scores
 under 3 doesn't fail the post: the post is rendered again without it. The scores and the notes
 are stored on the post (treatment.critic) and shown on its page.
 """
@@ -31,6 +33,7 @@ CHECKS = {
     "fresh": "the hook and text don't repeat what this account posted recently",
 }
 PASS_MIN, PAYOFF_MIN = 3, 4
+COPY_CHECKS = ("text_fits_shot", "fresh")  # the writers fix these; the rest are the cut, which the editor fixes
 
 SYSTEM = """You are the toughest reviewer on a sports network's social team. You watch every Reel before it can be
 approved and you are paid to stop weak posts, not to be kind. You only answer with JSON."""
@@ -66,20 +69,35 @@ This account's recent posts (hook / text):
 
 Score each check 0-5:
 {checks}
-Then a verdict: "pass" (good enough to post as is), "recut" (the moment is good but the cut isn't — say exactly what to
-change in source terms the editor can act on), or "kill" (the moment itself isn't worth a post).
-Reply with JSON only: {{"scores": {{"first_second": 4, ...}}, "verdict": "pass", "problems": ["..."], "fix": "..."}}"""
+Then a verdict: "pass" (good enough to post as is), "recut" (the moment is good but something needs fixing), or "kill"
+(the moment itself isn't worth a post). Keep the two kinds of problem apart: "cut_problems" are about the pictures and
+the edit (what the editor changes, in source terms it can act on); "copy_problems" are about the hook and on-screen
+text (what the writers change). Our own burned-in hook text over the opening counts as copy, not the cut.
+Reply with JSON only: {{"scores": {{"first_second": 4, ...}}, "verdict": "pass", "cut_problems": ["..."],
+"copy_problems": ["..."], "fix": "what the editor should change"}}"""
 
 
 def judge(res: dict) -> dict:
-    """Apply the pass bar to the critic's answer."""
+    """Apply the pass bar. A good cut with weak copy goes to the writers ("rewrite"), not back to the editor."""
     scores = {k: max(0, min(5, int(res.get("scores", {}).get(k, 0)))) for k in CHECKS}
-    verdict = res.get("verdict") if res.get("verdict") in ("pass", "recut", "kill") else "recut"
-    low = [k for k, s in scores.items() if s < PASS_MIN and k != "replay_earned"]  # a weak replay is removed, not re-cut
-    if verdict == "pass" and (low or scores["payoff_visible"] < PAYOFF_MIN):
+    said = res.get("verdict") if res.get("verdict") in ("pass", "recut", "kill") else "recut"
+    cut_low = [k for k, s in scores.items() if s < PASS_MIN and k not in COPY_CHECKS and k != "replay_earned"]
+    if scores["payoff_visible"] < PAYOFF_MIN and "payoff_visible" not in cut_low:
+        cut_low.append("payoff_visible")
+    copy_low = [k for k in COPY_CHECKS if scores[k] < PASS_MIN]  # a weak replay is removed, not re-cut
+    cut_p, copy_p = list(res.get("cut_problems") or []), list(res.get("copy_problems") or [])
+    if res.get("problems"):  # older single list
+        cut_p += [p for p in res["problems"] if p not in cut_p]
+    if said == "kill":
+        verdict = "kill"
+    elif cut_low or (said == "recut" and cut_p and not copy_low and not copy_p):
         verdict = "recut"
-    return {"scores": scores, "verdict": verdict, "problems": res.get("problems") or [], "fix": res.get("fix") or "",
-            "below_bar": low, "total": sum(scores.values())}
+    elif copy_low or (said == "recut" and copy_p):
+        verdict = "rewrite"
+    else:
+        verdict = "pass" if said == "pass" or not (cut_p or copy_p) else "recut"
+    return {"scores": scores, "verdict": verdict, "said": said, "problems": cut_p + copy_p, "cut_problems": cut_p,
+            "copy_problems": copy_p, "fix": res.get("fix") or "", "below_bar": cut_low + copy_low, "total": sum(scores.values())}
 
 
 def review(db: DB, variant_id: str, video: str, duration: float) -> dict:

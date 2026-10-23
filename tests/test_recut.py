@@ -22,6 +22,12 @@ class Model:
 
     def __call__(self, system, messages, max_tokens):
         content = messages[0]["content"]
+        if "Write FIVE drafts" in system:  # the writers' room
+            self.writers = getattr(self, "writers", []) + [messages[0]["content"]]
+            return json.dumps({"drafts": [{"angle": "stakes", "hook": "Flipped from the bottom", "caption": "He was stuck. Then he wasn't.",
+                                           "cta": "Who wins the rematch?"}]})
+        if "score social copy" in system:
+            return json.dumps({"scores": [{"i": 0, "hook": 9, "specific": 9, "accurate": 9, "payoff": 9, "dq": 0, "invented": []}]})
         if "senior editor" not in system and "toughest reviewer" not in system:
             return '{"frames": []}'  # the art director placing text: nothing on screen to avoid
         self.calls.append({"who": "editor" if "senior editor" in system else "critic",
@@ -56,6 +62,9 @@ class CheckTests(unittest.TestCase):
         self.assertEqual(critic.judge({"scores": {**GOOD, "payoff_visible": 3}, "verdict": "pass"})["verdict"], "recut")
         self.assertEqual(critic.judge({"verdict": "nonsense"})["verdict"], "recut")
         self.assertEqual(critic.judge({"scores": {**GOOD, "replay_earned": 1}, "verdict": "pass"})["verdict"], "pass")
+        self.assertEqual(critic.judge({"scores": {**GOOD, "fresh": 1}, "verdict": "recut"})["verdict"], "rewrite")
+        self.assertEqual(critic.judge({"scores": {**GOOD, "fresh": 1, "no_dead_air": 2}, "verdict": "recut"})["verdict"], "recut")
+        self.assertEqual(critic.judge({"scores": GOOD, "verdict": "recut", "copy_problems": ["hook repeats"]})["verdict"], "rewrite")
 
 
 @unittest.skipUnless(HAS_FFMPEG, "ffmpeg not installed")
@@ -102,6 +111,20 @@ class FlowTests(Base):
         self.assertIn("corner talk", m.calls[2]["text"])  # the second cut got the critic's notes
         v = db.get("variants", "variant_id", VID)
         self.assertEqual((v["state"], v["treatment"]["recut"]["attempts"]), ("archived", 2))
+
+    def test_weak_copy_goes_to_the_writers_not_the_editor(self):
+        db, s = make()
+        recut.pull(db, "test")
+        stale = {"scores": {**GOOD, "fresh": 1}, "verdict": "recut", "copy_problems": ["hook repeats the last four posts"]}
+        m = team._llm = Model([CUT], [stale, {"scores": GOOD, "verdict": "pass"}])
+        r = recut.process(db, VID, s)
+        self.assertEqual(r["outcome"], "passed")
+        self.assertEqual(sum(1 for c in m.calls if c["who"] == "editor"), 1)  # the cut was kept
+        self.assertIn("repeats the last four", json.dumps(m.writers[0]))  # the writers got the critic's note
+        self.assertIn("bottom fighter flips", json.dumps(m.writers[0]))  # and what the editor saw happen
+        v = db.get("variants", "variant_id", VID)
+        self.assertEqual((v["hook"], v["state"] in ("in_review", "needs_fix")), ("Flipped From The Bottom", True))
+        self.assertEqual(v["treatment"]["recut"]["rewrites"], 1)
 
     def test_unreadable_is_dropped_without_rendering(self):
         db, s = make()

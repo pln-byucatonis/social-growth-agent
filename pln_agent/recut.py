@@ -6,7 +6,8 @@ A Reel draft in state 'recut' is out of Approvals. The task runner takes each on
    be seen on a phone, and the draft is dropped;
 2. the post is rendered from those shots (the replay only if the editor called the payoff worth it);
 3. the critic watches the render (critic.py): pass → back to Approvals (in review); recut → the editor tries once
-   more with the critic's notes; kill, or a second miss → dropped.
+   more with the critic's notes; rewrite → the writers' room rewrites the copy once (a sound cut whose copy is still
+   weak then goes to Approvals with the critic's note on it); kill, or a second bad cut → dropped.
 
 Dropped drafts are archived, not deleted, with the reason on the post. `pull` moves the open Reel drafts here.
 """
@@ -60,8 +61,18 @@ def _mark(db: DB, vid: str, state: str, **rc) -> None:
     db.update("variants", "variant_id", vid, {"state": state, "treatment": t, "updated_at": now_iso()})
 
 
+def _rewrite(db: DB, vid: str, notes: str, actor: str) -> None:
+    """The writers' room rewrites the copy on the critic's notes (it edits drafts in review, so step out of re-cut)."""
+    from .writers_room import write
+    db.update("variants", "variant_id", vid, {"state": "in_review"})
+    try:
+        write(db, vid, actor="writers-room", notes=notes)
+    finally:
+        db.update("variants", "variant_id", vid, {"state": "recut", "render_status": "rendered"})
+
+
 def process(db: DB, variant_id: str, settings, actor: str = "editor", render=None, src: str | None = None) -> dict:
-    """Editor → render → critic for one draft, with one re-cut on the critic's notes."""
+    """Editor → render → critic for one draft: one re-cut on the critic's cut notes, one rewrite on its copy notes."""
     from . import critic, editor
     from .media import render_variant
     from .workflow import refresh_validation
@@ -70,43 +81,64 @@ def process(db: DB, variant_id: str, settings, actor: str = "editor", render=Non
     asset = db.get("assets", "asset_id", v["asset_id"])
     rc = (v.get("treatment") or {}).get("recut") or {}
     notes, attempts, history = rc.get("notes", ""), int(rc.get("attempts") or 0), list(rc.get("history") or [])
-    while attempts < MAX_ATTEMPTS:
-        attempts += 1
-        try:
-            ed = editor.edit(db, v, asset, notes, src=src)
-        except editor.EditorError as e:
-            _mark(db, variant_id, "recut", status="failed", attempts=attempts, error=str(e)[:300], history=history)
-            return {"variant_id": variant_id, "outcome": "failed", "why": str(e)}
-        if not ed.get("readable"):
-            _mark(db, variant_id, "archived", status="dropped", attempts=attempts, history=history,
-                  why="editor: " + (ed.get("why") or "the action can't be seen on a phone"))
-            db.audit(actor, "recut_dropped", "variants", variant_id, {"by": "editor", "why": ed.get("why")})
-            return {"variant_id": variant_id, "outcome": "dropped", "why": ed.get("why")}
-        editor.apply(db, variant_id, ed, actor)
+    rewrites, need_cut, c = int(rc.get("rewrites") or 0), True, None
+    while True:
+        if need_cut:
+            if attempts >= MAX_ATTEMPTS:
+                break
+            attempts += 1
+            try:
+                ed = editor.edit(db, v, asset, notes, src=src)
+            except editor.EditorError as e:
+                _mark(db, variant_id, "recut", status="failed", attempts=attempts, error=str(e)[:300], history=history)
+                return {"variant_id": variant_id, "outcome": "failed", "why": str(e)}
+            if not ed.get("readable"):
+                _mark(db, variant_id, "archived", status="dropped", attempts=attempts, history=history,
+                      why="editor: " + (ed.get("why") or "the action can't be seen on a phone"))
+                db.audit(actor, "recut_dropped", "variants", variant_id, {"by": "editor", "why": ed.get("why")})
+                return {"variant_id": variant_id, "outcome": "dropped", "why": ed.get("why")}
+            editor.apply(db, variant_id, ed, actor)
         r = render(variant_id)
         if r.get("status") != "rendered":
             _mark(db, variant_id, "recut", status="failed", attempts=attempts, error=f"render {r.get('status')}", history=history)
             return {"variant_id": variant_id, "outcome": "failed", "why": f"render {r.get('status')}"}
+        v = db.get("variants", "variant_id", variant_id)
+        ed = (v.get("treatment") or {}).get("editor") or {}
         dur = ((r.get("qc") or {}).get("duration_s")) or ed.get("length_s") or 0
         video = f"{r['dir']}/video.mp4" if r.get("dir") else r["path"]
         c = critic.review(db, variant_id, video, float(dur))
-        v = db.get("variants", "variant_id", variant_id)
         t = dict(v.get("treatment") or {})
         t["critic"] = c
         db.update("variants", "variant_id", variant_id, {"treatment": t})
-        history.append({"attempt": attempts, "length_s": ed.get("length_s"), "verdict": c["verdict"], "total": c["total"],
-                        "problems": c["problems"][:4]})
-        if c["verdict"] == "pass":
-            if t.get("editor", {}).get("replay_worthy") and c["scores"].get("replay_earned", 5) < 3:
-                r = render(variant_id)  # the critic didn't think the replay earned its place: render without it
-            _mark(db, variant_id, "in_review", status="passed", attempts=attempts, history=history)
+        history.append({"attempt": attempts, "rewrites": rewrites, "length_s": ed.get("length_s"), "verdict": c["verdict"],
+                        "total": c["total"], "problems": c["problems"][:4]})
+        if c["verdict"] == "pass" or (c["verdict"] == "rewrite" and rewrites >= 1):
+            # a sound cut whose copy is still weak after one rewrite goes to a person, with the critic's notes on it
+            if ed.get("replay_worthy") and c["scores"].get("replay_earned", 5) < 3:
+                render(variant_id)  # the critic didn't think the replay earned its place: render without it
+            _mark(db, variant_id, "in_review", status="passed", attempts=attempts, rewrites=rewrites, history=history,
+                  copy_note="; ".join(c["copy_problems"][:3]) if c["verdict"] == "rewrite" else "")
             refresh_validation(db, variant_id)
-            db.audit(actor, "recut_passed", "variants", variant_id, {"scores": c["scores"], "attempts": attempts})
+            db.audit(actor, "recut_passed", "variants", variant_id, {"scores": c["scores"], "attempts": attempts, "rewrites": rewrites})
             return {"variant_id": variant_id, "outcome": "passed", "scores": c["scores"]}
         if c["verdict"] == "kill":
             break
-        notes = "; ".join(c["problems"][:5]) + (f". Fix: {c['fix']}" if c["fix"] else "")
-    _mark(db, variant_id, "archived", status="dropped", attempts=attempts, history=history,
+        if c["verdict"] == "rewrite":
+            rewrites += 1
+            try:
+                _rewrite(db, variant_id, "; ".join(c["copy_problems"][:5]), actor)
+            except Exception as e:  # noqa: BLE001 — the room failed: the cut is sound, so a person fixes the copy
+                _mark(db, variant_id, "in_review", status="passed", attempts=attempts, rewrites=rewrites, history=history,
+                      copy_note="; ".join(c["copy_problems"][:3]) + f" (writers' room failed: {str(e)[:80]})")
+                refresh_validation(db, variant_id)
+                return {"variant_id": variant_id, "outcome": "passed", "scores": c["scores"]}
+            need_cut = False
+            v = db.get("variants", "variant_id", variant_id)
+            continue
+        notes = "; ".join(c["cut_problems"][:5]) + (f". Fix: {c['fix']}" if c["fix"] else "")
+        need_cut = True
+        v = db.get("variants", "variant_id", variant_id)
+    _mark(db, variant_id, "archived", status="dropped", attempts=attempts, rewrites=rewrites, history=history,
           why="critic: " + "; ".join((history[-1]["problems"] if history else [])[:3]))
     db.audit(actor, "recut_dropped", "variants", variant_id, {"by": "critic", "history": history[-2:]})
     return {"variant_id": variant_id, "outcome": "dropped", "why": history[-1]["problems"] if history else []}

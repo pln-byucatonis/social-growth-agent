@@ -67,7 +67,9 @@ def facts_for(db: DB, v: dict) -> dict:
     if pr:  # PREDCT: the curator's note is the clip description; say which show it is
         from .predct import policy
         clip = {**clip, "source_title": f"{clip.get('source_title')}: {policy()['shows'].get(pr['show'], {}).get('about', '')}"}
-    return {"moment": (m or {}).get("caption"), "type": (m or {}).get("content_type"),
+    seen = ((v.get("treatment") or {}).get("editor") or {}).get("what_happens")
+    return {**({"on_screen": seen} if seen else {}),  # what the editor saw happen in the cut itself
+            "moment": (m or {}).get("caption"), "type": (m or {}).get("content_type"),
             "title": clip.get("source_title"), "machine_caption": clip.get("machine_caption"),
             "transcript": (clip.get("transcript") or "")[:700],
             "moments": [{k: x.get(k) for k in ("kind", "description")} for x in (a.get("moments") or [])][:6]}
@@ -120,7 +122,7 @@ def _score(s: dict) -> float:
     return round((float(s.get("hook", 0)) + float(s.get("specific", 0)) + float(s.get("accurate", 0)) + float(s.get("payoff", 0))) / 4, 2)
 
 
-def write(db: DB, vid: str, actor: str = "writers-room", llm=None) -> dict:
+def write(db: DB, vid: str, actor: str = "writers-room", llm=None, notes: str = "") -> dict:
     """Run the room for one post and apply the winner. Returns {status, pick, drafts}."""
     from . import team
     from .workflow import edit_variant, refresh_validation
@@ -135,7 +137,8 @@ def write(db: DB, vid: str, actor: str = "writers-room", llm=None) -> dict:
     raw = call(WRITER.format(angles="; ".join(ANGLES)) + ("\nPREDCT overrides the digits rule above: a number from the clip "
                                                           "description is allowed, any other number is not." if market else ""),
                [{"role": "user", "content": f"Voice: {voice}\nPlatform: {v['platform']}\n"
-                                            f"Clip description: {json.dumps(facts)}"}], 1400)
+                                            f"Clip description: {json.dumps(facts)}"
+                                            + (f"\nThe reviewer who watched the finished post said, fix this: {notes}" if notes else "")}], 1400)
     drafts = [{k: _clean(d.get(k, "")) for k in ("angle", "hook", "caption", "cta")} for d in (team._json(raw).get("drafts") or [])][:5]
     if not drafts:
         raise ValueError("the writers returned no drafts")
