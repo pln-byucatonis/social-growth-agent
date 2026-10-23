@@ -30,7 +30,7 @@ FPS = 2.0
 PAD_BEFORE, PAD_AFTER = 4.0, 4.0  # look this far either side of the clip's own moments
 MAX_WINDOW = 70.0  # seconds of source looked at, at most (2 fps → 140 frames, 9 sheets)
 MIN_SHOT = 0.8
-EDITOR_MODEL = os.environ.get("PLN_EDITOR_MODEL", "us.anthropic.claude-opus-5-5")
+EDITOR_MODEL = os.environ.get("PLN_EDITOR_MODEL", "us.anthropic.claude-opus-4-6-v1")  # the strongest model this account can use
 REPLAY_STRENGTH = 7  # payoff strength (0-10) a replay needs, as well as the editor saying it is worth one
 
 SYSTEM = """You are the senior editor of a sports network's social team. You cut 9:16 Reels and TikToks from long
