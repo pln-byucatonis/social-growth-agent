@@ -240,7 +240,8 @@ def queue(request: Request, platform: str = "", state: str = "", brand: str = ""
             a = d.decode("assets", a)
             thumbs[a["asset_id"]] = asset_thumb_url(a)
     brands = [r["brand_id"] for r in d.query("SELECT DISTINCT brand_id FROM variants ORDER BY brand_id")]
-    return page(request, "queue.html", variants=vs, accs=accs, perm=perm, platform=platform, state=state, thumbs=thumbs,
+    searches = d.all("moment_searches", order="searched_at DESC", limit=20) if state == "recut" else []
+    return page(request, "queue.html", searches=searches, variants=vs, accs=accs, perm=perm, platform=platform, state=state, thumbs=thumbs,
                 platforms=platforms, total=total, limit=QUEUE_LIMIT, brand=brand, brands=brands, state_counts=state_counts)
 
 

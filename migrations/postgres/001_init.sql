@@ -316,6 +316,16 @@ CREATE TABLE IF NOT EXISTS predct_candidates (
   updated_at TEXT
 );
 
+CREATE TABLE IF NOT EXISTS moment_searches (
+  media_path TEXT PRIMARY KEY,
+  brand_id TEXT,
+  searched_at TEXT,
+  looked_at INTEGER,
+  candidates JSONB,
+  picked JSONB,
+  note TEXT
+);
+
 CREATE TABLE IF NOT EXISTS music_beds (
   bed_id TEXT PRIMARY KEY,
   path TEXT,

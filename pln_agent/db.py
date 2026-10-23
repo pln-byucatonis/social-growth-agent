@@ -330,6 +330,16 @@ TABLES: dict[str, list[tuple[str, str, str]]] = {
         ("created_at", "ts", ""),
         ("updated_at", "ts", ""),
     ],
+    # Moment finder (pln_agent/moment_finder.py): a recording whose drafts were all dropped, searched for better moments.
+    "moment_searches": [
+        ("media_path", "text", "PRIMARY KEY"),
+        ("brand_id", "text", ""),
+        ("searched_at", "ts", ""),
+        ("looked_at", "int", ""),
+        ("candidates", "json", ""),  # [{clip_id, start, end, readable, strength, payoff_t, what, wrong_sport}]
+        ("picked", "json", ""),  # clip ids made into drafts
+        ("note", "text", ""),
+    ],
     # Music library (pln_agent/music.py): beds a person has heard and approved, with where each one came from.
     "music_beds": [
         ("bed_id", "text", "PRIMARY KEY"),

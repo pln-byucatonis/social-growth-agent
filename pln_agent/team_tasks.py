@@ -592,6 +592,9 @@ def needs_compute(db: DB) -> bool:
     from .recut import pending as recut_pending
     if recut_pending(db, 1):
         return True  # Reels waiting for the editor and the critic
+    from .moment_finder import exhausted
+    if exhausted(db):
+        return True  # recordings to search for better moments
     from .predct import pending as predct_pending
     if predct_pending(db):
         return True  # PREDCT previews to make / picked moments to cut
@@ -682,6 +685,10 @@ def run_runner(settings, max_minutes: int = 50, pause_s: int = 20, idle_passes: 
         cut = recut.run_pending(own, settings)
         if cut:
             log.info("runner pass %s: editor/critic %s", passes + 1, [(c["variant_id"][:24], c["outcome"]) for c in cut])
+        from . import moment_finder
+        found = moment_finder.run_pending(own, ops, settings)  # recordings with nothing usable: search them whole
+        if found:
+            log.info("runner pass %s: moment finder %s", passes + 1, [(f["media_path"][-40:], f.get("note")) for f in found])
         queued = render_queued(own, settings)
         out = advance(own, settings, ops)
         if queued:

@@ -31,4 +31,7 @@
 <span class="faint small">Recorded under your name. Two-approver posts and posts whose copy changed since you loaded the page are skipped.</span></div>
 </form>
 <script>document.querySelectorAll('input[name=pick],[data-all]').forEach(function(c){c.addEventListener('change',function(){document.getElementById('bulkn').textContent=document.querySelectorAll('input[name=pick]:checked').length+' selected'})})</script>
+{% if searches %}<div class="card"><div class="ch"><h2>Moment finder</h2></div>
+<p class="small muted">Recordings where every draft was dropped, searched whole for moments that read on a phone.</p>
+<table class="small"><tr><th>Recording</th><th>Looked at</th><th>Picked</th><th>Best seen</th><th>Note</th></tr>{% for r in searches %}{% set best = (r.candidates or [])|sort(attribute='strength', reverse=True) %}<tr><td>{{ r.media_path.rsplit('/', 1)[-1][:48] }}</td><td>{{ r.looked_at }}</td><td>{{ (r.picked or [])|length }}</td><td>{% if best %}{{ best[0].what }} ({{ best[0].strength }}/10{{ ', can\'t follow' if not best[0].readable }}){% endif %}</td><td>{{ r.note }}</td></tr>{% endfor %}</table></div>{% endif %}
 {% endblock %}
