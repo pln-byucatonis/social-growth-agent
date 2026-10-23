@@ -50,6 +50,11 @@ def gate_new(db: DB, actor: str = "editor") -> int:
 
 
 def pending(db: DB, limit: int = 50) -> list[dict]:
+    """Drafts waiting for the editor (none while the model allowance is paused)."""
+    from datetime import datetime, timezone
+    until = db.kv_get(PAUSE_KEY, "")
+    if until and datetime.fromisoformat(until) > datetime.now(timezone.utc):
+        return []
     return [v for v in db.all("variants", "state='recut'", order="updated_at", limit=limit * 3)
             if ((v.get("treatment") or {}).get("recut") or {}).get("status") in ("pending", "retry")][:limit]
 
@@ -71,6 +76,17 @@ def _rewrite(db: DB, vid: str, notes: str, actor: str) -> None:
         db.update("variants", "variant_id", vid, {"state": "recut", "render_status": "rendered"})
 
 
+def _copy_for_cut(db: DB, vid: str, actor: str) -> None:
+    """Copy for the cut that was just made: the writers' room (with what the editor saw and the account's recent hooks),
+    then the on-screen words. A failure keeps the copy the post already has."""
+    from .overlay_copy import write as write_words
+    try:
+        _rewrite(db, vid, "", actor)
+    except Exception as e:  # noqa: BLE001
+        db.audit(actor, "writers_room_failed", "variants", vid, {"error": str(e)[:300]})
+    write_words(db, vid)
+
+
 def process(db: DB, variant_id: str, settings, actor: str = "editor", render=None, src: str | None = None) -> dict:
     """Editor → render → critic for one draft: one re-cut on the critic's cut notes, one rewrite on its copy notes."""
     from . import critic, editor
@@ -89,6 +105,9 @@ def process(db: DB, variant_id: str, settings, actor: str = "editor", render=Non
             attempts += 1
             try:
                 ed = editor.edit(db, v, asset, notes, src=src)
+            except editor.Throttled as e:  # out of model allowance: wait, the draft keeps its place
+                _mark(db, variant_id, "recut", status="pending", attempts=attempts - 1, error=str(e)[:200], history=history)
+                raise
             except editor.EditorError as e:
                 _mark(db, variant_id, "recut", status="failed", attempts=attempts, error=str(e)[:300], history=history)
                 return {"variant_id": variant_id, "outcome": "failed", "why": str(e)}
@@ -98,6 +117,7 @@ def process(db: DB, variant_id: str, settings, actor: str = "editor", render=Non
                 db.audit(actor, "recut_dropped", "variants", variant_id, {"by": "editor", "why": ed.get("why")})
                 return {"variant_id": variant_id, "outcome": "dropped", "why": ed.get("why")}
             editor.apply(db, variant_id, ed, actor)
+            _copy_for_cut(db, variant_id, actor)
         r = render(variant_id)
         if r.get("status") != "rendered":
             _mark(db, variant_id, "recut", status="failed", attempts=attempts, error=f"render {r.get('status')}", history=history)
@@ -127,6 +147,8 @@ def process(db: DB, variant_id: str, settings, actor: str = "editor", render=Non
             rewrites += 1
             try:
                 _rewrite(db, variant_id, "; ".join(c["copy_problems"][:5]), actor)
+                from .overlay_copy import write as write_words
+                write_words(db, variant_id)
             except Exception as e:  # noqa: BLE001 — the room failed: the cut is sound, so a person fixes the copy
                 _mark(db, variant_id, "in_review", status="passed", attempts=attempts, rewrites=rewrites, history=history,
                       copy_note="; ".join(c["copy_problems"][:3]) + f" (writers' room failed: {str(e)[:80]})")
@@ -144,12 +166,27 @@ def process(db: DB, variant_id: str, settings, actor: str = "editor", render=Non
     return {"variant_id": variant_id, "outcome": "dropped", "why": history[-1]["problems"] if history else []}
 
 
+PAUSE_KEY = "recut_paused_until"
+PAUSE_H = 1
+
+
 def run_pending(db: DB, settings, limit: int = 6, actor: str = "editor") -> list[dict]:
-    """Runner step: a few drafts per pass, so other work keeps moving."""
+    """Runner step: a few drafts per pass, so other work keeps moving. When the model allowance runs out, everything
+    waits an hour (and keeps its place) instead of failing one draft after another."""
+    from datetime import datetime, timedelta, timezone
+    from .editor import Throttled
+    until = db.kv_get(PAUSE_KEY, "")
+    if until and datetime.fromisoformat(until) > datetime.now(timezone.utc):
+        return []
     out = []
     for v in pending(db, limit):
         try:
             out.append(process(db, v["variant_id"], settings, actor))
+        except Throttled as e:
+            db.kv_set(PAUSE_KEY, (datetime.now(timezone.utc) + timedelta(hours=PAUSE_H)).replace(microsecond=0).isoformat(), actor)
+            db.audit(actor, "recut_paused", "variants", "", {"why": str(e)[:200], "hours": PAUSE_H})
+            out.append({"variant_id": v["variant_id"], "outcome": "paused", "why": "model allowance used up"})
+            break
         except Exception as e:  # noqa: BLE001 — one bad draft never stops the others
             _mark(db, v["variant_id"], "recut", status="failed", error=str(e)[:300])
             out.append({"variant_id": v["variant_id"], "outcome": "failed", "why": str(e)[:200]})

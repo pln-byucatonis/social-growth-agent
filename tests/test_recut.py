@@ -26,6 +26,9 @@ class Model:
             self.writers = getattr(self, "writers", []) + [messages[0]["content"]]
             return json.dumps({"drafts": [{"angle": "stakes", "hook": "Flipped from the bottom", "caption": "He was stuck. Then he wasn't.",
                                            "cta": "Who wins the rematch?"}]})
+        if "few words burned" in system:  # the on-screen words for the cut
+            self.words = getattr(self, "words", []) + [messages[0]["content"]]
+            return json.dumps(getattr(self, "word_reply", {"hook": "", "payoff_word": "FROM THE BOTTOM.", "reaction_word": "", "why": "flip"}))
         if "score social copy" in system:
             return json.dumps({"scores": [{"i": 0, "hook": 9, "specific": 9, "accurate": 9, "payoff": 9, "dq": 0, "invented": []}]})
         if "senior editor" not in system and "toughest reviewer" not in system:
@@ -96,9 +99,9 @@ class FlowTests(Base):
         seen = []
         self.assertEqual(recut.process(db, VID, s, render=lambda vid: seen.append(render_variant(db, vid, s)) or seen[-1])["outcome"], "passed")
         ed = db.get("variants", "variant_id", VID)["treatment"]["editor"]
-        self.assertEqual((ed["replay_focus"], ed["replay_zoom"]), ({"x": 0.8, "y": 0.3}, 2.2))
+        self.assertEqual((ed["replay_focus"], ed["replay_zoom"]), ({"x": 0.8, "y": 0.3}, 1.5))  # capped: more is mush
         self.assertEqual(ed["replay_window"], [10.3, 12.7])  # a window that missed the payoff is moved onto it
-        self.assertIn("punched in 2.2x", seen[0]["detail"])
+        self.assertIn("punched in 1.5x", seen[0]["detail"])
         self.assertEqual(probe_output(seen[0]["path"])["height"], 1920)
 
     def test_recut_with_notes_then_drop(self):
@@ -120,7 +123,7 @@ class FlowTests(Base):
         r = recut.process(db, VID, s)
         self.assertEqual(r["outcome"], "passed")
         self.assertEqual(sum(1 for c in m.calls if c["who"] == "editor"), 1)  # the cut was kept
-        self.assertIn("repeats the last four", json.dumps(m.writers[0]))  # the writers got the critic's note
+        self.assertIn("repeats the last four", json.dumps(m.writers[-1]))  # the rewrite got the critic's note
         self.assertIn("bottom fighter flips", json.dumps(m.writers[0]))  # and what the editor saw happen
         v = db.get("variants", "variant_id", VID)
         self.assertEqual((v["hook"], v["state"] in ("in_review", "needs_fix")), ("Flipped From The Bottom", True))
@@ -149,6 +152,87 @@ class FlowTests(Base):
         self.assertEqual((r["outcome"], len(renders)), ("passed", 2))  # rendered again, without the replay
         from pln_agent import edit_fx
         self.assertFalse(edit_fx.settings_for(db.get("variants", "variant_id", VID))["replay"]["enabled"])
+
+
+class AllowanceTests(Base):
+    def test_one_look_per_clip_and_pause_when_the_allowance_runs_out(self):
+        from pln_agent import editor as ed_mod
+        db, s = make()
+        recut.pull(db, "test")
+        sibs = [v["variant_id"] for v in db.all("variants", "asset_id=? AND state='recut'", [CJ])]
+        self.assertGreater(len(sibs), 1)
+        m = team._llm = Model([{"readable": False, "why": "dark car"}], [])
+        outs = [recut.process(db, vid, s, render=lambda vid: {"status": "rendered"}) for vid in sibs]
+        self.assertEqual({o["outcome"] for o in outs}, {"dropped"})
+        self.assertEqual(sum(1 for c in m.calls if c["who"] == "editor"), 1)  # watched once for every account's draft
+
+        db2, s2 = make()
+        recut.pull(db2, "test")
+
+        def out_of_tokens(*a, **k):
+            raise ed_mod.Throttled("Too many tokens per day")
+        team._llm = out_of_tokens
+        r = recut.run_pending(db2, s2)
+        self.assertEqual([x["outcome"] for x in r], ["paused"])
+        self.assertEqual(recut.pending(db2), [])  # everything waits
+        self.assertEqual({v["treatment"]["recut"]["status"] for v in db2.all("variants", "state='recut'")}, {"pending"})
+        db2.kv_set(recut.PAUSE_KEY, "2000-01-01T00:00:00+00:00")
+        self.assertTrue(recut.pending(db2))
+
+
+class WordsTests(Base):
+    def _posted(self, db, words, style="pill", hook="Clutch Putt Under Pressure"):
+        """Another post on the same account that already carries these words."""
+        import uuid
+        from pln_agent.db import now_iso
+        v = dict(db.get("variants", "variant_id", VID))
+        v.update(variant_id=f"other-{uuid.uuid4().hex[:6]}", state="published", hook=hook, updated_at=now_iso(),
+                 render_qc={"overlay_words": {"hook": hook.upper(), **words}, "overlay_style": f"{style}+kinetic+stamp"})
+        db.insert("variants", v)
+
+    def test_words_are_written_for_the_cut_and_never_repeat(self):
+        from pln_agent import overlay_copy
+        db, _ = make()
+        editor.apply(db, VID, editor.check(CUT, 4, 20, {}))
+        self._posted(db, {"payoff": "FROM THE BOTTOM."})
+        self._posted(db, {"payoff": "FLIPPED."})
+        m = team._llm = Model([], [])
+        w = overlay_copy.write(db, VID)
+        self.assertEqual(w["payoff"], "")  # the model's word was used on this account lately: refused
+        self.assertIn("bottom fighter flips", json.dumps(m.words[0]))  # it was told what the editor saw
+        self.assertIn("TAP.", json.dumps(m.words[0]))  # and the stock bank is off limits
+        m.word_reply = {"hook": "Stuck Then Free", "payoff_word": "OUT THE BACK.", "reaction_word": "TAP.", "why": "x"}
+        w = overlay_copy.write(db, VID)
+        self.assertEqual((w["hook"], w["payoff"], w["reaction"]), ("STUCK THEN FREE", "OUT THE BACK.", ""))  # stock word refused
+        t = db.get("variants", "variant_id", VID)["treatment"]["overlay"]
+        self.assertEqual((t["stamp"], t["reaction"]), ("OUT THE BACK.", False))
+        self.assertEqual(db.get("variants", "variant_id", VID)["onscreen_text"][0]["text"], "STUCK THEN FREE")
+
+    def test_repeated_hook_shape_and_style_rotate(self):
+        from pln_agent import overlay_copy
+        db, _ = make()
+        self._posted(db, {}, "pill", "Clutch Putt Under Pressure")
+        self._posted(db, {}, "pill", "Clutch Putt From Distance")
+        rec = overlay_copy.recent(db, db.get("variants", "variant_id", VID))
+        self.assertFalse(overlay_copy.fresh_hook("Clutch putt for the win", rec))
+        self.assertTrue(overlay_copy.fresh_hook("Off the rocks", rec))
+        self.assertEqual(overlay_copy.pick_style(rec, "pill"), "knockout")
+        team._llm = Model([], [])
+        team._llm.word_reply = {"hook": "Clutch Putt Again", "payoff_word": "", "reaction_word": ""}
+        w = overlay_copy.write(db, VID)
+        self.assertNotIn("CLUTCH PUTT", w["hook"])
+        self.assertEqual(w["style"], "knockout")
+
+    def test_no_model_falls_back_to_unused_stock_words(self):
+        from pln_agent import overlay_copy
+        db, _ = make()
+        self._posted(db, {"payoff": "TAP."})
+
+        def down(*a, **k):
+            raise RuntimeError("bedrock down")
+        w = overlay_copy.write(db, VID, llm=down)
+        self.assertEqual(w["by"], "bank")
+        self.assertNotEqual(w["payoff"], "TAP.")
 
 
 class GateTests(unittest.TestCase):

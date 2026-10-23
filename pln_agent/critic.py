@@ -24,7 +24,7 @@ from .db import DB, now_iso
 from .editor import _llm, frames, images, sheets
 
 CHECKS = {
-    "first_second": "the first second shows motion that makes you want to keep watching (not a desk, a scoreboard or a title card)",
+    "first_second": "the FOOTAGE in the first second shows motion that makes you want to keep watching (not a desk, a scoreboard or a broadcast title card); judge the pictures, not our own hook text on top, which is copy",
     "payoff_visible": "the decisive moment is clearly visible and readable on a phone",
     "no_dead_air": "no stretch of commentators talking, scoreboards, scenery, resets or anything else that isn't the action or a reaction",
     "text_fits_shot": "each piece of on-screen text matches what is on screen when it appears, and isn't generic filler",
@@ -72,7 +72,8 @@ Score each check 0-5:
 Then a verdict: "pass" (good enough to post as is), "recut" (the moment is good but something needs fixing), or "kill"
 (the moment itself isn't worth a post). Keep the two kinds of problem apart: "cut_problems" are about the pictures and
 the edit (what the editor changes, in source terms it can act on); "copy_problems" are about the hook and on-screen
-text (what the writers change). Our own burned-in hook text over the opening counts as copy, not the cut.
+text (what the writers change). Our own burned-in text (the hook over the opening, the words on the payoff) is copy:
+if it is too big or covers the action, that is a copy problem, never a reason to score the cut down.
 Reply with JSON only: {{"scores": {{"first_second": 4, ...}}, "verdict": "pass", "cut_problems": ["..."],
 "copy_problems": ["..."], "fix": "what the editor should change"}}"""
 

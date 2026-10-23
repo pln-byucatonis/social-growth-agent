@@ -8,7 +8,8 @@ Styles (config/overlay_styles.json, per brand; a post's treatment may override):
             outline  — heavy white type, thick dark stroke and a soft shadow
 * captions  kinetic  — 2–4 word phrases, the spoken word lit in the accent colour as it's said
             classic  — the whole cue in white with a stroke
-* stamp     a bold word ("TAP.", "ACE.") slammed onto the payoff; a second one on the reaction
+* stamp     a bold word slammed onto the payoff; a second one on the reaction. Written for each cut from what the
+            editor saw (overlay_copy.py); the stock words in the config are only the fallback, and never reused lately
 * countdown a thin bar filling up to the payoff, under the hook
 
 How it's applied (the Creative Director's rules):
@@ -362,7 +363,8 @@ def build(v: dict, cues: list[dict], duration: float, w: int, h: int, outdir: Pa
     if s.get("reaction") and payoff_at is not None:
         after = (stamp_win[1] + 0.4) if stamp_win else payoff_at + 1.4
         r = next((b for b in beats if b["kind"] == "reaction" and b["t"] >= after - 0.4), None)
-        word = _pick(bank.get("reaction") or [], seed + ":reaction") if r else ""
+        own_word = ov.get("reaction_word") if "reaction_word" in ov else None  # written for this cut (overlay_copy.py)
+        word = (own_word if own_word is not None else _pick(bank.get("reaction") or [], seed + ":reaction")) if r else ""
         if word:
             t0 = max(r["t"], after)
             t1 = min(t0 + 1.2, duration - END_GUARD)

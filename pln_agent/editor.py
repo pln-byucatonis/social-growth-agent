@@ -19,6 +19,7 @@ from __future__ import annotations
 import base64
 import io
 import json
+import re
 import os
 import subprocess
 import tempfile
@@ -28,7 +29,8 @@ from .db import DB, now_iso
 
 FPS = 2.0  # defaults; config/editor.json overrides
 PAD_BEFORE, PAD_AFTER = 4.0, 4.0  # look this far either side of the clip's own moments
-MAX_WINDOW = 70.0  # seconds of source looked at, at most (2 fps → 140 frames, 9 sheets)
+MAX_WINDOW = 50.0  # seconds of source looked at, at most (2 fps → 100 frames)
+MAX_ZOOM = 1.5  # a 9:16 crop of a 1080p frame is already enlarged ~1.8x; past this the replay turns to mush
 MIN_SHOT = 0.8
 EDITOR_MODEL = os.environ.get("PLN_EDITOR_MODEL", "us.anthropic.claude-opus-4-6-v1")  # the strongest model this account can use
 REPLAY_STRENGTH = 7  # payoff strength (0-10) a replay needs, as well as the editor saying it is worth one
@@ -54,15 +56,16 @@ RULES = """How to cut:
   slow grappling, celebrations, or anything you had to squint at. "replay_window" is the 1.5-3 s of source to replay and
   must contain the payoff itself (the ball dropping, the tap), never just the celebration after it.
 - "focus" is where the payoff happens in the full frame (x and y from 0 to 1, left/top = 0): the cup the ball drops into,
-  the hand that taps. "replay_zoom" (1.3-2.5) is how far the replay should crop in on that spot for the detail to read on
-  a phone: a small ball needs 2-2.5, a full-body action 1.3-1.6. A detail too small to see in the main shot can still be
-  readable when the replay crops in on it.
+  the hand that taps. "replay_zoom" (1.0-1.5) is how far the replay crops in on that spot: 1.5 for a small detail such as
+  a ball, 1.0-1.3 for a full-body action. Past 1.5 the picture turns to mush, so a detail that needs more than that is
+  not readable.
+- Never start, end or hold a shot on a whip-pan, a blurred camera move, a transition or an out-of-focus frame.
 - Times are source seconds, read from the labels printed on the frames.
 
 Reply with JSON only:
 {"readable": true, "why": "one sentence", "what_happens": "one plain sentence of the visible action, no hype",
  "payoff": {"t": 914.2, "what": "the ball drops", "strength": 8, "replay_worthy": true, "replay_window": [913.0, 915.4],
-            "focus": {"x": 0.62, "y": 0.58}, "replay_zoom": 2.2},
+            "focus": {"x": 0.62, "y": 0.58}, "replay_zoom": 1.5},
  "shots": [{"in": 910.5, "out": 912.0, "role": "setup", "why": "lines up the putt"},
            {"in": 912.0, "out": 915.6, "role": "payoff", "why": "the putt"},
            {"in": 931.0, "out": 932.5, "role": "reaction", "why": "partner's reaction"}],
@@ -81,12 +84,25 @@ def config() -> dict:
         return {}
 
 
+class Throttled(EditorError):
+    """Bedrock's daily (or per-minute) token allowance is used up: try again later, the draft isn't at fault."""
+
+
 def _llm(system: str, messages: list[dict], max_tokens: int) -> str:
-    """The editor and the critic judge pictures, so they use the strongest model (PLN_EDITOR_MODEL); tests swap team._llm."""
+    """The editor and the critic judge pictures, so they use the strongest model (PLN_EDITOR_MODEL), falling back to
+    its global endpoint when the regional allowance is used up; tests swap team._llm."""
     from . import team
     if team._llm is not team.bedrock_call:
         return team._llm(system, messages, max_tokens)
-    return team.bedrock_call(system, messages, max_tokens, model=EDITOR_MODEL)
+    last = None
+    for model in (EDITOR_MODEL, EDITOR_MODEL.replace("us.", "global.", 1)):
+        try:
+            return team.bedrock_call(system, messages, max_tokens, model=model)
+        except team.TeamLLMError as e:
+            last = e
+            if not re.search(r"Throttl|Too many tokens|rate", str(e), re.I):
+                raise
+    raise Throttled(str(last)[:200])
 
 
 def frames(src: str, t0: float, t1: float, outdir: Path, fps: float = FPS, width: int = 320) -> list[tuple[float, Path]]:
@@ -193,11 +209,23 @@ def check(ed: dict, a: float, b: float, spec: dict) -> dict:
         f = p["focus"]
         p["focus"] = {"x": min(1.0, max(0.0, float(f.get("x", 0.5)))), "y": min(1.0, max(0.0, float(f.get("y", 0.5))))}
     if p.get("replay_zoom") is not None:
-        p["replay_zoom"] = min(2.5, max(1.0, float(p["replay_zoom"])))
+        p["replay_zoom"] = min(MAX_ZOOM, max(1.0, float(p["replay_zoom"])))
     ed = {**ed, "payoff": p}
     if p.get("t") is not None and not any(s["in"] - 0.3 <= float(p["t"]) <= s["out"] + 0.3 for s in clean):
         raise EditorError("the payoff isn't inside any shot")
     return {**ed, "shots": clean, "length_s": round(total, 2)}
+
+
+def sibling_cut(db: DB, v: dict, a: float, b: float) -> dict | None:
+    """The same footage already watched for any draft of this clip (another account's, or this one before the model
+    allowance ran out): reuse that verdict. Only a first cut is shared; a re-cut on the critic's notes is watched afresh."""
+    for o in db.all("variants", "asset_id=?", [v["asset_id"]]):
+        ed = (o.get("treatment") or {}).get("editor_verdict")
+        w = (ed or {}).get("window") or [0, 0]
+        overlap = min(b, w[1]) - max(a, w[0])
+        if ed and not ed.get("with_notes") and overlap >= 0.6 * min(b - a, w[1] - w[0]):  # the same moment
+            return {**ed, "shared_from": o["variant_id"]} if o["variant_id"] != v["variant_id"] else ed
+    return None
 
 
 def edit(db: DB, v: dict, asset: dict, notes: str = "", src: str | None = None) -> dict:
@@ -205,6 +233,10 @@ def edit(db: DB, v: dict, asset: dict, notes: str = "", src: str | None = None) 
     from .media import resolve_media
     from .team import _json
     a, b = window(v, asset)
+    if not notes:
+        shared = sibling_cut(db, v, a, b)
+        if shared:
+            return shared
     src = src or resolve_media(asset["media_path"])
     with tempfile.TemporaryDirectory() as d:
         cfg = config()
@@ -219,8 +251,12 @@ def edit(db: DB, v: dict, asset: dict, notes: str = "", src: str | None = None) 
     for _ in range(2):  # one retry when the answer can't be used
         raw = _llm(SYSTEM, [{"role": "user", "content": content}], 1500)
         try:
-            ed = check(_json(raw), a, b, (v.get("validation") or {}).get("spec") or {})
-            return {**ed, "window": [a, b], "frames": len(fr), "at": now_iso()}
+            ed = {**check(_json(raw), a, b, (v.get("validation") or {}).get("spec") or {}), "window": [a, b], "frames": len(fr),
+                  "at": now_iso(), "with_notes": bool(notes)}
+            t = dict(db.get("variants", "variant_id", v["variant_id"]).get("treatment") or {})
+            t["editor_verdict"] = ed  # what the editor decided, readable or not, for every draft of the same clip
+            db.update("variants", "variant_id", v["variant_id"], {"treatment": t})
+            return ed
         except (EditorError, ValueError, KeyError, TypeError) as e:
             last = e
             content = content + [{"type": "text", "text": f"That answer couldn't be used ({e}). Reply again with valid JSON."}]

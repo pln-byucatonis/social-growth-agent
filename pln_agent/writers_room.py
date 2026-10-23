@@ -134,10 +134,14 @@ def write(db: DB, vid: str, actor: str = "writers-room", llm=None, notes: str = 
     asset = db.get("assets", "asset_id", v["asset_id"]) or {}
     market = bool((asset.get("flags") or {}).get("gambling"))  # PREDCT / PLN Picks
     voice = _predct_rules() if market else _voice(v["brand_id"], v["account_id"])
+    from .overlay_copy import recent as recent_on_account
+    recent = recent_on_account(db, v)["hooks"][:10]
     raw = call(WRITER.format(angles="; ".join(ANGLES)) + ("\nPREDCT overrides the digits rule above: a number from the clip "
                                                           "description is allowed, any other number is not." if market else ""),
                [{"role": "user", "content": f"Voice: {voice}\nPlatform: {v['platform']}\n"
                                             f"Clip description: {json.dumps(facts)}"
+                                            + (f"\nThis account's recent hooks — don't reuse their wording or their shape "
+                                               f"(e.g. another 'Clutch putt …'): {'; '.join(recent)}" if recent else "")
                                             + (f"\nThe reviewer who watched the finished post said, fix this: {notes}" if notes else "")}], 1400)
     drafts = [{k: _clean(d.get(k, "")) for k in ("angle", "hook", "caption", "cta")} for d in (team._json(raw).get("drafts") or [])][:5]
     if not drafts:
