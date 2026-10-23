@@ -1,0 +1,12 @@
+{
+  "_note": "The editor (pln_agent/editor.py). 'sports' tells it what each brand's footage is and what a moment people can follow looks like on a phone, so it judges each sport on its own terms. Frames are sampled at 'fps' and 'frame_width' pixels wide; a 9:16 Reel shows roughly the middle third of a landscape frame at full phone width, so the editor is told to judge legibility as if zoomed in that far.",
+  "fps": 2,
+  "frame_width": 480,
+  "sports": {
+    "carjitsu": "CarJitsu: jiu-jitsu fought inside a parked car, filmed by cameras in and around the car. Close, tangled bodies are normal for the sport and fine on their own. A moment people can follow is one where something visibly changes: a tap (the hand slapping), the referee stepping in or stopping it, a clear escape or reversal (someone ends up on top or gets out of the door), a choke where the face shows the pressure, or a big reaction after (fists up, slumping back, the partner's face). If none of those can be seen, the moment can't be followed.",
+    "putt_tour": "Putt Tour: professional mini-golf on themed courses. A moment people can follow shows the putt being struck AND the ball's path to the hole or the miss, ideally the drop itself, then the player's reaction. Cameras that lose the ball, or whip away from it, make the moment unreadable.",
+    "world_putting_league": "World Putting League (now Putt Tour): professional mini-golf. Same as Putt Tour: the strike, the ball's path and the drop or miss, then the reaction.",
+    "pln": "Pro League Network clips come from its leagues (CarJitsu, Putt Tour, SlapFIGHT, STR33T); judge them as that league's footage.",
+    "slapfight": "SlapFIGHT: open-hand slap contests. The slap landing and the recipient's reaction must both be visible."
+  }
+}

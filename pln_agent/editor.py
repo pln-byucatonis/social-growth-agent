@@ -26,7 +26,7 @@ from pathlib import Path
 
 from .db import DB, now_iso
 
-FPS = 2.0
+FPS = 2.0  # defaults; config/editor.json overrides
 PAD_BEFORE, PAD_AFTER = 4.0, 4.0  # look this far either side of the clip's own moments
 MAX_WINDOW = 70.0  # seconds of source looked at, at most (2 fps → 140 frames, 9 sheets)
 MIN_SHOT = 0.8
@@ -38,8 +38,10 @@ event footage for people scrolling with the sound off, who give a clip one secon
 thousands of viral sports clips and you are ruthless about dead time. You only answer with JSON."""
 
 RULES = """How to cut:
-- A stranger must understand what happened from the pictures alone, on a phone. If the decisive action cannot be clearly
-  seen (bodies tangled in a dark car interior, a ball too small to follow, the action off-frame or blocked), set
+- A stranger must understand what happened from the pictures alone, on a phone. The frames are the full landscape
+  picture shrunk down; the Reel shows a 9:16 crop on the action (about the middle third, at full phone width), so judge
+  legibility as if zoomed in about three times. Judge it by the sport's own terms (below). If the decisive action
+  still cannot be seen (the camera loses it, it is off-frame or blocked, nothing visibly changes), set
   "readable": false. Do not rescue it with padding.
 - Start on motion that leads straight into the payoff (at most ~3 s of build-up). Never open on a commentary desk, an
   empty course, a scoreboard or a title card.
@@ -63,6 +65,14 @@ Reply with JSON only:
 
 class EditorError(RuntimeError):
     pass
+
+
+def config() -> dict:
+    from .config import CONFIG_DIR
+    try:
+        return json.loads((CONFIG_DIR / "editor.json").read_text())
+    except FileNotFoundError:
+        return {}
 
 
 def _llm(system: str, messages: list[dict], max_tokens: int) -> str:
@@ -139,11 +149,12 @@ def _brief(db: DB, v: dict, asset: dict, a: float, b: float, notes: str) -> str:
     brand = next((x for x in load_brands() if x["brand_id"] == v.get("brand_id")), None)
     moments = [f"- {m.get('label') or m.get('kind')}: {m['start']:.1f}-{m['end']:.1f}s ({m.get('kind')})"
                for m in asset.get("moments") or [] if a <= m.get("start", -1) <= b]
-    parts = [f"Brand: {brand['name'] if brand else v.get('brand_id')}",
+    sport = (config().get("sports") or {}).get(asset.get("brand_id") or v.get("brand_id") or "", "")
+    parts = [f"Brand: {brand['name'] if brand else v.get('brand_id')}" + (f"\n{sport}" if sport else ""),
              f"Clip: {asset.get('title') or ''}. {asset.get('description') or ''}".strip(),
              f"Platform: {v.get('platform')} ({spec.get('min_s', 5)}-{spec.get('max_s', 60)} s allowed)",
              f"The clip library's rough moments in this window (may be wrong):\n" + ("\n".join(moments) or "- none"),
-             f"You are looking at source {a:.1f}s to {b:.1f}s at {FPS:g} frames a second."]
+             f"You are looking at source {a:.1f}s to {b:.1f}s at {config().get('fps', FPS):g} frames a second."]
     if notes:
         parts.append("The critic watched your last cut and said this, fix it:\n" + notes)
     return "\n\n".join(parts) + "\n\n" + RULES
@@ -180,10 +191,13 @@ def edit(db: DB, v: dict, asset: dict, notes: str = "", src: str | None = None) 
     a, b = window(v, asset)
     src = src or resolve_media(asset["media_path"])
     with tempfile.TemporaryDirectory() as d:
-        fr = frames(src, a, b, Path(d))
+        cfg = config()
+        fr = frames(src, a, b, Path(d), fps=float(cfg.get("fps", FPS)), width=int(cfg.get("frame_width", 320)))
         if len(fr) < 4:
             raise EditorError("couldn't read frames from the source")
-        sh = sheets(fr, cols=4 if (asset.get("width") or 16) >= (asset.get("height") or 9) else 6)
+        while len(fr) > 162:  # at most 18 sheets in one request
+            fr = fr[::2]
+        sh = sheets(fr, cols=3 if (asset.get("width") or 16) >= (asset.get("height") or 9) else 6, rows=3)
     content = images(sh) + [{"type": "text", "text": _brief(db, v, asset, a, b, notes)}]
     last = None
     for _ in range(2):  # one retry when the answer can't be used
