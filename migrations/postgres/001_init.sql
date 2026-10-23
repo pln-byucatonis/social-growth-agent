@@ -316,6 +316,28 @@ CREATE TABLE IF NOT EXISTS predct_candidates (
   updated_at TEXT
 );
 
+CREATE TABLE IF NOT EXISTS curation_clips (
+  clip_id TEXT PRIMARY KEY,
+  brand_id TEXT,
+  media_path TEXT,
+  source_title TEXT,
+  start_s DOUBLE PRECISION,
+  end_s DOUBLE PRECISION,
+  score DOUBLE PRECISION,
+  energy DOUBLE PRECISION,
+  caption TEXT,
+  finder JSONB,
+  preview_path TEXT,
+  thumb_path TEXT,
+  preview_from DOUBLE PRECISION,
+  preview_status TEXT,
+  status TEXT,
+  pick JSONB,
+  error TEXT,
+  created_at TEXT,
+  updated_at TEXT
+);
+
 CREATE TABLE IF NOT EXISTS moment_searches (
   media_path TEXT PRIMARY KEY,
   brand_id TEXT,

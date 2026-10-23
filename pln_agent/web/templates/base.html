@@ -101,7 +101,7 @@ video{max-width:100%;max-height:560px;border-radius:8px;background:#000}hr{borde
 {% if not embedded %}<nav class="nav">
 {% for g, items in [("Today", [("/", "Today"), ("/runsheet", "Run sheet"), ("/queue", "Approvals"), ("/community", "Community")]),
   ("Plan", [("/growth", "Growth brief"), ("/calendar", "Calendar"), ("/cadence", "Cadence"), ("/experiments", "Experiments")]),
-  ("Content", [("/scout", "Scout"), ("/predct", "PREDCT"), ("/music", "Music"), ("/trends", "Trends"), ("/assets", "Assets"), ("/creative", "Creative DB")]),
+  ("Content", [("/scout", "Scout"), ("/predct", "PREDCT"), ("/curation", "Curation"), ("/music", "Music"), ("/trends", "Trends"), ("/assets", "Assets"), ("/creative", "Creative DB")]),
   ("Insight", [("/intelligence", "Audience"), ("/competitors", "Competitors"), ("/knowledge", "Knowledge"), ("/migration", "WPL → Putt Tour")]),
   ("Team", [("/team", "Agent Team")]), ("Admin", [("/accounts", "Accounts"), ("/audit", "Audit log")])] %}
 <div class="grp"><span class="gl">{{ g }}</span>{% for href, name in items %}<a href="{{ base }}{{ href }}" class="{{ 'on' if (href == '/' and p.rstrip('/') == base) or (href != '/' and p.startswith(base ~ href)) }}">{{ name }}</a>{% endfor %}</div>{% endfor %}

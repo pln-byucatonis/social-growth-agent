@@ -824,6 +824,56 @@ def predct_dismiss(request: Request, cid: str):
     return back(request, "/predct", "Dismissed")
 
 
+@app.get("/curation", response_class=HTMLResponse)
+def curation_page(request: Request, brand: str = "carjitsu", view: str = "new"):
+    """Hand-picked moments: a person picks from the league's library clips; the team makes the posts."""
+    from .. import curation
+    from ..media import resolve_media
+    d = db()
+    where = {"picked": "status='picked'", "dismissed": "status='dismissed'"}.get(view, "status='new'")
+    rows = d.all("curation_clips", f"brand_id=? AND {where}", [brand], order="media_path, score DESC", limit=120)
+    for r in rows:
+        r["preview_url"] = resolve_media(r["preview_path"], "video/mp4") if r.get("preview_path") else ""
+        r["thumb_url"] = resolve_media(r["thumb_path"], "image/jpeg") if r.get("thumb_path") else ""
+    counts = {r["status"]: r["n"] for r in d.query("SELECT status, COUNT(*) AS n FROM curation_clips WHERE brand_id=? GROUP BY status", [brand])}
+    groups: dict[str, list] = {}
+    for r in rows:
+        groups.setdefault(r["source_title"] or r["media_path"], []).append(r)
+    return page(request, "curation.html", brand=brand, brands=curation.BRANDS, view=view, groups=groups, counts=counts,
+                pad=curation.PAD_S)
+
+
+@app.post("/curation/fill")
+def curation_fill(request: Request, brand: str = Form("carjitsu")):
+    from .. import curation
+    if not settings.ops_database_url:
+        return back(request, f"/curation?brand={brand}", err="the ops database isn't configured")
+    r = curation.fill(db(), DB(settings.ops_database_url, init=False), brand, actor=request.state.user or "dashboard")
+    if os.environ.get("PLN_TASK_RUNNER_PROJECT"):
+        _kick_team_tasks()
+    return back(request, f"/curation?brand={brand}", f"{len(r['added'])} clips added from {r['recordings']} recordings — previews in a few minutes.")
+
+
+@app.post("/curation/{clip_id:path}/pick")
+def curation_pick(request: Request, clip_id: str, start: float = Form(...), end: float = Form(...), payoff_at: float = Form(...),
+                  note: str = Form(...), brand: str = Form("carjitsu")):
+    from .. import curation
+    try:
+        curation.pick(db(), clip_id, start, end, payoff_at, note, request.state.user or "dashboard")
+    except (curation.CurationError, ValueError) as e:
+        return back(request, f"/curation?brand={brand}", err=str(e))
+    if os.environ.get("PLN_TASK_RUNNER_PROJECT"):
+        _kick_team_tasks()
+    return back(request, f"/curation?brand={brand}", "Picked: the team is making the posts; they'll be in Approvals.")
+
+
+@app.post("/curation/{clip_id:path}/dismiss")
+def curation_dismiss(request: Request, clip_id: str, brand: str = Form("carjitsu")):
+    from .. import curation
+    curation.dismiss(db(), clip_id, request.state.user or "dashboard")
+    return back(request, f"/curation?brand={brand}", "Dismissed")
+
+
 @app.get("/music", response_class=HTMLResponse)
 def music_page(request: Request, view: str = "pending"):
     """Music library: listen, approve or reject; add a licensed track. Only approved, licence-cleared beds play."""

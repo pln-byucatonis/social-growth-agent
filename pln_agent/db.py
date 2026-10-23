@@ -330,6 +330,28 @@ TABLES: dict[str, list[tuple[str, str, str]]] = {
         ("created_at", "ts", ""),
         ("updated_at", "ts", ""),
     ],
+    # Curation queue (pln_agent/curation.py): library clips a person looks at and picks the moment from.
+    "curation_clips": [
+        ("clip_id", "text", "PRIMARY KEY"),  # ops clip library id
+        ("brand_id", "text", ""),
+        ("media_path", "text", ""),  # the recording (s3://)
+        ("source_title", "text", ""),
+        ("start_s", "real", ""),  # the library clip, seconds of the recording
+        ("end_s", "real", ""),
+        ("score", "real", ""),
+        ("energy", "real", ""),
+        ("caption", "text", ""),
+        ("finder", "json", ""),  # what the moment finder thought of it, if it looked
+        ("preview_path", "text", ""),
+        ("thumb_path", "text", ""),
+        ("preview_from", "real", ""),  # recording time of the preview's first frame
+        ("preview_status", "text", ""),  # pending | ready | failed
+        ("status", "text", ""),  # new | picked | dismissed
+        ("pick", "json", ""),  # {start, end, payoff_at, note, by, at, status: pending|done|failed, asset_id, error}
+        ("error", "text", ""),
+        ("created_at", "ts", ""),
+        ("updated_at", "ts", ""),
+    ],
     # Moment finder (pln_agent/moment_finder.py): a recording whose drafts were all dropped, searched for better moments.
     "moment_searches": [
         ("media_path", "text", "PRIMARY KEY"),

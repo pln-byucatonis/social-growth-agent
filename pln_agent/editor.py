@@ -177,6 +177,11 @@ def _brief(db: DB, v: dict, asset: dict, a: float, b: float, notes: str) -> str:
              f"Platform: {v.get('platform')} ({spec.get('min_s', 5)}-{spec.get('max_s', 60)} s allowed)",
              f"The clip library's rough moments in this window (may be wrong):\n" + ("\n".join(moments) or "- none"),
              f"You are looking at source {a:.1f}s to {b:.1f}s at {config().get('fps', FPS):g} frames a second."]
+    cur = (asset.get("probe") or {}).get("curated")
+    if cur:
+        parts.append(f"A person picked this moment by hand: in {cur['start']:.1f}s, payoff {cur['payoff_at']:.1f}s, out "
+                     f"{cur['end']:.1f}s — \"{cur['note']}\". Cut inside that range and keep the payoff in it. Don't refuse it: "
+                     "\"readable\" is true; say in \"why\" what would make it read better.")
     if notes:
         parts.append("The critic watched your last cut and said this, fix it:\n" + notes)
     return "\n\n".join(parts) + "\n\n" + RULES
@@ -216,6 +221,17 @@ def check(ed: dict, a: float, b: float, spec: dict) -> dict:
     return {**ed, "shots": clean, "length_s": round(total, 2)}
 
 
+def _keep_pick(ed: dict, asset: dict) -> dict:
+    """A person's pick (curation.py) is never dropped: when the editor still says no, the pick itself is the cut."""
+    cur = (asset.get("probe") or {}).get("curated")
+    if not cur or ed.get("readable"):
+        return ed
+    return {**ed, "readable": True, "overruled": ed.get("why", ""),
+            "shots": [{"in": cur["start"], "out": cur["end"], "role": "payoff", "why": "the curator's pick"}],
+            "payoff": {**(ed.get("payoff") or {}), "t": cur["payoff_at"], "what": cur["note"], "replay_worthy": False},
+            "length_s": round(cur["end"] - cur["start"], 2), "what_happens": ed.get("what_happens") or cur["note"]}
+
+
 def sibling_cut(db: DB, v: dict, a: float, b: float) -> dict | None:
     """The same footage already watched for any draft of this clip (another account's, or this one before the model
     allowance ran out): reuse that verdict. Only a first cut is shared; a re-cut on the critic's notes is watched afresh."""
@@ -251,7 +267,8 @@ def edit(db: DB, v: dict, asset: dict, notes: str = "", src: str | None = None) 
     for _ in range(2):  # one retry when the answer can't be used
         raw = _llm(SYSTEM, [{"role": "user", "content": content}], 1500)
         try:
-            ed = {**check(_json(raw), a, b, (v.get("validation") or {}).get("spec") or {}), "window": [a, b], "frames": len(fr),
+            ed = _keep_pick(check(_json(raw), a, b, (v.get("validation") or {}).get("spec") or {}), asset)
+            ed = {**ed, "window": [a, b], "frames": len(fr),
                   "at": now_iso(), "with_notes": bool(notes)}
             t = dict(db.get("variants", "variant_id", v["variant_id"]).get("treatment") or {})
             t["editor_verdict"] = ed  # what the editor decided, readable or not, for every draft of the same clip

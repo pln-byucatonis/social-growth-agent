@@ -160,8 +160,13 @@ def process(db: DB, variant_id: str, settings, actor: str = "editor", render=Non
         notes = "; ".join(c["cut_problems"][:5]) + (f". Fix: {c['fix']}" if c["fix"] else "")
         need_cut = True
         v = db.get("variants", "variant_id", variant_id)
+    why = "critic: " + "; ".join((history[-1]["problems"] if history else [])[:3])
+    if (asset.get("probe") or {}).get("curated"):  # a person picked it: they decide, with the critic's notes in front of them
+        _mark(db, variant_id, "in_review", status="passed", attempts=attempts, rewrites=rewrites, history=history, critic_note=why)
+        refresh_validation(db, variant_id)
+        return {"variant_id": variant_id, "outcome": "passed", "note": "curated: the critic's objections go to Approvals"}
     _mark(db, variant_id, "archived", status="dropped", attempts=attempts, rewrites=rewrites, history=history,
-          why="critic: " + "; ".join((history[-1]["problems"] if history else [])[:3]))
+          why=why)
     db.audit(actor, "recut_dropped", "variants", variant_id, {"by": "critic", "history": history[-2:]})
     return {"variant_id": variant_id, "outcome": "dropped", "why": history[-1]["problems"] if history else []}
 

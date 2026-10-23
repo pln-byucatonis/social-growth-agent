@@ -1,0 +1,29 @@
+{% extends "base.html" %}{% block title %}Curation{% endblock %}{% block body %}
+<div class="ph"><div class="t"><div class="eyebrow">Content</div><h1>Curation queue</h1>
+<p>Hand-picked moments. These are the clip library's best-scored moments from each recording, with a few seconds either side. Watch one, then mark where it starts, where the payoff lands and where it ends, and write a line on what happens. That line is what the writers may say. The team cuts it, writes it and puts it in Approvals. A pick you make here is never thrown out: if the critic objects, its notes come with the post and you decide.</p></div>
+<div class="acts"><form method="post" action="{{ base }}/curation/fill" class="inline"><input type="hidden" name="brand" value="{{ brand }}"><button>Add clips from the library</button></form></div></div>
+<div class="kpis"><div class="kpi warn"><div class="v">{{ counts.get('new', 0) }}</div><div class="l">To look at</div></div>
+<div class="kpi ok"><div class="v">{{ counts.get('picked', 0) }}</div><div class="l">Picked</div></div>
+<div class="kpi"><div class="v">{{ counts.get('dismissed', 0) }}</div><div class="l">Dismissed</div></div></div>
+<div class="fbar">{% for b in brands %}<a class="btn sm{{ ' on' if brand == b }}" href="{{ base }}/curation?brand={{ b }}&view={{ view }}">{{ b }}</a>{% endfor %}
+<span class="muted small">·</span>{% for v, n in [('new', 'To look at'), ('picked', 'Picked'), ('dismissed', 'Dismissed')] %}<a class="btn sm{{ ' on' if view == v }}" href="{{ base }}/curation?brand={{ brand }}&view={{ v }}">{{ n }}</a>{% endfor %}</div>
+{% for title, clips in groups.items() %}<div class="card"><div class="ch"><h2>{{ title }}</h2><div class="acts"><span class="chip">{{ clips|length }} clips</span></div></div>
+{% for r in clips %}{% set k = loop.index0 ~ '-' ~ title|length %}<div style="border-top:1px solid var(--line, #8883);padding:10px 0" id="c{{ k }}">
+<div class="fbar"><b>{{ '%d:%02d'|format((r.start_s // 60)|int, (r.start_s % 60)|int) }}</b><span class="chip">score {{ r.score|int }}</span>
+{% if r.finder and r.finder.strength is not none %}<span class="chip {{ 'ok' if r.finder.readable else 'warn' }}">finder: {{ r.finder.strength }}/10{{ '' if r.finder.readable else ", can't follow" }}</span>{% endif %}
+<span class="small muted">{{ r.caption[:140] }}</span>
+{% if r.status != 'dismissed' %}<form method="post" action="{{ base }}/curation/{{ r.clip_id }}/dismiss" class="inline"><input type="hidden" name="brand" value="{{ brand }}"><button class="sm">Dismiss</button></form>{% endif %}</div>
+{% if r.finder and r.finder.what %}<div class="small muted">Finder saw: {{ r.finder.what }}{% if r.finder.verify_why %} — closer look: {{ r.finder.verify_why }}{% endif %}</div>{% endif %}
+{% if r.status == 'picked' %}{% set p = r.pick %}<div class="small">Picked {{ p.start }}–{{ p.end }}s (payoff {{ p.payoff_at }}s) by {{ p.by }}: “{{ p.note }}” — {% if p.status == 'done' %}<a href="{{ base }}/asset/{{ p.asset_id }}">drafted</a>{% elif p.status == 'failed' %}<b>failed</b>: {{ p.error }}{% else %}being made…{% endif %}</div>
+{% elif r.preview_url %}<video id="v{{ k }}" src="{{ r.preview_url }}" poster="{{ r.thumb_url }}" controls preload="none" playsinline style="width:100%;max-width:560px;border-radius:8px" data-from="{{ r.preview_from }}"></video>
+<form method="post" action="{{ base }}/curation/{{ r.clip_id }}/pick" class="fbar" style="margin-top:6px"><input type="hidden" name="brand" value="{{ brand }}">
+<label>In <input name="start" id="in{{ k }}" size="7" required></label><button type="button" class="sm" onclick="setT('{{ k }}','in')">⇤ now</button>
+<label>Payoff <input name="payoff_at" id="po{{ k }}" size="7" required></label><button type="button" class="sm" onclick="setT('{{ k }}','po')">★ now</button>
+<label>Out <input name="end" id="out{{ k }}" size="7" required></label><button type="button" class="sm" onclick="setT('{{ k }}','out')">⇥ now</button>
+<label style="flex:1 1 100%">What happens <input name="note" style="width:100%" required placeholder="e.g. Pinned against the door, he slips the choke and ends up on top"></label>
+<button>Pick this moment</button></form>
+{% elif r.preview_status == 'failed' %}<p class="small muted">Couldn't make a preview: {{ r.error }}</p>{% else %}<p class="small muted">Making the preview…</p>{% endif %}
+</div>{% endfor %}</div>
+{% else %}<div class="card"><p class="muted">Nothing here. "Add clips from the library" queues the best moments from each {{ brand }} recording.</p></div>{% endfor %}
+<script>function setT(k, which){var v=document.getElementById('v'+k);document.getElementById(which+k).value=(parseFloat(v.dataset.from||0)+v.currentTime).toFixed(1);}</script>
+{% endblock %}

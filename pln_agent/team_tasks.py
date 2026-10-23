@@ -592,6 +592,9 @@ def needs_compute(db: DB) -> bool:
     from .recut import pending as recut_pending
     if recut_pending(db, 1):
         return True  # Reels waiting for the editor and the critic
+    from .curation import pending as curation_pending
+    if curation_pending(db):
+        return True  # previews to make / hand-picked moments to turn into posts
     from .moment_finder import exhausted
     if exhausted(db):
         return True  # recordings to search for better moments
@@ -685,6 +688,11 @@ def run_runner(settings, max_minutes: int = 50, pause_s: int = 20, idle_passes: 
         cut = recut.run_pending(own, settings)
         if cut:
             log.info("runner pass %s: editor/critic %s", passes + 1, [(c["variant_id"][:24], c["outcome"]) for c in cut])
+        if os.environ.get("PLN_RENDER_BUCKET"):
+            from . import curation
+            picked = curation.run_pending(own, ops, settings, os.environ["PLN_RENDER_BUCKET"])  # hand-picked moments + previews
+            if picked:
+                log.info("runner pass %s: curation %s", passes + 1, [(p["clip_id"][-24:], p.get("pick") or p.get("preview")) for p in picked])
         from . import moment_finder
         found = moment_finder.run_pending(own, ops, settings)  # recordings with nothing usable: search them whole
         if found:
