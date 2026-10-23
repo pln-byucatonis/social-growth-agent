@@ -289,33 +289,83 @@ def render_variant(db: DB, variant_id: str, settings: Settings, actor: str = "re
                          f"[sbg][sfg]overlay=0:{layout['y0']},setsar=1[base]")
         else:
             parts.append(f"[cv]{chain}[base]")
+        # edit effects (edit_fx.py): punch-in on the payoff, the slowed replay after the edit, the impact sound
+        from . import edit_fx
+        efx = edit_fx.settings_for(v)
+        payoff, beats = edit_fx.payoff_time(v, asset, segs, cut)
+        W, H = out["w"], out["h"]
+        vlabel, alabel, fx_used, n_in = "base", "ca", [], len(segs)
+        pin = edit_fx.punch_in_filter(payoff, efx, W, H)
+        if pin:
+            parts.append(f"[base]{pin}[basep]")
+            vlabel = "basep"
+            fx_used.append("punch-in on the payoff")
+        max_total = ((v.get("validation") or {}).get("spec") or {}).get("max_s")
+        rp = edit_fx.replay_plan(segs, payoff, efx, asset.get("duration_s"), max_total)
+        if rp:
+            inputs += ["-ss", f"{rp['src_in']:.3f}", "-t", f"{rp['src_out'] - rp['src_in']:.3f}", "-i", src]
+            z = rp["zoom"]
+            zoom = f"crop=iw/{z}:ih/{z}:(iw-iw/{z})/2:(ih-ih/{z})/2"
+            slow = f"setpts=PTS-STARTPTS,setpts={1 / rp['speed']:.4f}*PTS"
+            if layout:  # the whole frame, punched in, over the same blurred fill
+                fh = layout["y1"] - layout["y0"]
+                parts.append(f"[{n_in}:v]{slow},{zoom},split=2[rps1][rps2];"
+                             f"[rps1]scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},boxblur=28:4,eq=brightness=-0.22[rpbg];"
+                             f"[rps2]scale={W}:{fh}[rpfg];[rpbg][rpfg]overlay=0:{layout['y0']},setsar=1,fps={edit_fx.FPS}[rpv0]")
+            else:
+                parts.append(f"[{n_in}:v]{slow},{chain},{zoom},scale={W}:{H},setsar=1,fps={edit_fx.FPS}[rpv0]")
+            tag = f",drawtext=fontfile={font}:text='{rp['label']}':fontsize={int(W * 0.06)}:fontcolor=white:box=1:boxcolor=black@0.6:" \
+                  f"boxborderw={int(W * 0.016)}:x=w-tw-{int(W * 0.06)}:y=h*0.07" if font and rp["label"] else ""
+            parts.append(f"[rpv0]null{tag}[rpv]")
+            parts.append(f"[{vlabel}]fps={edit_fx.FPS},setsar=1[basef]")
+            if has_audio:
+                parts.append(f"[{n_in}:a]asetpts=PTS-STARTPTS,atempo={rp['speed']},volume={rp['volume']}[rpa]")
+                parts.append("[basef][ca][rpv][rpa]concat=n=2:v=1:a=1[vcat][acat]")
+                alabel = "acat"
+            else:
+                parts.append("[basef][rpv]concat=n=2:v=1:a=0[vcat]")
+            vlabel = "vcat"
+            n_in += 1
+            fx_used.append(f"replay {rp['src_out'] - rp['src_in']:.1f}s at {rp['speed']:g}x, punched in {rp['zoom']:g}x")
+        if has_audio and efx["sfx"]["enabled"] and payoff is not None:
+            snd = edit_fx.make_sfx(outdir)
+            inputs += ["-i", str(snd["hit"])]
+            mix, k = [f"[{n_in}:a]adelay={int(payoff * 1000)}:all=1,volume={efx['sfx']['hit_volume']}[sfxh]"], ["[sfxh]"]
+            n_in += 1
+            if rp:
+                inputs += ["-i", str(snd["whoosh"])]
+                mix.append(f"[{n_in}:a]adelay={max(0, int((rp['starts_at'] - 0.45) * 1000))}:all=1,volume={efx['sfx']['whoosh_volume']}[sfxw]")
+                k.append("[sfxw]")
+                n_in += 1
+            parts += mix
+            parts.append(f"[{alabel}]{''.join(k)}amix=inputs={1 + len(k)}:normalize=0:duration=first[amx]")
+            alabel = "amx"
+            fx_used.append("impact sound on the payoff" + (" + whoosh into the replay" if rp else ""))
+        bed = edit_fx.music_bed(v.get("brand_id") or "", efx) if has_audio else None
+        if bed:
+            inputs += ["-stream_loop", "-1", "-i", resolve_media(bed["path"])]
+            parts.append(f"[{n_in}:a]volume={efx['music']['bed_volume']}[bed0]")
+            parts.append(f"[{alabel}]asplit=2[vo1][vo2];[bed0][vo2]sidechaincompress=threshold=0.04:ratio=8:release=400[bedd];"
+                         f"[vo1][bedd]amix=inputs=2:normalize=0:duration=first[amus]")
+            alabel = "amus"
+            n_in += 1
+            fx_used.append(f"music bed ({bed.get('license')})")
+        if fx_used:
+            framing += "; " + "; ".join(fx_used)
         if has_audio:  # -14 LUFS (platform target), peaks ~1.5 dB under full scale so re-encoding doesn't clip
-            parts.append("[ca]loudnorm=I=-14:TP=-1.5:LRA=11,alimiter=limit=0.84:level=false[cal]")
+            parts.append(f"[{alabel}]loudnorm=I=-14:TP=-1.5:LRA=11,alimiter=limit=0.84:level=false[cal]")
         clean = outdir / "clean.mp4"
         video = outdir / "video.mp4"
-        cmd = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", *inputs, "-filter_complex", ";".join(parts), "-map", "[base]"]
+        cmd = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", *inputs, "-filter_complex", ";".join(parts), "-map", f"[{vlabel}]"]
         if has_audio:
             cmd += ["-map", "[cal]", "-c:a", "aac", "-b:a", "160k"]
         cmd += ["-c:v", "libx264", "-preset", "veryfast", "-crf", "17", "-pix_fmt", "yuv420p", str(clean)]
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
         if proc.returncode == 0:
             # pass 2: designed overlays on top of the clean edit (audio copied as is)
-            duration = sum(x["source_out"] - x["source_in"] for x in segs)
+            duration = sum(x["source_out"] - x["source_in"] for x in segs) + (rp["out_len"] if rp else 0.0)
             try:
                 from . import art_director, overlays
-                label = (v.get("edl") or {}).get("variant_label")
-                dv = cut or next((c for c in (v.get("treatment") or {}).get("duration_variants") or [] if c["label"] == label), None)
-                payoff = (dv or {}).get("payoff_at_s")
-                beats, t_out = [], 0.0
-                for sg in segs:  # the clip's moments mapped onto the edited timeline
-                    for m in asset.get("moments") or []:
-                        if m.get("kind") != "setup" and sg["source_in"] <= m.get("start", -1) < sg["source_out"]:
-                            beats.append({"kind": m.get("kind"), "t": t_out + m["start"] - sg["source_in"],
-                                          "intensity": m.get("intensity") or 0})
-                    t_out += sg["source_out"] - sg["source_in"]
-                hits = [b for b in beats if b["kind"] != "reaction"]
-                if payoff is None and hits:  # not on a Creative Director cut: the strongest action moment in the edit
-                    payoff = max(hits, key=lambda b: b["intensity"])["t"]
                 # frames at each moment and through the ~1.3 s a word stays up after it
                 marks = [t for t in [payoff, *[b["t"] for b in beats]] if t is not None]
                 looks = art_director.analyze(str(clean), duration, sorted({round(m + d, 2) for m in marks for d in (0, 0.65, 1.3)}))

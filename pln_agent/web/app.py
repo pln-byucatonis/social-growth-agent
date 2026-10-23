@@ -442,6 +442,22 @@ def do_writers_pick(request: Request, vid: str, i: int):
     return back(request, f"/variant/{vid}", f"Using “{r['hook']}” — re-rendering.")
 
 
+@app.post("/variant/{vid:path}/fx")
+async def do_edit_fx(request: Request, vid: str):
+    """Switch the post's edit effects (replay, punch-in, sound, music) on or off and re-render."""
+    form = await request.form()
+    v = db().get("variants", "variant_id", vid)
+    if not v:
+        return back(request, "/queue", err="no such post")
+    t = dict(v.get("treatment") or {})
+    t["edit_fx"] = {k: form.get(k) == "on" for k in ("replay", "punch_in", "sfx", "music")}
+    db().update("variants", "variant_id", vid, {"treatment": t, "render_status": "queued", "updated_at": now_iso()})
+    db().audit(request.state.user or "dashboard", "edit_fx_set", "variants", vid, t["edit_fx"])
+    if os.environ.get("PLN_TASK_RUNNER_PROJECT"):
+        _kick_team_tasks()
+    return back(request, f"/variant/{vid}", "Saved — re-rendering with those effects.")
+
+
 @app.post("/variant/{vid:path}/writers")
 def do_writers_run(request: Request, vid: str):
     """Send this post (back) to the writers' room; the task runner writes it."""

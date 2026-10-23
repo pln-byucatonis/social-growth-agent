@@ -1,0 +1,8 @@
+{
+  "_note": "Edit effects on every Reel (pln_agent/edit_fx.py). replay: the payoff again, slowed and punched in, after the main edit. punch_in: a quick zoom on the payoff itself. sfx: an impact hit on the payoff and a whoosh into the replay, synthesised by the renderer (no third-party audio). music: beds only from a licensed library you add here as {\"path\": \"s3://...\", \"license\": \"...\", \"brands\": [...]}; none until then. A post can switch any of these off on its page.",
+  "replay": {"enabled": true, "source_before_s": 1.2, "source_after_s": 0.8, "speed": 0.5, "zoom": 1.3, "volume": 0.35,
+             "label": "REPLAY", "skip_brands": []},
+  "punch_in": {"enabled": true, "zoom": 1.12, "ramp_s": 0.22, "hold_s": 0.45},
+  "sfx": {"enabled": true, "hit_volume": 0.9, "whoosh_volume": 0.6},
+  "music": {"enabled": true, "bed_volume": 0.18, "duck": true, "beds": []}
+}
