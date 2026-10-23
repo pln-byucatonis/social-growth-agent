@@ -11,7 +11,7 @@ SEGS = [{"source_in": 2.0, "source_out": 8.0}, {"source_in": 12.0, "source_out":
 
 class PlanTests(unittest.TestCase):
     def fx(self, **own):
-        return edit_fx.settings_for({"brand_id": "carjitsu", "treatment": {"edit_fx": own}})
+        return edit_fx.settings_for({"brand_id": "carjitsu", "treatment": {"edit_fx": own, "editor": {"replay_worthy": True}}})
 
     def test_replay_window_around_the_payoff_in_source_time(self):
         r = edit_fx.replay_plan(SEGS, 8.0, self.fx(), 60.0, 90)  # output 8.0 s = source 14.0 (second segment)
@@ -20,7 +20,7 @@ class PlanTests(unittest.TestCase):
         self.assertEqual(r["starts_at"], 12.0)
 
     def test_putting_replays_the_roll_not_just_the_stroke(self):
-        fx = edit_fx.settings_for({"brand_id": "putt_tour", "treatment": {}})
+        fx = edit_fx.settings_for({"brand_id": "putt_tour", "treatment": {"editor": {"replay_worthy": True}}})
         r = edit_fx.replay_plan(SEGS, 8.0, fx, 60.0, 90)
         self.assertEqual((r["src_in"], r["src_out"]), (13.4, 16.4))
         self.assertEqual(r["out_len"], 6.0)
@@ -29,6 +29,16 @@ class PlanTests(unittest.TestCase):
         self.assertIsNone(edit_fx.replay_plan(SEGS, 8.0, self.fx(replay=False), 60.0, 90))
         self.assertIsNone(edit_fx.replay_plan(SEGS, 8.0, self.fx(), 60.0, 14))  # 12 s edit + 4 s replay > 14 s limit
         self.assertIsNone(edit_fx.replay_plan(SEGS, None, self.fx(), 60.0, 90))
+
+    def test_no_replay_unless_the_editor_earned_it(self):
+        bare = edit_fx.settings_for({"brand_id": "carjitsu", "treatment": {}})
+        self.assertFalse(bare["replay"]["enabled"])
+        vetoed = edit_fx.settings_for({"brand_id": "carjitsu", "treatment": {"editor": {"replay_worthy": True},
+                                                                            "critic": {"scores": {"replay_earned": 2}}}})
+        self.assertFalse(vetoed["replay"]["enabled"])
+        own = edit_fx.settings_for({"brand_id": "carjitsu", "treatment": {"editor": {"replay_worthy": True, "replay_window": [13.0, 15.5]}}})
+        r = edit_fx.replay_plan(SEGS, 8.0, own, 60.0, 90)
+        self.assertEqual((r["src_in"], r["src_out"]), (13.0, 15.5))
 
     def test_post_switches_and_licensed_music_only(self):
         f = self.fx(sfx=False, punch_in=False)
@@ -49,6 +59,7 @@ class RenderTests(unittest.TestCase):
         from pln_agent.media import probe_output, render_variant
         db, s = make()
         v = db.get("variants", "variant_id", self.VID)
+        db.update("variants", "variant_id", self.VID, {"treatment": {**(v.get("treatment") or {}), "editor": {"replay_worthy": True}}})
         edit = sum(x["source_out"] - x["source_in"] for x in v["edl"]["segments"])
         r = render_variant(db, self.VID, s)
         self.assertEqual(r["status"], "rendered", r["detail"])
@@ -76,6 +87,8 @@ class RenderTests(unittest.TestCase):
         from pln_agent.media import probe_output, render_variant
         from unittest import mock
         db, s = make()
+        v = db.get("variants", "variant_id", self.VID)
+        db.update("variants", "variant_id", self.VID, {"treatment": {**(v.get("treatment") or {}), "editor": {"replay_worthy": True}}})
         with mock.patch("pln_agent.art_director.crop_cuts_graphics", lambda *a, **k: (True, "score bug")):
             r = render_variant(db, self.VID, s)
         self.assertEqual(r["status"], "rendered", r["detail"])

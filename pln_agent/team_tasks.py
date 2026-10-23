@@ -589,6 +589,9 @@ def needs_compute(db: DB) -> bool:
         return True  # dashboard re-renders / overlay edits
     if db.one("SELECT variant_id FROM variants WHERE writers_status='pending' AND state IN ('in_review','needs_fix')"):
         return True  # the writers' room has copy to write
+    from .recut import pending as recut_pending
+    if recut_pending(db, 1):
+        return True  # Reels waiting for the editor and the critic
     from .predct import pending as predct_pending
     if predct_pending(db):
         return True  # PREDCT previews to make / picked moments to cut
@@ -637,6 +640,8 @@ def start(settings) -> str:
                 if project:
                     advance(own, settings, ops, kinds=tuple(k for k in ORDER if k not in COMPUTE_KINDS))
                     ensure_for_adopted(own)
+                    from .recut import gate_new
+                    gate_new(own)  # new Reels wait for the editor and the critic on the runner
                     if needs_compute(own):
                         _start_runner(project)
                 else:
@@ -672,6 +677,11 @@ def run_runner(settings, max_minutes: int = 50, pause_s: int = 20, idle_passes: 
         wrote = run_pending(own)  # copy first, so the render that follows burns in the room's hook
         if wrote:
             log.info("runner pass %s: writers' room %s", passes + 1, wrote)
+        from . import recut
+        recut.gate_new(own)  # every Reel goes through the editor and the critic before Approvals
+        cut = recut.run_pending(own, settings)
+        if cut:
+            log.info("runner pass %s: editor/critic %s", passes + 1, [(c["variant_id"][:24], c["outcome"]) for c in cut])
         queued = render_queued(own, settings)
         out = advance(own, settings, ops)
         if queued:

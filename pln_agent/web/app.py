@@ -442,6 +442,31 @@ def do_writers_pick(request: Request, vid: str, i: int):
     return back(request, f"/variant/{vid}", f"Using “{r['hook']}” — re-rendering.")
 
 
+@app.post("/variant/{vid:path}/recut")
+def do_recut(request: Request, vid: str):
+    """Send one post (back) through the editor and the critic."""
+    d = db()
+    v = d.get("variants", "variant_id", vid)
+    if not v or v["state"] not in ("in_review", "needs_fix", "archived", "recut"):
+        return back(request, f"/variant/{vid}", err="Only drafts can be re-cut.")
+    t = dict(v.get("treatment") or {})
+    t["recut"] = {"status": "pending", "from_state": v["state"], "pulled_at": now_iso(), "attempts": 0, "by": request.state.user or "dashboard"}
+    d.update("variants", "variant_id", vid, {"state": "recut", "treatment": t, "updated_at": now_iso()})
+    d.audit(request.state.user or "dashboard", "recut_requested", "variants", vid, {})
+    if os.environ.get("PLN_TASK_RUNNER_PROJECT"):
+        _kick_team_tasks()
+    return back(request, f"/variant/{vid}", "With the editor: it comes back to Approvals only if the critic passes it.")
+
+
+@app.post("/queue/recut-all")
+def queue_recut_all(request: Request):
+    from ..recut import pull
+    n = pull(db(), request.state.user or "dashboard")
+    if os.environ.get("PLN_TASK_RUNNER_PROJECT"):
+        _kick_team_tasks()
+    return back(request, "/queue?state=recut", f"{n} Reel drafts are with the editor.")
+
+
 @app.post("/variant/{vid:path}/fx")
 async def do_edit_fx(request: Request, vid: str):
     """Switch the post's edit effects (replay, punch-in, sound, music) on or off and re-render."""

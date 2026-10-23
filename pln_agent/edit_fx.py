@@ -1,6 +1,7 @@
 """Edit effects: the replay, the punch-in and the sound that make a sports Reel land (config/edit_fx.json).
 
-* Replay — after the main edit, the payoff again: ~2 s of source around it at half speed, cropped in (punch-in) on
+* Replay — only when the editor (editor.py) watched the payoff and called it worth slowing down: after the main
+  edit, the payoff again: the editor's 1.5-3 s window (else ~2 s around it) at half speed, cropped in (punch-in) on
   the action, with a small REPLAY tag and the commentary turned down. Skipped when there is no payoff moment, when
   the post would run past the platform's limit, or when the post or brand switches it off.
 * Punch-in on the payoff — a quick zoom (1.12x) as the decisive moment hits, held under half a second.
@@ -39,14 +40,23 @@ def settings_for(v: dict) -> dict:
     for k, val in ((out["replay"].get("brands") or {}).get(v.get("brand_id") or "") or {}).items():
         if not k.startswith("_"):  # per-brand replay window (a putt lands seconds after the stroke)
             out["replay"][k] = val
+    # the replay is earned, not automatic: only when the editor watched the payoff and called it worth slowing down
+    # (and the critic hasn't said otherwise); the editor's own window replaces the fixed one
+    t = v.get("treatment") if isinstance(v.get("treatment"), dict) else {}
+    ed = t.get("editor") or {}
+    if not ed.get("replay_worthy") or ((t.get("critic") or {}).get("scores") or {}).get("replay_earned", 5) < 3:
+        out["replay"]["enabled"] = False
+    elif ed.get("replay_window"):
+        out["replay"]["window"] = [float(x) for x in ed["replay_window"]]
     return out
 
 
 def payoff_time(v: dict, asset: dict, segs: list[dict], cut: dict | None) -> tuple[float | None, list[dict]]:
     """The payoff on the edited timeline (the Creative Director's cut says it; otherwise the strongest action moment),
     and the clip's moments mapped onto that timeline."""
+    ed = (v.get("treatment") or {}).get("editor") or {}
     label = (v.get("edl") or {}).get("variant_label")
-    dv = cut or next((c for c in (v.get("treatment") or {}).get("duration_variants") or [] if c["label"] == label), None)
+    dv = {"payoff_at_s": ed["payoff_at_s"]} if not cut and ed.get("payoff_at_s") is not None else cut or next((c for c in (v.get("treatment") or {}).get("duration_variants") or [] if c["label"] == label), None)
     payoff = (dv or {}).get("payoff_at_s")
     beats, t_out = [], 0.0
     for sg in segs:
@@ -77,8 +87,11 @@ def replay_plan(segs: list[dict], payoff: float | None, fx: dict, source_duratio
     p = to_source(segs, payoff)
     if p is None:
         return None
-    a = max(0.0, p - float(r["source_before_s"]))
-    b = p + float(r["source_after_s"])
+    if r.get("window"):  # the editor's own pick of the seconds to slow down
+        a, b = max(0.0, r["window"][0]), r["window"][1]
+    else:
+        a = max(0.0, p - float(r["source_before_s"]))
+        b = p + float(r["source_after_s"])
     if source_duration:
         b = min(b, source_duration)
     if b - a < 0.8:

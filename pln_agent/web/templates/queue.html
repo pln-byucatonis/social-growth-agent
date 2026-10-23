@@ -3,7 +3,7 @@
 <div class="ph"><div class="t"><div class="eyebrow">Today</div><h1>Approvals</h1>
 <p>Drafts the agents made from licensed footage, best first. Approve to make them schedulable (then lock them in on the <a href="{{ base }}/runsheet">run sheet</a>); open one to edit copy, switch cut or render.</p></div></div>
 <div class="card"><div class="fbar">
-<div class="seg">{% for st, nm in [('in_review','In review'),('needs_fix','Needs fix'),('approved','Approved'),('scheduled','Scheduled'),('published','Published'),('failed','Failed'),('','All')] %}
+<div class="seg">{% for st, nm in [('in_review','In review'),('needs_fix','Needs fix'),('recut','With the editor'),('approved','Approved'),('scheduled','Scheduled'),('published','Published'),('failed','Failed'),('','All')] %}
 <a href="{{ q(st) }}" class="{{ 'on' if st == state }}">{{ nm }}{% if st %} <span class="faint">{{ state_counts.get(st, 0) }}</span>{% endif %}</a>{% endfor %}</div>
 <form method="get" class="fbar grow"><input type="hidden" name="state" value="{{ state }}">
 <select name="brand"><option value="">All brands</option>{% for b in brands %}<option value="{{ b }}" {{ 'selected' if b==brand }}>{{ b|brand }}</option>{% endfor %}</select>

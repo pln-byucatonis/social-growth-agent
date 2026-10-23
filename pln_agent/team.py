@@ -259,13 +259,13 @@ class TeamLLMError(Exception):
     pass
 
 
-def bedrock_call(system: str, messages: list[dict], max_tokens: int = 2500) -> str:
+def bedrock_call(system: str, messages: list[dict], max_tokens: int = 2500, model: str | None = None) -> str:
     import boto3
     from botocore.exceptions import BotoCoreError, ClientError
     body = {"anthropic_version": "bedrock-2023-05-31", "max_tokens": max_tokens, "system": system, "messages": messages}
     try:
         r = boto3.client("bedrock-runtime", region_name=REGION).invoke_model(
-            modelId=MODEL, body=json.dumps(body), contentType="application/json", accept="application/json")
+            modelId=model or MODEL, body=json.dumps(body), contentType="application/json", accept="application/json")
     except (ClientError, BotoCoreError) as e:
         raise TeamLLMError(str(e)[:300]) from e
     data = json.loads(r["body"].read())
