@@ -49,18 +49,28 @@ def stock() -> list[str]:
 
 
 def recent(db: DB, v: dict, n: int = RECENT) -> dict:
-    """What this account's last posts said and looked like: openings, stamped words, hook styles (newest first)."""
+    """What this account's last n posts with words on them said and looked like: openings, stamped words, hook styles
+    (newest first). Words count from the moment they are chosen (treatment.overlay.words), not only once rendered, so
+    two drafts written in the same batch can't both say "DROPS."; drafts with no words yet don't use up the n."""
     rows = db.all("variants", "account_id=? AND variant_id<>? AND COALESCE(post_type,'')='' AND "
                   "state IN ('in_review','approved','scheduled','published','simulated','recut')",
-                  [v["account_id"], v["variant_id"]], order="updated_at DESC", limit=n)
-    hooks, words, styles = [], [], []
+                  [v["account_id"], v["variant_id"]], order="updated_at DESC", limit=n * 20)
+    hooks, words, styles, counted = [], [], [], 0
     for r in rows:
         qc = r.get("render_qc") or {}
-        ow = qc.get("overlay_words") if isinstance(qc.get("overlay_words"), dict) else {}
-        hooks += [x for x in [ow.get("hook") or r.get("hook")] if x]
-        words += [x for k, x in ow.items() if k != "hook" and x]
-        if qc.get("overlay_style"):
-            styles.append(qc["overlay_style"].split("+")[0])
+        chosen = ((r.get("treatment") or {}).get("overlay") or {}).get("words") or {}
+        rendered = qc.get("overlay_words") if isinstance(qc.get("overlay_words"), dict) else {}
+        w = {k: chosen.get(k) or rendered.get(k) for k in ("hook", "payoff", "reaction")}
+        if not any(w.values()):
+            continue  # nothing on screen yet: not one of the account's recent posts
+        hooks += [x for x in [w["hook"] or r.get("hook")] if x]
+        words += [x for k, x in w.items() if k != "hook" and x]
+        style = ((r.get("treatment") or {}).get("overlay") or {}).get("hook") if chosen else None
+        if style or qc.get("overlay_style"):
+            styles.append(style or qc["overlay_style"].split("+")[0])
+        counted += 1
+        if counted >= n:
+            break
     return {"hooks": hooks, "words": words, "styles": styles}
 
 

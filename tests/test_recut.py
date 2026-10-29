@@ -223,6 +223,24 @@ class WordsTests(Base):
         self.assertNotIn("CLUTCH PUTT", w["hook"])
         self.assertEqual(w["style"], "knockout")
 
+    def test_words_chosen_in_the_same_batch_count_before_either_renders(self):
+        from pln_agent import overlay_copy
+        import uuid
+        from pln_agent.db import now_iso
+        db, _ = make()
+        first = dict(db.get("variants", "variant_id", VID))
+        first.update(variant_id="first", state="recut", render_qc={}, updated_at="2026-10-25T01:00:00+00:00",
+                     treatment={"overlay": {"hook": "pill", "words": {"hook": "MINI GOLF. SERIOUS STAKES.", "payoff": "DROPS."}}})
+        db.insert("variants", first)
+        for i in range(15):  # newer drafts still waiting for the editor: no words, mustn't push "first" out
+            db.insert("variants", dict(first, variant_id=f"waiting-{uuid.uuid4().hex[:6]}", treatment={}, updated_at=now_iso()))
+        rec = overlay_copy.recent(db, db.get("variants", "variant_id", VID))
+        self.assertIn("DROPS.", rec["words"])
+        self.assertEqual(rec["styles"], ["pill"])
+        team._llm = Model([], [])
+        team._llm.word_reply = {"hook": "Practice Means Nothing Here", "payoff_word": "DROPS.", "reaction_word": ""}
+        self.assertEqual(overlay_copy.write(db, VID)["payoff"], "")  # the same word is refused
+
     def test_no_model_falls_back_to_unused_stock_words(self):
         from pln_agent import overlay_copy
         db, _ = make()
