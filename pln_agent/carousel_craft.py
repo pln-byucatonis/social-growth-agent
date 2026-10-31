@@ -44,7 +44,7 @@ FORMATS = {
                           "card to follow for more"},
 }
 PASS_MIN, COVER_MIN = 3, 4
-SHARP_TRIES = (-0.25, -0.125, 0.125, 0.25)
+SHARP_TRIES = (-0.375, -0.25, -0.125, 0.125, 0.25, 0.375)
 
 SYSTEM = """You are the senior editor of a sports network's social team, making Instagram carousels from event footage.
 You only answer with JSON."""
@@ -62,16 +62,20 @@ Rules:
 - Pick each slide's exact frame by its time label. Only sharp frames where the action reads; never a blurred, dark or
   in-between frame; no two slides that look the same.
 - Each slide is cropped to 4:5 from the full frame: give "focus" (x, y from 0 to 1) at the centre of the action.
+- Each slide's line goes at the "top" or the "bottom" of the slide: "text_at" is the side with no scoreboard, score bug,
+  clock, logo or broadcast text in that crop, and off the faces and the action. The cover's line is always at the top,
+  so pick the cover's focus to leave the top clear.
 - Slide 1 is the cover: the biggest face or action, with a 2-6 word line that makes people swipe. Slide 2 must also
   work on its own (Instagram shows carousels again from slide 2).
 - Every other slide carries a short line (2-7 words) that moves the story on; the lines read as one sequence. Plain,
   specific to what's in the frame, no names, no numbers or digits, no hashtags, no emojis, nothing the frames and the
   editor's description don't support.
+- Never say how many slides there are (no "in four slides").
 - Never use these words or openings, they are worn out on this account or are stock filler: {avoid}.
 {notes}
 Reply with JSON only:
 {{"format": "frame_by_frame", "why": "one sentence",
- "slides": [{{"t": 1234.5, "focus": {{"x": 0.5, "y": 0.45}}, "text": "...", "role": "cover"}}, ...],
+ "slides": [{{"t": 1234.5, "focus": {{"x": 0.5, "y": 0.45}}, "text": "...", "text_at": "top", "role": "cover"}}, ...],
  "end_card": "a short question or follow line, or empty"}}"""
 
 CRITIC = """These are the finished slides of an Instagram carousel for {brand}, in order, left to right then down. The
@@ -149,7 +153,8 @@ def check(plan: dict, a: float, b: float, banned: set[str]) -> dict:
         f = s.get("focus") or {}
         slides.append({"t": round(t, 2), "focus": {"x": min(1.0, max(0.0, float(f.get("x", 0.5)))),
                                                    "y": min(1.0, max(0.0, float(f.get("y", 0.5))))},
-                       "text": _clean(s.get("text", ""), banned, 6 if not slides else 7), "role": s.get("role") or ""})
+                       "text": _clean(s.get("text", ""), banned, 6 if not slides else 7), "role": s.get("role") or "",
+                       "text_at": "top" if not slides else ("top" if s.get("text_at") == "top" else "bottom")})
         seen.append(t)
     slides = slides[: spec["max"]]
     if len(slides) < spec["min"]:
@@ -223,7 +228,7 @@ def sharpest(src: str, t: float, workdir: Path, grab=None) -> tuple[float, Path]
     for dt in (0.0, *SHARP_TRIES):
         p = grab(src, t + dt, workdir / f"s_{t + dt:.3f}.png")
         if p:
-            s = sharpness(p) * (1.15 if dt == 0 else 1.0)  # the editor's own pick wins a close call
+            s = sharpness(p) * (1.05 if dt == 0 else 1.0)  # the editor's own pick wins only a very close call
             if best is None or s > best[0]:
                 best = (s, t + dt, p)
     if not best:
@@ -242,7 +247,30 @@ def crop45(frame: Path, focus: dict):
         cw, ch = fw, int(fw * H / W)
     x0 = int(min(max(focus["x"] * fw - cw / 2, 0), fw - cw))
     y0 = int(min(max(focus["y"] * fh - ch / 2, 0), fh - ch))
-    return im.crop((x0, y0, x0 + cw, y0 + ch)).resize((W, H))
+    return lift(im.crop((x0, y0, x0 + cw, y0 + ch)).resize((W, H)))
+
+
+DARK = 80  # mean brightness (0-255) under which a frame is lifted: in-car shots are often murky
+
+
+def lift(img):
+    """A gentle brightness and contrast lift for a dark frame; bright frames are left alone."""
+    from PIL import ImageEnhance, ImageOps, ImageStat
+    mean = ImageStat.Stat(img.convert("L")).mean[0]
+    if mean >= DARK:
+        return img
+    img = ImageOps.autocontrast(img, cutoff=1)
+    return ImageEnhance.Brightness(img).enhance(min(1.6, max(1.0, DARK / max(ImageStat.Stat(img.convert("L")).mean[0], 1))))
+
+
+def too_alike(a, b) -> bool:
+    """Two slides that would read as the same frame on a phone."""
+    from PIL import ImageChops, ImageStat
+    x, y = a.convert("L").resize((64, 80)), b.convert("L").resize((64, 80))
+    return ImageStat.Stat(ImageChops.difference(x, y)).mean[0] < DUPLICATE
+
+
+DUPLICATE = 9.0  # mean difference (0-255) between two small greyscale versions under which slides count as the same
 
 
 def render(v: dict, p: dict, src: str, outdir: Path, style: str, grab=None) -> list[dict]:
@@ -253,15 +281,21 @@ def render(v: dict, p: dict, src: str, outdir: Path, style: str, grab=None) -> l
     out = []
     with tempfile.TemporaryDirectory() as td:
         td = Path(td)
+        spec, prev = FORMATS[p["format"]], None
+        kept = 0
         for i, sl in enumerate(p["slides"]):
             t, fr = sharpest(src, sl["t"], td, grab)
             img = crop45(fr, sl["focus"])
+            left = len(p["slides"]) - i - 1
+            if prev is not None and too_alike(prev, img) and kept + left >= spec["min"]:
+                continue  # the same picture as the slide before: swipe momentum dies; skip it while enough remain
+            prev, kept = img, kept + 1
             if sl["text"]:
                 png = td / f"txt{i}.png"
                 overlays.render_hook(sl["text"], s if i == 0 else {**s, "hook": "outline"}, W, H, png,
-                                     "top" if i == 0 else "bottom")
+                                     "top" if i == 0 else sl.get("text_at") or "bottom")  # clear of the broadcast graphics
                 img = _layer(img, png)
-            f = outdir / f"slide_{i + 1}.jpg"
+            f = outdir / f"slide_{len(out) + 1}.jpg"
             img.save(f, "JPEG", quality=92)
             out.append({"kind": "image", "file": str(f), "role": sl.get("role") or ("cover" if i == 0 else "step"),
                         "text": sl["text"], "t": t, "placed": "full-bleed 4:5"})

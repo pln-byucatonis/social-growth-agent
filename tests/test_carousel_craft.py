@@ -49,6 +49,11 @@ class CheckTests(unittest.TestCase):
         dup = fbf(6)
         dup["slides"][2]["t"] = dup["slides"][1]["t"] + 0.1
         self.assertEqual(len(craft.check(dup, 0, 4, set())["slides"]), 5)  # the same frame twice: dropped
+        placed = fbf(6)
+        placed["slides"][0]["text_at"] = "bottom"
+        placed["slides"][2]["text_at"] = "top"
+        got = craft.check(placed, 0, 4, set())["slides"]
+        self.assertEqual([x["text_at"] for x in got], ["top", "bottom", "top", "bottom", "bottom", "bottom"])  # cover always top
         self.assertEqual(craft.check({"format": "explainer", "slides": fbf(4)["slides"], "end_card": ""}, 0, 4, set())["end_card"],
                          "Follow for the next one")
 
@@ -66,6 +71,24 @@ class CheckTests(unittest.TestCase):
         out = craft.crop45(f, {"x": 0.9, "y": 0.5})
         self.assertEqual(out.size, (1080, 1350))
         self.assertGreater(out.getpixel((1000, 600))[0], 200)  # cropped toward the action, no blurred fill
+
+    def test_dark_frames_lifted_and_duplicates_spotted(self):
+        from PIL import Image, ImageStat
+        dark = Image.effect_noise((1080, 1350), 20).convert("RGB").point(lambda v: v // 4)
+        self.assertGreater(ImageStat.Stat(craft.lift(dark).convert("L")).mean[0], ImageStat.Stat(dark.convert("L")).mean[0] + 15)
+        bright = Image.new("RGB", (1080, 1350), (200, 200, 200))
+        self.assertEqual(craft.lift(bright).getpixel((5, 5)), (200, 200, 200))
+        self.assertTrue(craft.too_alike(bright, bright))
+        self.assertFalse(craft.too_alike(bright, Image.new("RGB", (1080, 1350), (20, 20, 20))))
+
+    def test_bottom_text_stays_on_the_slide(self):
+        from PIL import Image
+        from pln_agent import overlays
+        out = Path(tempfile.mkdtemp()) / "t.png"
+        overlays.render_hook("a line long enough to wrap onto two lines here", {**overlays.style_for("carjitsu"), "hook": "outline"},
+                             1080, 1350, out, "bottom")
+        box = Image.open(out).getbbox()
+        self.assertLessEqual(box[3], int(1350 * overlays.BOTTOM_EDGE) + 20)  # ends above the edge, not off it
 
     def test_sharpest_frame_wins(self):
         from PIL import Image, ImageFilter
@@ -100,7 +123,7 @@ class FlowTests(unittest.TestCase):
         m = team._llm = Model([fbf()], [{"scores": GOOD, "verdict": "pass"}])
         r = carousel.render_slides(self.db, self.vid, self.s)
         self.assertEqual(r["status"], "rendered", r)
-        self.assertEqual(len(r["slides"]), 6)
+        self.assertIn(len(r["slides"]), (5, 6))  # a near-duplicate frame may be dropped (min 5)
         for sl in r["slides"]:
             with Image.open(sl["file"]) as im:
                 self.assertEqual((im.size, im.format), ((1080, 1350), "JPEG"))
