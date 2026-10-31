@@ -34,7 +34,7 @@ FPS = 30
 EASE_IN = [0.72, 1.12, 1.04, 0.99]  # scale per frame on entry (ease-out-back), then 1.0
 FADE_OUT = [0.6, 0.3]  # alpha per step over the last 0.15 s
 MIN_HOLD, END_GUARD = 0.7, 0.5
-ZONE_TOP = {"top": SAFE_TOP + 0.03, "middle": 0.37, "lower": 0.58}  # where a hook block starts (share of height)
+ZONE_TOP = {"top": SAFE_TOP + 0.03, "middle": 0.37, "lower": 0.58, "bottom": 0.74}  # where a hook block starts (share of height); bottom: carousel slides (no platform UI over them)
 ZONE_CENTRE = {"top": 0.24, "middle": 0.44, "lower": 0.66}  # where a stamp is centred
 
 

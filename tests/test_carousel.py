@@ -81,7 +81,7 @@ class SlideTests(unittest.TestCase):
     def test_carousel_slides_are_4x5_jpegs_with_a_cta_card(self):
         from PIL import Image
         vid = carousel.make(self.db, REEL, "carousel", "bill")["variant_id"]
-        r = carousel.render_slides(self.db, vid, self.s)
+        r = carousel.render_slides(self.db, vid, self.s, craft=False)  # the plain version (no model)
         self.assertEqual(r["status"], "rendered", r)
         self.assertTrue(r["qc"]["passed"], r["qc"])
         self.assertEqual([s["role"] for s in r["slides"]], ["setup", "payoff", "reaction", "cta"])
@@ -129,7 +129,7 @@ class SlideTests(unittest.TestCase):
 
     def test_render_variant_dispatches_slides(self):
         from pln_agent.media import render_variant
-        vid = carousel.make(self.db, REEL, "carousel", "bill")["variant_id"]
+        vid = carousel.make(self.db, REEL, "story", "bill")["variant_id"]
         self.assertEqual(render_variant(self.db, vid, self.s)["status"], "rendered")
 
 

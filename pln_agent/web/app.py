@@ -503,10 +503,11 @@ def do_make_slides(request: Request, vid: str, kind: str):
         return back(request, f"/variant/{vid}", err=str(e))
     if r["created"] and os.environ.get("PLN_TASK_RUNNER_PROJECT"):
         _kick_team_tasks()
-    elif r["created"]:
+    elif r["created"] and kind == "story":  # a carousel is planned and critiqued by Claude: too slow for a page request
         db().update("variants", "variant_id", r["variant_id"], {"render_status": "rendering"})
         render_variant(db(), r["variant_id"], settings, actor=request.state.user or "dashboard")
-    note = "Created — rendering its slides (about a minute)." if r["created"] else "Already made — here it is."
+    note = ("Created — the editor is choosing the format and frames, then the critic looks (a few minutes)." if kind == "carousel"
+            else "Created — rendering it (about a minute).") if r["created"] else "Already made — here it is."
     return back(request, f"/variant/{r['variant_id']}", note)
 
 

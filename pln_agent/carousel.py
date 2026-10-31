@@ -258,7 +258,9 @@ def _upload(slides: list[dict], variant_id: str, bucket: str) -> list[dict]:
     return out
 
 
-def render_slides(db: DB, variant_id: str, settings, actor: str = "renderer") -> dict:
+def render_slides(db: DB, variant_id: str, settings, actor: str = "renderer", craft: bool = True) -> dict:
+    """Render a carousel or Story. Carousels made from a Reel go through the editor and the critic (carousel_craft.py);
+    craft=False draws the plain three-slide version."""
     from .media import _safe, resolve_media
     v = db.get("variants", "variant_id", variant_id)
     kind = v["post_type"]
@@ -277,6 +279,30 @@ def render_slides(db: DB, variant_id: str, settings, actor: str = "renderer") ->
         db.update("variants", "variant_id", variant_id, {"render_status": status, "slides": [], "render_qc": {},
                                                          "updated_at": now_iso()})
         return {"variant_id": variant_id, "status": status, "detail": "source media missing"}
+    elif kind == "carousel" and parent and craft:
+        # the editor makes it (carousel_craft.py): format, frames, crops and lines, then the critic looks
+        from . import carousel_craft as crafted
+        from .editor import EditorError, Throttled
+        from .team import TeamLLMError
+        try:
+            made = crafted.make(db, v, resolve_media(asset["media_path"]), outdir)
+        except Throttled as e:  # out of model allowance: try again on a later pass
+            db.update("variants", "variant_id", variant_id, {"render_status": "queued", "updated_at": now_iso()})
+            return {"variant_id": variant_id, "status": "deferred", "detail": str(e)[:200]}
+        except (crafted.CraftError, EditorError, TeamLLMError) as e:
+            return _needs_fix(db, variant_id, f"carousel: {e}", actor)
+        slides, c = made["slides"], made["carousel"]
+        t = dict(v.get("treatment") or {})
+        t["carousel"] = c
+        db.update("variants", "variant_id", variant_id, {"treatment": t})
+        detail = f"{len(slides)} slide(s), {c['format']}; critic {c['critic']['verdict']} ({c['critic']['total']}/30)"
+        if not made["passed"]:
+            qc = qc_slides(slides, kind)
+            if os.environ.get("PLN_RENDER_BUCKET") and slides:
+                slides = _upload(slides, variant_id, os.environ["PLN_RENDER_BUCKET"])
+            db.update("variants", "variant_id", variant_id, {"render_status": "rendered", "render_path": slides[0]["file"],
+                                                             "slides": slides, "render_qc": qc, "updated_at": now_iso()})
+            return _needs_fix(db, variant_id, "critic: " + "; ".join(c["critic"]["problems"][:3]), actor, detail)
     else:
         slides = build_slides(v, resolve_media(asset["media_path"]), kind, outdir)
         detail = f"{len(slides)} slide(s)"
@@ -289,6 +315,21 @@ def render_slides(db: DB, variant_id: str, settings, actor: str = "renderer") ->
                                                      "render_qc": qc, "public_media_url": "", "updated_at": now_iso()})
     db.audit(actor, "slides_rendered", "variants", variant_id, {"status": status, "detail": detail, "qc": qc["summary"]})
     return {"variant_id": variant_id, "status": status, "detail": detail, "qc": qc, "slides": slides}
+
+
+def _needs_fix(db: DB, variant_id: str, why: str, actor: str, detail: str = "") -> dict:
+    """A carousel the editor or the critic turned down: out of review, with the reason on it."""
+    v = db.get("variants", "variant_id", variant_id)
+    val = dict(v.get("validation") or {})
+    val["errors"] = [e for e in val.get("errors") or [] if not e.startswith(("carousel:", "critic:"))] + [why[:400]]
+    upd = {"validation": val, "updated_at": now_iso()}
+    if v["state"] in ("in_review", "needs_fix"):
+        upd["state"] = "needs_fix"
+    if v.get("render_status") in ("queued", "rendering", ""):
+        upd["render_status"] = "render_failed"
+    db.update("variants", "variant_id", variant_id, upd)
+    db.audit(actor, "carousel_turned_down", "variants", variant_id, {"why": why[:300]})
+    return {"variant_id": variant_id, "status": upd.get("render_status", v.get("render_status")), "detail": detail or why}
 
 
 def preview_urls(v: dict) -> list[dict]:
