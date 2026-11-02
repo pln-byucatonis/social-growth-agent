@@ -61,6 +61,11 @@ class CheckTests(unittest.TestCase):
         self.assertEqual(craft.judge({"scores": GOOD, "verdict": "pass"})["verdict"], "pass")
         self.assertEqual(craft.judge({"scores": {**GOOD, "cover_stops": 3}, "verdict": "pass"})["verdict"], "redo")
         self.assertEqual(craft.judge({"scores": {**GOOD, "sharp": 2}, "verdict": "pass"})["verdict"], "redo")
+        j = craft.judge({"scores": {**GOOD, "sharp": 3}, "verdict": "redo", "problems": ["slide 4 is soft"]})
+        self.assertEqual((j["verdict"], j["said"], j["problems"]), ("pass", "redo", ["slide 4 is soft"]))  # scores are the bar
+        self.assertEqual(craft.judge({"scores": {**GOOD, "swipe_pull": 3}, "verdict": "redo"})["verdict"], "redo")
+        self.assertEqual(craft.judge({"scores": GOOD, "verdict": "kill"})["verdict"], "kill")
+        self.assertEqual(craft.judge({"verdict": "pass"})["verdict"], "redo")  # no scores: not a pass
 
     def test_crop_is_full_bleed_on_the_action(self):
         from PIL import Image
@@ -104,6 +109,18 @@ class CheckTests(unittest.TestCase):
 
 
 @unittest.skipUnless(HAS_FFMPEG, "ffmpeg not installed")
+class FreshnessTests(unittest.TestCase):
+    def test_unposted_carousels_dont_count(self):
+        db, _ = make(packs=True)
+        reel = db.get("variants", "variant_id", REEL)
+        base = {**reel, "post_type": "carousel", "treatment": {"carousel": {"slides": [{"text": "Sunk deep in the car"}]}}}
+        db.insert("variants", {**base, "variant_id": "c-review", "state": "needs_fix"})
+        v = {**reel, "variant_id": "new~carousel"}
+        self.assertNotIn("Sunk deep in the car", craft.recent_lines(db, v))
+        db.update("variants", "variant_id", "c-review", {"state": "published"})
+        self.assertIn("Sunk deep in the car", craft.recent_lines(db, v))
+
+
 class FlowTests(unittest.TestCase):
     def setUp(self):
         self.old = team._llm
@@ -134,7 +151,7 @@ class FlowTests(unittest.TestCase):
         self.assertIn("TAP.", m.prompts[0])  # stock words are off limits
 
     def test_redo_then_needs_fix_with_the_reasons(self):
-        bad = {"scores": {**GOOD, "sharp": 1}, "verdict": "redo", "problems": ["slide 3 is motion blur"], "fix": "use 1.4s"}
+        bad = {"scores": {**GOOD, "sharp": 2}, "verdict": "redo", "problems": ["slide 3 is motion blur"], "fix": "use 1.4s"}
         m = team._llm = Model([fbf(), fbf()], [bad, bad])
         carousel.render_slides(self.db, self.vid, self.s)
         self.assertTrue(any("slide 3 is motion blur" in p for p in m.prompts[2:]))  # the redo heard the critic

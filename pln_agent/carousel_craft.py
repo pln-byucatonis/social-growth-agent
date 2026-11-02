@@ -43,7 +43,7 @@ FORMATS = {
                           "then one thing a newcomer needs per slide, said over a real frame that shows it, then an end "
                           "card to follow for more"},
 }
-PASS_MIN, COVER_MIN = 3, 4
+PASS_MIN, COVER_MIN, SWIPE_MIN = 3, 4, 4
 SHARP_TRIES = (-0.375, -0.25, -0.125, 0.125, 0.25, 0.375)
 
 SYSTEM = """You are the senior editor of a sports network's social team, making Instagram carousels from event footage.
@@ -118,11 +118,14 @@ def window(parent: dict, asset: dict) -> tuple[float, float]:
 
 
 def recent_lines(db: DB, v: dict, n: int = 10) -> list[str]:
-    """Words this account used lately: the Reels' (overlay_copy.recent) and its carousels' lines."""
+    """Words this account used lately: the Reels' (overlay_copy.recent) and the lines of carousels it has posted or
+    committed to (approved / scheduled). Carousels still being made or reviewed don't count, so a batch made together
+    isn't marked down for sounding like itself."""
     from .overlay_copy import recent
     rec = recent(db, v)
     out = rec["hooks"] + rec["words"]
-    for r in db.all("variants", "account_id=? AND variant_id<>? AND post_type='carousel'", [v["account_id"], v["variant_id"]],
+    for r in db.all("variants", "account_id=? AND variant_id<>? AND post_type='carousel' AND "
+                                "state IN ('approved','scheduled','published','simulated')", [v["account_id"], v["variant_id"]],
                     order="updated_at DESC", limit=n):
         out += [s.get("text") for s in ((r.get("treatment") or {}).get("carousel") or {}).get("slides") or [] if s.get("text")]
     return [x for x in out if x][: n * 4]
@@ -310,11 +313,13 @@ def render(v: dict, p: dict, src: str, outdir: Path, style: str, grab=None) -> l
 def judge(res: dict) -> dict:
     keys = ("cover_stops", "swipe_pull", "sharp", "text_reads", "fresh", "format_fit")
     scores = {k: max(0, min(5, int((res.get("scores") or {}).get(k, 0)))) for k in keys}
-    verdict = res.get("verdict") if res.get("verdict") in ("pass", "redo", "kill") else "redo"
+    said = res.get("verdict") if res.get("verdict") in ("pass", "redo", "kill") else "redo"
     low = [k for k, x in scores.items() if x < PASS_MIN]
-    if verdict == "pass" and (low or scores["cover_stops"] < COVER_MIN):
-        verdict = "redo"
-    return {"scores": scores, "verdict": verdict, "problems": res.get("problems") or [], "fix": res.get("fix") or "",
+    # the scores are the bar: the critic always finds something to improve and says "redo" even when every score
+    # clears it, so its notes travel with the post to Approvals and a person decides. Only "kill" is taken at its word.
+    clears = bool(res.get("scores")) and not low and scores["cover_stops"] >= COVER_MIN and scores["swipe_pull"] >= SWIPE_MIN
+    verdict = "kill" if said == "kill" else ("pass" if clears else "redo")
+    return {"scores": scores, "verdict": verdict, "said": said, "problems": res.get("problems") or [], "fix": res.get("fix") or "",
             "below_bar": low, "total": sum(scores.values()), "at": now_iso()}
 
 
