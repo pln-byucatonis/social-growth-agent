@@ -52,6 +52,34 @@ class RunSheetTests(unittest.TestCase):
                                            "actor": "bill"}, follow_redirects=False)
         self.assertEqual(r.status_code, 303)
         self.assertEqual(self.db.get("variants", "variant_id", props[0]["variant_id"])["state"], "scheduled")
+        # the page you land on works (the redirect used to read ?day=…?msg=… and error) and is already up to date
+        loc = r.headers["location"]
+        self.assertEqual(loc.count("?"), 1, loc)
+        after = c.get(loc)
+        self.assertEqual(after.status_code, 200)
+        self.assertIn("Scheduled 1 post(s)", after.text)
+        self.assertNotIn(f'value="{props[0]["variant_id"]}|', after.text)  # no longer offered for approval
+
+    def test_lock_runs_inline_even_with_background_on(self):
+        from fastapi.testclient import TestClient
+        from pln_agent.web import app as web
+        web._db = self.db
+        self.assertTrue(web.BACKGROUND)
+        props = [x for x in runsheet.day_sheet(self.db, self.s, self.day, focus=False)["rows"] if x["kind"] == "proposed" and not x["two_person"]]
+        r = TestClient(web.app).post("/runsheet/lock", data={"pick": [f"{props[0]['variant_id']}|{props[0]['time'].isoformat()}"],
+                                                             "day": self.day.isoformat(), "actor": "bill"}, follow_redirects=False)
+        self.assertEqual(self.db.get("variants", "variant_id", props[0]["variant_id"])["state"], "scheduled")
+        self.assertIn("Scheduled", r.headers["location"].replace("+", " "))
+
+    def test_empty_pick_and_bad_day_dont_error(self):
+        from fastapi.testclient import TestClient
+        from pln_agent.web import app as web
+        web._db = self.db
+        c = TestClient(web.app)
+        r = c.post("/runsheet/lock", data={"day": self.day.isoformat(), "actor": "bill"})
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("Tick at least one post", r.text)
+        self.assertEqual(c.get("/runsheet?day=2026-10-21?msg=x").status_code, 200)
 
 
 if __name__ == "__main__":

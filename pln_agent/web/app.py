@@ -174,7 +174,8 @@ def ctx(request: Request, **kw) -> dict:
 
 def back(request: Request, url: str, msg: str = "", err: str = "") -> RedirectResponse:
     q = urlencode({k: v for k, v in (("msg", msg), ("err", err)) if v})
-    return RedirectResponse(base(request) + url + ("?" + q if q else ""), status_code=303)
+    sep = "&" if "?" in url else "?"  # the url may already carry a query (/runsheet?day=…)
+    return RedirectResponse(base(request) + url + (sep + q if q else ""), status_code=303)
 
 
 def page(request: Request, name: str, **kw):
@@ -659,7 +660,10 @@ def _render_url(request: Request, v: dict) -> str:
 def runsheet_page(request: Request, day: str = "", all: int = 0):
     from .. import runsheet
     today = datetime.now(ZoneInfo(settings.timezone)).date()
-    d = (today + timedelta(days=1)) if day == "tomorrow" else (date.fromisoformat(day) if day else today)
+    try:
+        d = (today + timedelta(days=1)) if day == "tomorrow" else (date.fromisoformat(day[:10]) if day else today)
+    except ValueError:
+        d = today  # a mangled address shows today rather than an error page
     sheet = runsheet.day_sheet(db(), settings, d, focus=not all)
     for r in sheet["rows"]:  # play-in-place preview, with sound, before approving
         v = db().get("variants", "variant_id", r["variant_id"]) or {}
@@ -671,12 +675,17 @@ def runsheet_page(request: Request, day: str = "", all: int = 0):
     # what needs a decision: posts a team challenge pinned for the day; on days without any, the planner's proposals
     approve = pinned if challenge_vids else props
     return page(request, "runsheet.html", s=sheet, day=d, today=today, prev=(d - timedelta(days=1)).isoformat(),
-                next=(d + timedelta(days=1)).isoformat(), bg=bg_status("runsheet"), approve=approve,
+                next=(d + timedelta(days=1)).isoformat(), approve=approve,
+                # the last background lock's result, unless this page load already carries a fresher one
+                bg=None if (request.query_params.get("msg") or request.query_params.get("err")) else bg_status("runsheet"),
                 # a day a team challenge planned shows only those posts; the planner's extras are one click away
                 suggestions=[r for r in props if r not in approve] if (all or not challenge_vids) else [],
                 hidden=0 if (all or not challenge_vids) else len([r for r in sheet["rows"] if r["variant_id"] not in challenge_vids]),
                 scheduled=[r for r in sheet["rows"] if r["kind"] == "scheduled" and (all or not challenge_vids or r["variant_id"] in challenge_vids)],
                 now=datetime.now(ZoneInfo(settings.timezone)))
+
+
+INLINE_LOCK = 12  # more picks than this go to the background (the ops proxy gives a request 25 seconds)
 
 
 @app.post("/runsheet/lock")
@@ -700,8 +709,15 @@ def runsheet_lock(request: Request, pick: list[str] = Form([]), day: str = Form(
         if r["failed"]:
             msg += "; not scheduled: " + "; ".join(f"{f['variant_id']}: {f['error']}" for f in r["failed"][:4])
         return msg
+    if len(picks) <= INLINE_LOCK:  # a handful takes a few seconds: do it now, so the page you land on is up to date
+        try:
+            msg = work(db())
+        except Exception as e:  # noqa: BLE001
+            return back(request, f"/runsheet?day={day}", err=f"Couldn't lock in: {str(e)[:200]}")
+        bad = "need a second approver" in msg or "not scheduled" in msg
+        return back(request, f"/runsheet?day={day}", **({"err": msg} if bad else {"msg": msg}))
     run_later("runsheet", work, reviewer)
-    return back(request, f"/runsheet?day={day}", "Locking in the selected posts…")
+    return back(request, f"/runsheet?day={day}", "Locking in the selected posts… this page refreshes when it's done.")
 
 
 @app.post("/runsheet/unschedule")

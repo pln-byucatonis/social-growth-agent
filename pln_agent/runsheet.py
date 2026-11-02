@@ -38,6 +38,12 @@ def focus_accounts(db: DB) -> dict:
             "waiting": [a["account_id"] for a in worked if a.get("verification_status") != "oauth_connected"]}
 
 
+def _two_person(flags: dict) -> bool:
+    """Whether the post needs two approvers under today's rights policy (the flag saved on the post can be older)."""
+    from .rights import SENSITIVE
+    return any(f in SENSITIVE for f in flags.get("review_flags") or [])
+
+
 def day_sheet(db: DB, settings: Settings, day: date, focus: bool = True) -> dict:
     """focus: the planner proposes only for the worked accounts that are connected (config/focus.json); scheduled
     posts and team-challenge pins always show."""
@@ -86,7 +92,7 @@ def day_sheet(db: DB, settings: Settings, day: date, focus: bool = True) -> dict
                      "platform": acc.get("platform", ""), "brand_id": acc.get("brand_id", ""), "hook": v.get("hook", ""),
                      "state": v.get("state", ""), "route_role": v.get("route_role", ""),
                      "why_time": f"Team challenge, post {p['n']}" + (f" — {p['moved']}" if p.get("moved") else ""),
-                     "mode": "live" if live else "simulated", "why_not_live": why_not, "two_person": bool(flags.get("two_person_signoff")),
+                     "mode": "live" if live else "simulated", "why_not_live": why_not, "two_person": _two_person(flags),
                      "qc": (v.get("render_qc") or {}).get("passed"), "render": v.get("render_status")})
     fa = focus_accounts(db) if focus else {}
     keep = set(fa.get("connected") or []) if fa else None
@@ -111,7 +117,7 @@ def day_sheet(db: DB, settings: Settings, day: date, focus: bool = True) -> dict
                      "handle": acc.get("username_original") or p["account_id"], "platform": p["platform"],
                      "brand_id": acc.get("brand_id", ""), "hook": p["hook"], "state": p["state"], "score": p.get("score"),
                      "route_role": p["route_role"], "why_time": why, "mode": "live" if live else "simulated",
-                     "why_not_live": why_not, "two_person": bool(flags.get("two_person_signoff")),
+                     "why_not_live": why_not, "two_person": _two_person(flags),
                      "qc": (v.get("render_qc") or {}).get("passed"), "render": v.get("render_status")})
     rows.sort(key=lambda r: (r["time"], r["handle"]))
     return {"day": day.isoformat(), "timezone": settings.timezone, "rows": rows, "unplaced": plan["unplaced"][:40], "focus": fa,
