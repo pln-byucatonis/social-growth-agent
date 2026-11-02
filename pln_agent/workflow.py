@@ -224,7 +224,9 @@ def bulk_review(db: DB, picks: list[tuple[str, str]], reviewer: str, decision: s
 
 
 def idempotency_key(v: dict) -> str:
-    return hashlib.sha256(f"{v['account_id']}|{v['asset_id']}|{v['caption_hash']}".encode()).hexdigest()[:32]
+    # a Story or carousel made from a Reel is its own post: its type is in the key (a Reel's key is unchanged)
+    pt = f"|{v['post_type']}" if v.get("post_type") else ""
+    return hashlib.sha256(f"{v['account_id']}|{v['asset_id']}|{v['caption_hash']}{pt}".encode()).hexdigest()[:32]
 
 
 def schedule(db: DB, vid: str, slot_at: datetime, actor: str) -> dict:
@@ -241,8 +243,11 @@ def schedule(db: DB, vid: str, slot_at: datetime, actor: str) -> dict:
     if dup:
         raise WorkflowError("duplicate: this asset is already queued/published on this account" +
                             (f" as a {v['post_type']}" if v.get("post_type") else ""))
+    # the same caption twice on one account reads as a repost — but only within a post type: a Story or carousel made
+    # from a Reel shares the Reel's caption (a Story doesn't even show one), and that's the companion post, not a repeat
     recent = db.one("SELECT j.job_id FROM publish_jobs j JOIN variants x ON x.variant_id=j.variant_id WHERE j.account_id=? "
-                    "AND x.caption_hash=? AND j.state NOT IN ('cancelled')", [v["account_id"], v["caption_hash"]])
+                    "AND x.caption_hash=? AND COALESCE(x.post_type, '')=? AND j.state NOT IN ('cancelled')",
+                    [v["account_id"], v["caption_hash"], v.get("post_type") or ""])
     if recent:
         raise WorkflowError("duplicate: identical caption already used on this account")
     # the daily limit is enforced here, where a person sees it, not at publish time (which used to hold a post 12h)

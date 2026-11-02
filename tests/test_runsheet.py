@@ -81,6 +81,25 @@ class RunSheetTests(unittest.TestCase):
         self.assertIn("Tick at least one post", r.text)
         self.assertEqual(c.get("/runsheet?day=2026-10-21?msg=x").status_code, 200)
 
+    def test_story_with_the_reels_caption_can_be_scheduled(self):
+        """A Story made from a Reel shares its caption: that's its companion post, not a repeat. A second Reel with the
+        same caption still is."""
+        from datetime import datetime, timezone
+        from pln_agent.workflow import WorkflowError, schedule
+        reel = next(r for r in runsheet.day_sheet(self.db, self.s, self.day, focus=False)["rows"]
+                    if r["kind"] == "proposed" and not r["two_person"])
+        runsheet.lock(self.db, [(reel["variant_id"], reel["time"].isoformat())], "bill")
+        v = self.db.get("variants", "variant_id", reel["variant_id"])
+        self.assertEqual(v["state"], "scheduled")
+        for suffix, post_type in (("~story", "story"), ("~again", None)):
+            copy = {k: x for k, x in v.items()}
+            copy.update(variant_id=v["variant_id"] + suffix, post_type=post_type, state="approved")
+            self.db.insert("variants", copy)
+        slot = datetime(2030, 1, 2, 16, tzinfo=timezone.utc)
+        self.assertEqual(schedule(self.db, v["variant_id"] + "~story", slot, "bill")["state"], "queued")
+        with self.assertRaises(WorkflowError):
+            schedule(self.db, v["variant_id"] + "~again", slot, "bill")
+
 
 if __name__ == "__main__":
     unittest.main()
