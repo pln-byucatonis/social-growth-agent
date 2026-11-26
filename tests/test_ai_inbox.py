@@ -68,3 +68,11 @@ class AiInboxTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class VeoLicenceTests(unittest.TestCase):
+    def test_veo_from_vertex_is_accepted_and_lookalikes_are_not(self):
+        allowed = json.load(open("config/ai_inbox.json"))["licenses"]
+        self.assertTrue(ai_inbox.license_ok("google-vertex-ai-generative-terms", allowed))
+        self.assertFalse(ai_inbox.license_ok("google-gemini-api-terms", allowed))
+        self.assertFalse(ai_inbox.license_ok("vertex-ai", allowed))
