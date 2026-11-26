@@ -53,6 +53,11 @@ def _tick(db: DB, settings: Settings, do_ops: bool) -> dict:
         out["ops_accounts"] = import_ops_accounts(db, ops, "worker")
         out["ops_clips"] = import_ops_clips(db, ops, settings.ops_assets_bucket, limit=200, min_score=60, actor="worker")
         out["intelligence"] = start_intelligence(settings)
+        try:  # AI video sent from ops AI Tools (pln_agent/ai_inbox.py)
+            from . import ai_inbox
+            out["ai_inbox"] = ai_inbox.import_inbox(db, actor="worker")
+        except Exception as e:  # noqa: BLE001: never let it stop the publisher loop
+            out["ai_inbox"] = {"error": str(e)[:200]}
     try:  # follower history can't be fetched after the fact: one snapshot a day for the priority accounts
         from .insights import snapshot_followers_due
         out["followers"] = snapshot_followers_due(db)

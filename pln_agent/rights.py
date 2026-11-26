@@ -42,6 +42,7 @@ LABEL_REQUIREMENTS = {
     "names_withheld": "Athlete identities are unverified: do not name or tag anyone in copy, captions or on-screen text.",
     "paid_partnership": "Turn on the platform's branded-content / paid-partnership disclosure and name the partner.",
     "ai_generated_person": "Apply the platform's AI-generated content label (TikTok AIGC toggle, Meta 'AI info', YouTube altered/synthetic disclosure).",
+    "ai_generated": "AI-generated scene (from ops AI Tools): apply the platform's AI label (TikTok AIGC toggle, Meta 'AI info', YouTube altered/synthetic disclosure).",
     "gambling": "No wagering call-to-action; check geo/age restrictions and each platform's gambling policy.",
     "combat": "Combat sports: no gore, slow-mo injury replays, or 'brutal KO' bait; check advertiser suitability.",
     "injury": "Remove or justify any injury footage; never use as the hook.",
@@ -107,7 +108,7 @@ def evaluate(asset: dict, at: datetime | None = None, territory: str = "US", req
         r.blockers.append("source media file missing")
 
     flags = asset.get("flags") or {}
-    for f in ("gambling", "paid_partnership", "combat", "injury", "minors", "ai_generated_person"):
+    for f in ("gambling", "paid_partnership", "combat", "injury", "minors", "ai_generated_person", "ai_generated"):
         if flags.get(f):
             r.review_flags.append(f)
     for p in asset.get("people") or []:

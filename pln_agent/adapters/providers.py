@@ -200,7 +200,7 @@ class TikTokAdapter(BaseAdapter):
                               "video_cover_timestamp_ms": int(1000 * (v.get("thumbnail") or {}).get("source_time", 0) -
                                                               1000 * ((v.get("edl") or {}).get("segments") or [{"source_in": 0}])[0]["source_in"]),
                               "brand_content_toggle": "paid_partnership" in flags, "brand_organic_toggle": False,
-                              "is_aigc": "ai_generated_person" in flags},
+                              "is_aigc": bool({"ai_generated_person", "ai_generated"} & set(flags))},
                 "source_info": {"source": "PULL_FROM_URL", "video_url": media_url}}, "init direct post"),
             HttpRequest("POST", "https://open.tiktokapis.com/v2/post/publish/status/fetch/", h, {"publish_id": "{PUBLISH_ID}"}, "status"),
         ]
@@ -239,7 +239,7 @@ class YouTubeAdapter(BaseAdapter):
                             {"snippet": {"title": (v.get("title") or v["hook"])[:100], "description": _caption(v),
                                          "categoryId": "17"},
                              "status": {"privacyStatus": "public", "selfDeclaredMadeForKids": False,
-                                        "containsSyntheticMedia": "ai_generated_person" in (v.get("risk_flags") or {}).get("review_flags", [])}},
+                                        "containsSyntheticMedia": bool({"ai_generated_person", "ai_generated"} & set((v.get("risk_flags") or {}).get("review_flags", [])))}},
                             "start resumable upload"),
                 HttpRequest("PUT", "{Location header}", {}, None, "upload bytes")]
 

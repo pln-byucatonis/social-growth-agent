@@ -1,0 +1,11 @@
+{
+  "_note": "AI asset inbox (pln_agent/ai_inbox.py). ops.proleaguenetwork.com > AI Tools > Send to Growth Desk copies a finished AI video and a sidecar (model, licence, prompt, seed, checksum, brand) here. Only outputs of a model whose licence allows PLN's commercial use are imported. Every imported asset is flagged ai_generated, so its posts carry the platforms' AI labels. Decided by by@proleaguenetwork.com, 2026-11-26.",
+  "inbox_prefix": "social-agent/ai/inbox/",
+  "licenses": {
+    "apache-2.0": "Apache License 2.0: outputs usable commercially",
+    "mit": "MIT: outputs usable commercially",
+    "ltx-2.x-community-license": "LTX-2 Community License: commercial use while PLN group revenue is under $10M (confirmed 2026-09-26)"
+  },
+  "owner": "Pro League Network",
+  "territory": ["WORLDWIDE"]
+}
