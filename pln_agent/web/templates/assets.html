@@ -1,7 +1,7 @@
 {% extends "base.html" %}{% block title %}Assets{% endblock %}{% block body %}
 <div class="ph"><div class="t"><div class="eyebrow">Content</div><h1>Assets &amp; rights</h1>
 <p>Every clip the agents can post from. A clip only turns into posts once its media rights are recorded; people and athletes are confirmed clip by clip.</p></div>
-<div class="acts"><form method="post" action="{{ base }}/assets/plan" class="inline"><input type="hidden" name="brand" value="{{ brand }}"><button class="primary">Generate posts for rights-clear clips{{ ' · ' ~ (brand|brand) if brand }}</button></form></div></div>
+<div class="acts"><form method="post" action="{{ base }}/assets/ai-import" class="inline"><button title="AI video sent from ops AI Tools">Check the AI inbox</button></form><form method="post" action="{{ base }}/assets/plan" class="inline"><input type="hidden" name="brand" value="{{ brand }}"><button class="primary">Generate posts for rights-clear clips{{ ' · ' ~ (brand|brand) if brand }}</button></form></div></div>
 <div class="card"><form method="get" class="fbar"><select name="brand"><option value="">All brands</option>{% for b in brands %}<option value="{{ b }}" {{ 'selected' if b==brand }}>{{ b|brand }}</option>{% endfor %}</select>
 <div class="seg">{% for r, nm in [('', 'Any rights'), ('blocked', 'Rights blocked'), ('clear', 'Rights clear')] %}<a href="{{ base }}/assets?rights={{ r }}{% if brand %}&brand={{ brand|urlencode }}{% endif %}" class="{{ 'on' if r == rights }}">{{ nm }}</a>{% endfor %}</div>
 <input type="hidden" name="rights" value="{{ rights }}"><button>Apply</button></form></div>

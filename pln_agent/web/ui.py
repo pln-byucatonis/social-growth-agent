@@ -45,6 +45,7 @@ STATUS = {
 WORDS = {"pln": "PLN", "wpl": "WPL", "ig": "IG", "yt": "YouTube", "utm": "UTM", "qc": "QC", "cta": "CTA", "faq": "FAQ",
          "b2b": "B2B", "kpi": "KPI", "1k": "1k"}
 LABELS = {
+    "ai_generated": "AI-generated", "ai_generated_person": "AI person",
     "posting_gap": "Posting gap", "partnership_approval": "Partnership sign-off", "rights_blocker": "Rights blocker",
     "missed_post": "Missed post", "baseline": "No analytics", "fatigue": "Series fatigue", "scale": "Scale up",
     "pln_amplification": "PLN amplification", "legacy_bridge": "WPL bridge", "legacy_inplace": "Legacy (in place)",

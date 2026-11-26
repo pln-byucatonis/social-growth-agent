@@ -919,6 +919,17 @@ def music_import(request: Request):
     return back(request, "/music", f"{len(r['added'])} new bed(s) to listen to.{why}")
 
 
+@app.post("/assets/ai-import")
+def assets_ai_import(request: Request):
+    from .. import ai_inbox
+    try:
+        r = ai_inbox.import_inbox(db(), actor=request.state.user or "dashboard")
+    except ai_inbox.AiInboxError as e:
+        return back(request, "/assets", err=str(e))
+    why = f" Skipped {len(r['skipped'])}: {r['skipped'][0]['why']}" if r["skipped"] else ""
+    return back(request, "/assets", f"{len(r['added'])} AI video(s) added, rights clear and labelled AI-generated.{why}")
+
+
 @app.post("/music/add")
 async def music_add(request: Request):
     from .. import music
