@@ -4,8 +4,11 @@
   "licenses": {
     "apache-2.0": "Apache License 2.0: outputs usable commercially",
     "mit": "MIT: outputs usable commercially",
-    "ltx-2.x-community-license": "LTX-2 Community License: commercial use while PLN group revenue is under $10M (confirmed 2026-09-26)"
+    "ltx-2.x-community-license": "LTX-2 Community License: commercial use while PLN group revenue is under $10M (confirmed 2026-09-26)",
+    "google-vertex-ai-generative-terms": "Veo on Google Vertex AI (ops AI Tools > Video > Veo): Google's generative AI terms let the customer use outputs commercially; Veo refuses real people. Added 2026-11-26."
   },
   "owner": "Pro League Network",
-  "territory": ["WORLDWIDE"]
+  "territory": [
+    "WORLDWIDE"
+  ]
 }
