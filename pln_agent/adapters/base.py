@@ -24,6 +24,8 @@ class HttpRequest:
     json_body: dict | None = None
     purpose: str = ""
     form_body: dict | None = None  # application/x-www-form-urlencoded (OAuth token endpoints)
+    data: bytes | None = None      # a raw body (a video file), sent with the Content-Type in headers
+    timeout: float = 30            # seconds; uploads need longer
 
     def redacted(self) -> dict:
         h = {k: ("***REDACTED***" if k.lower() in ("authorization", "access-token") else v) for k, v in self.headers.items()}
@@ -31,7 +33,10 @@ class HttpRequest:
         for k in list(body):
             if "token" in k.lower() or "secret" in k.lower():
                 body[k] = "***REDACTED***"
-        return {"method": self.method, "url": self.url, "headers": h, "json": body, "purpose": self.purpose}
+        out = {"method": self.method, "url": self.url, "headers": h, "json": body, "purpose": self.purpose}
+        if self.data is not None:
+            out["bytes"] = len(self.data)
+        return out
 
 
 @dataclass
@@ -45,8 +50,11 @@ class Transport(Protocol):
     def __call__(self, req: HttpRequest) -> HttpResponse: ...
 
 
-def urllib_transport(req: HttpRequest, timeout: float = 30) -> HttpResponse:
-    if req.form_body is not None:
+def urllib_transport(req: HttpRequest, timeout: float | None = None) -> HttpResponse:
+    timeout = timeout or req.timeout
+    if req.data is not None:
+        data, ctype = req.data, {}
+    elif req.form_body is not None:
         data = urllib.parse.urlencode(req.form_body).encode()
         ctype = {"Content-Type": "application/x-www-form-urlencoded"}
     else:

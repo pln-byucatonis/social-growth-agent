@@ -232,26 +232,58 @@ class TikTokAdapter(BaseAdapter):
         return PublishResult("published" if st == "PUBLISH_COMPLETE" else "processing", platform_post_id, "", d)
 
 
+def _render_bytes(v: dict) -> bytes:
+    """The finished render's file (S3 or local): YouTube takes the bytes, not a link."""
+    path = v.get("render_path") or ""
+    if not path:
+        raise AdapterError("blocked", "this post isn't rendered yet")
+    if path.startswith("s3://"):
+        import boto3
+        bucket, _, key = path[5:].partition("/")
+        return boto3.client("s3", region_name="us-east-1").get_object(Bucket=bucket, Key=key)["Body"].read()
+    with open(path, "rb") as f:
+        return f.read()
+
+
 class YouTubeAdapter(BaseAdapter):
     platform = "youtube"
     official_docs = ["https://developers.google.com/youtube/v3/docs/videos/insert",
                      "https://developers.google.com/youtube/v3/guides/uploading_a_video"]
     requirements = ["Google Cloud project with YouTube Data API v3", "OAuth scope https://www.googleapis.com/auth/youtube.upload",
                     "Quota: videos.insert is expensive; request quota increase", "Altered/synthetic content disclosure where applicable"]
-    app_review_blockers = ["Uploads from unverified API projects are locked to private until the project passes Google's audit"]
+    app_review_blockers = ["Uploads from unverified API projects are locked to private until the project passes Google's audit "
+                           "(set YOUTUBE_API_AUDITED=true once it has)"]
 
     def plan_requests(self, v, account, media_url, token="{TOKEN}"):
+        # until Google audits the API project, YouTube makes every upload private whatever we ask, so ask for private
+        privacy = "public" if os.environ.get("YOUTUBE_API_AUDITED", "false").lower() == "true" else "private"
         return [HttpRequest("POST", "https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status",
-                            {"Authorization": f"Bearer {token}"},
-                            {"snippet": {"title": (v.get("title") or v["hook"])[:100], "description": _caption(v),
+                            {"Authorization": f"Bearer {token}", "X-Upload-Content-Type": "video/mp4"},
+                            {"snippet": {"title": (v.get("title") or v["hook"])[:100], "description": _caption(v)[:5000],
                                          "categoryId": "17"},
-                             "status": {"privacyStatus": "public", "selfDeclaredMadeForKids": False,
+                             "status": {"privacyStatus": privacy, "selfDeclaredMadeForKids": False,
                                         "containsSyntheticMedia": bool({"ai_generated_person", "ai_generated"} & set((v.get("risk_flags") or {}).get("review_flags", [])))}},
                             "start resumable upload"),
                 HttpRequest("PUT", "{Location header}", {}, None, "upload bytes")]
 
     def publish(self, v, account, idempotency_key):
-        raise AdapterError("blocked", "YouTube resumable byte upload not enabled until OAuth project is verified; use dry-run preview")
+        """YouTube's resumable upload: announce the video (title, description, privacy), then send the file to the
+        address YouTube hands back. A vertical video under three minutes shows as a Short."""
+        token = resolve_token(account["credential_ref"])
+        video = _render_bytes(v)
+        init = self.plan_requests(v, account, "", token)[0]
+        init.headers["X-Upload-Content-Length"] = str(len(video))
+        resp = self._send(init, "youtube start upload")
+        where = next((val for k, val in (resp.headers or {}).items() if k.lower() == "location"), "")
+        if not where:
+            raise AdapterError("retryable", "youtube start upload: no upload address in the answer")
+        up = self._send(HttpRequest("PUT", where, {"Content-Type": "video/mp4"}, None, "upload bytes", data=video,
+                                    timeout=600), "youtube upload")
+        vid_id = (up.body or {}).get("id", "")
+        if not vid_id:
+            raise AdapterError("retryable", f"youtube upload: no video id in the answer {str(up.body)[:200]}")
+        return PublishResult("published", vid_id, f"https://www.youtube.com/shorts/{vid_id}",
+                             {"privacy": ((up.body or {}).get("status") or {}).get("privacyStatus", "")})
 
 
 class XAdapter(BaseAdapter):
