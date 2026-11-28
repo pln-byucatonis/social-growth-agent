@@ -1,0 +1,12 @@
+{% extends "base.html" %}{% block title %}Health{% endblock %}{% block body %}
+<div class="ph"><div class="t"><div class="eyebrow">Admin</div><h1>Pipeline health</h1>
+<p>Is the agent actually producing posts? These checks run every {{ every }} minutes and look at what comes out: new drafts, tomorrow's run sheet, approvals, posts going out. Anything wrong shows as a banner on every page.</p></div>
+<div class="acts"><form method="post" action="{{ base }}/health/run" class="inline"><button>Check now</button></form></div></div>
+{% if not h %}<div class="card"><div class="empty">Not checked yet. Click "Check now".</div></div>{% else %}
+<p class="small muted">Last checked {{ h.at|ago }}.</p>
+<div class="card flush"><div class="tw"><table class="stack"><thead><tr><th>Check</th><th>Status</th><th>What it means</th><th></th></tr></thead><tbody>
+{% for c in h.checks %}<tr><td><b>{{ c.title }}</b></td>
+<td>{% if c.ok %}{{ chip('x', 'ok', 'OK') }}{% elif c.level == 'bad' %}{{ chip('x', 'bad', 'Problem') }}{% else %}{{ chip('x', 'warn', 'Look at this') }}{% endif %}</td>
+<td class="small muted">{{ c.detail }}</td><td class="act"><a class="btn sm ghost" href="{{ base }}{{ c.link }}">Open</a></td></tr>{% endfor %}
+</tbody></table></div></div>{% endif %}
+{% endblock %}

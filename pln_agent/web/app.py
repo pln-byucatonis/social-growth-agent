@@ -169,7 +169,16 @@ def ctx(request: Request, **kw) -> dict:
             "ops_connected": bool(settings.ops_database_url),
             # framed inside the ops portal: the portal sidebar is the nav, so hide ours
             "embedded": request.headers.get("sec-fetch-dest") == "iframe",
-            "msg": request.query_params.get("msg"), "err": request.query_params.get("err"), **kw}
+            "msg": request.query_params.get("msg"), "err": request.query_params.get("err"),
+            "health_problems": _health_problems(), **kw}
+
+
+def _health_problems() -> list[dict]:
+    from ..health import latest, problems
+    try:
+        return problems(latest(db()))
+    except Exception:  # noqa: BLE001 — never break a page over the banner
+        return []
 
 
 def back(request: Request, url: str, msg: str = "", err: str = "") -> RedirectResponse:
@@ -728,6 +737,19 @@ def runsheet_unschedule(request: Request, vid: str = Form(...), day: str = Form(
     except WorkflowError as e:
         return back(request, f"/runsheet?day={day}", err=str(e))
     return back(request, f"/runsheet?day={day}", "Unscheduled — it's back to approved.")
+
+
+@app.get("/health", response_class=HTMLResponse)
+def health_page(request: Request):
+    from .. import health
+    return page(request, "health.html", h=health.latest(db()), every=health.EVERY_MIN)
+
+
+@app.post("/health/run")
+def health_run(request: Request):
+    from .. import health
+    health.run(db(), settings, actor=request.state.user or "dashboard")
+    return back(request, "/health", "Checked just now.")
 
 
 @app.get("/accounts", response_class=HTMLResponse)

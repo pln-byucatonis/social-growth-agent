@@ -103,10 +103,11 @@ video{max-width:100%;max-height:560px;border-radius:8px;background:#000}hr{borde
   ("Plan", [("/growth", "Growth brief"), ("/calendar", "Calendar"), ("/cadence", "Cadence"), ("/experiments", "Experiments")]),
   ("Content", [("/scout", "Scout"), ("/predct", "PREDCT"), ("/curation", "Curation"), ("/music", "Music"), ("/trends", "Trends"), ("/assets", "Assets"), ("/creative", "Creative DB")]),
   ("Insight", [("/intelligence", "Audience"), ("/competitors", "Competitors"), ("/knowledge", "Knowledge"), ("/migration", "WPL → Putt Tour")]),
-  ("Team", [("/team", "Agent Team")]), ("Admin", [("/accounts", "Accounts"), ("/audit", "Audit log")])] %}
+  ("Team", [("/team", "Agent Team")]), ("Admin", [("/health", "Health"), ("/accounts", "Accounts"), ("/audit", "Audit log")])] %}
 <div class="grp"><span class="gl">{{ g }}</span>{% for href, name in items %}<a href="{{ base }}{{ href }}" class="{{ 'on' if (href == '/' and p.rstrip('/') == base) or (href != '/' and p.startswith(base ~ href)) }}">{{ name }}</a>{% endfor %}</div>{% endfor %}
 </nav>{% endif %}</div>
 <main>
+{% if health_problems and not p.startswith(base ~ '/health') %}<div class="flash {{ 'err' if health_problems|selectattr('level', 'equalto', 'bad')|list else 'info' }}"><b>Pipeline:</b> {% for c in health_problems %}{{ c.title }}{{ '; ' if not loop.last }}{% endfor %}. <a href="{{ base }}/health">See health</a></div>{% endif %}
 {% if msg %}<div class="flash ok">{{ msg }}</div>{% endif %}{% if err %}<div class="flash err">{{ err }}</div>{% endif %}
 {% if bg %}{% if bg.state == 'running' %}<div class="flash info"><span class="chip info">Working</span> {{ bg.label or 'Running in the background' }} — this page refreshes itself.</div>
 {% elif bg.msg %}<div class="flash {{ 'err' if bg.state == 'failed' else 'ok' }}">{{ chip('failed' if bg.state == 'failed' else 'done', text='Failed' if bg.state == 'failed' else 'Last run') }} {{ bg.msg }} <span class="faint small">{{ bg.finished|ago }}</span></div>{% endif %}{% endif %}
