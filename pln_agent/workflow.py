@@ -252,13 +252,15 @@ def schedule(db: DB, vid: str, slot_at: datetime, actor: str) -> dict:
         raise WorkflowError("duplicate: identical caption already used on this account")
     # the daily limit is enforced here, where a person sees it, not at publish time (which used to hold a post 12h)
     asked, moved = slot_at, ""
-    cap = allocation()["max_posts_per_account_per_day"].get(v["platform"], 1)
+    story = v.get("post_type") == "story"
+    cap = (allocation().get("max_stories_per_account_per_day") or {}).get(v["platform"], 3) if story else \
+        allocation()["max_posts_per_account_per_day"].get(v["platform"], 1)
     for _ in range(14):
-        if _posts_on_day(db, v["account_id"], slot_at) < cap:
+        if _posts_on_day(db, v["account_id"], slot_at, story) < cap:
             break
         slot_at = slot_at + timedelta(days=1)
     if slot_at != asked:
-        moved = (f"{v['platform']} allows {cap} post(s) a day on this account and that day is full: "
+        moved = (f"{v['platform']} allows {cap} {'Stories' if story else 'post(s)'} a day on this account and that day is full: "
                  f"moved to the same time on {slot_at.astimezone(timezone.utc).date().isoformat()} (UTC)")
     job = {"job_id": f"job-{uuid.uuid4().hex[:10]}", "variant_id": vid, "account_id": v["account_id"],
            "idempotency_key": key, "state": "queued", "mode": "pending", "attempts": 0,
@@ -274,13 +276,16 @@ def schedule(db: DB, vid: str, slot_at: datetime, actor: str) -> dict:
     return {**job, "moved": moved}
 
 
-def _posts_on_day(db: DB, account_id: str, at: datetime) -> int:
-    """Posts that went out, or are queued, for the account on the UTC day of `at` (the publisher's daily window)."""
+def _posts_on_day(db: DB, account_id: str, at: datetime, stories: bool = False) -> int:
+    """Posts that went out, or are queued, for the account on the UTC day of `at` (the publisher's daily window).
+    Stories and feed posts are counted apart: a Story doesn't use up one of the day's feed posts."""
     start = datetime.combine(at.astimezone(timezone.utc).date(), datetime.min.time(), timezone.utc)
     lo, hi = start.isoformat(), (start + timedelta(days=1)).isoformat()
-    r = db.one("SELECT COUNT(*) AS n FROM publish_jobs WHERE account_id=? AND ("
-               "(state IN ('queued','publishing') AND next_attempt_at>=? AND next_attempt_at<?) OR "
-               "(state IN ('published','simulated') AND updated_at>=? AND updated_at<?))", [account_id, lo, hi, lo, hi])
+    kind = "=" if stories else "<>"
+    r = db.one("SELECT COUNT(*) AS n FROM publish_jobs j JOIN variants v ON v.variant_id=j.variant_id WHERE j.account_id=? AND "
+               f"COALESCE(v.post_type, '') {kind} 'story' AND ("
+               "(j.state IN ('queued','publishing') AND j.next_attempt_at>=? AND j.next_attempt_at<?) OR "
+               "(j.state IN ('published','simulated') AND j.updated_at>=? AND j.updated_at<?))", [account_id, lo, hi, lo, hi])
     return r["n"] if r else 0
 
 

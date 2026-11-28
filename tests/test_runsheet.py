@@ -100,6 +100,22 @@ class RunSheetTests(unittest.TestCase):
         with self.assertRaises(WorkflowError):
             schedule(self.db, v["variant_id"] + "~again", slot, "bill")
 
+    def test_stories_dont_use_up_the_days_feed_posts(self):
+        from datetime import datetime, timezone
+        from pln_agent.workflow import caption_hash, schedule
+        v = next(r for r in runsheet.day_sheet(self.db, self.s, self.day, focus=False)["rows"]
+                 if r["kind"] == "proposed" and r["platform"] == "instagram")
+        base = self.db.get("variants", "variant_id", v["variant_id"])
+        slot = datetime(2030, 1, 2, 16, tzinfo=timezone.utc)
+        def copy(n, post_type=None):
+            cap = f"feed post {n}"
+            self.db.insert("variants", {**base, "variant_id": f"x{n}", "asset_id": f"a{n}", "post_type": post_type,
+                                        "state": "approved", "caption": cap, "caption_hash": caption_hash(cap)})
+            return schedule(self.db, f"x{n}", slot, "bill")["moved"]
+        self.assertEqual([copy(1), copy(2)], ["", ""])  # Instagram: two feed posts a day
+        self.assertEqual(copy(3, "story"), "")          # a Story still fits that day
+        self.assertIn("moved", copy(4))                 # a third feed post moves to the next day
+
 
 if __name__ == "__main__":
     unittest.main()

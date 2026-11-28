@@ -8,6 +8,7 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from datetime import datetime, timedelta, timezone
 
 from .config import Settings
 from .db import DB
@@ -18,7 +19,8 @@ from .workflow import poll_statuses, run_publisher
 log = logging.getLogger("pln_agent.worker")
 
 
-PLAN_PER_TICK = 10  # bounded work per scheduler call; a backlog drains over successive ticks
+PLAN_PER_TICK = 10
+REPLAN_DAYS = 7  # a clip placed nowhere is looked at again after this long (accounts and bars change)  # bounded work per scheduler call; a backlog drains over successive ticks
 _tick_lock = threading.Lock()
 
 
@@ -26,6 +28,10 @@ def plan_new_clear_assets(db: DB, settings: Settings, limit: int = PLAN_PER_TICK
     """Generate posts for rights-clear assets that have none yet (never re-plans reviewed work).
     Highest-scoring clips first, at most `limit` per call."""
     planned = {r["asset_id"] for r in db.query("SELECT DISTINCT asset_id FROM variants")}
+    # a clip the planner already looked at this week and placed nowhere (every account parked, below an account's
+    # bar…) counts as planned too: otherwise the same few top clips come back every minute and the rest never get a turn
+    since = (datetime.now(timezone.utc) - timedelta(days=REPLAN_DAYS)).replace(microsecond=0).isoformat()
+    planned |= {r["asset_id"] for r in db.query("SELECT DISTINCT asset_id FROM editorial_packs WHERE created_at >= ?", [since])}
     todo = [a for a in db.all("assets") if a["asset_id"] not in planned and evaluate(a).ok]
     todo.sort(key=lambda a: -max((m.get("intensity", 0) for m in (a.get("moments") or [])), default=0))
     for a in todo[:limit]:
@@ -52,6 +58,8 @@ def _tick(db: DB, settings: Settings, do_ops: bool) -> dict:
         ops = DB(settings.ops_database_url, init=False)
         out["ops_accounts"] = import_ops_accounts(db, ops, "worker")
         out["ops_clips"] = import_ops_clips(db, ops, settings.ops_assets_bucket, limit=200, min_score=60, actor="worker")
+        from .ops_sources import import_new_clips
+        out["new_clips"] = import_new_clips(db, ops, settings.ops_assets_bucket, actor="worker")
         out["intelligence"] = start_intelligence(settings)
         try:  # AI video sent from ops AI Tools (pln_agent/ai_inbox.py)
             from . import ai_inbox

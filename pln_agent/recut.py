@@ -139,6 +139,7 @@ def process(db: DB, variant_id: str, settings, actor: str = "editor", render=Non
             _mark(db, variant_id, "in_review", status="passed", attempts=attempts, rewrites=rewrites, history=history,
                   copy_note="; ".join(c["copy_problems"][:3]) if c["verdict"] == "rewrite" else "")
             refresh_validation(db, variant_id)
+            companions(db, variant_id, actor)
             db.audit(actor, "recut_passed", "variants", variant_id, {"scores": c["scores"], "attempts": attempts, "rewrites": rewrites})
             return {"variant_id": variant_id, "outcome": "passed", "scores": c["scores"]}
         if c["verdict"] == "kill":
@@ -169,6 +170,46 @@ def process(db: DB, variant_id: str, settings, actor: str = "editor", render=Non
           why=why)
     db.audit(actor, "recut_dropped", "variants", variant_id, {"by": "critic", "history": history[-2:]})
     return {"variant_id": variant_id, "outcome": "dropped", "why": history[-1]["problems"] if history else []}
+
+
+def companions(db: DB, vid: str, actor: str = "editor") -> list[str]:
+    """A Reel that passed on Instagram also gets its carousel and Story (each made once, rendered and checked by the
+    runner, then approved like any post): up to three posts from one good clip."""
+    from .accounts import focus
+    from .carousel import KINDS, PLATFORMS, CarouselError, make
+    v = db.get("variants", "variant_id", vid) or {}
+    worked = focus().get("worked")
+    if v.get("platform") not in PLATFORMS or v.get("post_type") or (worked and v.get("account_id") not in worked):
+        return []  # only the accounts the team works get the extra posts (not WPL, which is bridging out)
+    made = []
+    for kind in KINDS:
+        try:
+            if make(db, vid, kind, actor)["created"]:
+                made.append(f"{vid}~{kind}")
+        except CarouselError as e:
+            db.audit(actor, "companion_skipped", "variants", vid, {"kind": kind, "why": str(e)[:200]})
+    return made
+
+
+def move_to_account(db: DB, vid: str, account_id: str, actor: str, why: str) -> str:
+    """Give a finished Reel to another account of the same platform (e.g. a WPL post to @putttour, as WPL parks).
+    The copy keeps the cut, render and critic's verdict and goes to Approvals; the original is archived."""
+    from .workflow import refresh_validation
+    v = db.get("variants", "variant_id", vid)
+    acc = db.get("accounts", "account_id", account_id)
+    if not v or not acc:
+        raise ValueError("unknown post or account")
+    new_id = f"{v['asset_id']}:{account_id}"
+    if db.get("variants", "variant_id", new_id):
+        raise ValueError(f"{account_id} already has a post of this clip")
+    row = {**v, "variant_id": new_id, "account_id": account_id, "platform": acc["platform"],
+           "brand_id": acc.get("brand_id") or v.get("brand_id"), "state": "in_review", "public_media_url": "",
+           "treatment": {**(v.get("treatment") or {}), "moved_from": vid}, "created_at": now_iso(), "updated_at": now_iso()}
+    db.insert("variants", row)
+    refresh_validation(db, new_id)
+    db.update("variants", "variant_id", vid, {"state": "archived", "updated_at": now_iso()})
+    db.audit(actor, "post_moved", "variants", new_id, {"from": vid, "why": why})
+    return new_id
 
 
 PAUSE_KEY = "recut_paused_until"

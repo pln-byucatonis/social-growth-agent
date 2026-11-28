@@ -288,6 +288,25 @@ class OpsImportTests(unittest.TestCase):
         self.assertNotIn("PT:2", ids)     # junk-level score never imported
         self.assertEqual(r["imported"], 3)  # 4 picked: PT:1 + 2 CarJitsu (P0) per round, Mystery (score 99) skipped
 
+    def test_new_clip_intake_goes_past_the_top_ranked_clips(self):
+        from pln_agent import ops_sources
+        self.ops.execute("INSERT INTO clips (id, source_id, property, start_sec, end_sec, highlight_score, caption, source_bucket,"
+                         " source_key, status) VALUES " + ",".join(
+                             f"('CJ:n{i}','pln-vod-library/PLNstudio/CJ.mp4','CarJitsu',{i},{i + 5},{90 - i},'c','b','k','tagged')"
+                             for i in range(10)))
+        import_ops_clips(self.db, self.ops, "b", limit=3, min_score=50)  # the regular import: the same top ones each time
+        before = {a["content_id"] for a in self.db.all("assets") if a["content_id"]}
+        r = ops_sources.import_new_clips(self.db, self.ops, "b")
+        after = {a["content_id"] for a in self.db.all("assets") if a["content_id"]}
+        self.assertEqual(r["imported"], ops_sources.NEW_PER_REFRESH)
+        self.assertEqual(len(after - before), ops_sources.NEW_PER_REFRESH)  # all of them new clips
+        brands = {a["brand_id"] for a in self.db.all("assets") if a["content_id"] in after - before}
+        self.assertLessEqual(brands, {"carjitsu", "putt_tour", "pln"}, brands)  # only leagues the team works
+        for _ in range(10):
+            ops_sources.import_new_clips(self.db, self.ops, "b")
+        self.assertLessEqual(len({a["content_id"] for a in self.db.all("assets") if a["content_id"]} - before),
+                             ops_sources.NEW_PER_DAY)  # a modest daily intake
+
     def test_rights_overlay_survives_reimport(self):
         import_ops_clips(self.db, self.ops, "b", min_score=50)
         aid = clip_asset_id("CJ.mp4:10-24")

@@ -7,6 +7,7 @@
   "max_posts_per_account_per_day": {
     "linkedin": 1, "facebook": 2, "instagram": 2, "tiktok": 2, "youtube": 1, "x": 4, "twitch": 1
   },
+  "max_stories_per_account_per_day": {"instagram": 3},
   "legacy_bridge_max_posts_per_week": 2,
   "pln_amplification": {
     "min_hours_after_canonical": 24,

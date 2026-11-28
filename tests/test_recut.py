@@ -47,6 +47,20 @@ class Base(unittest.TestCase):
         team._llm = self.old
 
 
+class MoveTests(unittest.TestCase):
+    def test_move_a_reel_to_another_account(self):
+        db, s = make()
+        acc = db.get("variants", "variant_id", VID)
+        other = next(a["account_id"] for a in db.all("accounts") if a["platform"] == acc["platform"]
+                     and not db.get("variants", "variant_id", f"{acc['asset_id']}:{a['account_id']}"))
+        new = recut.move_to_account(db, VID, other, "test", "account parked")
+        v = db.get("variants", "variant_id", new)
+        self.assertEqual((v["account_id"], v["edl"]), (other, acc["edl"]))
+        self.assertEqual(db.get("variants", "variant_id", VID)["state"], "archived")
+        with self.assertRaises(ValueError):
+            recut.move_to_account(db, VID, other, "test", "twice")
+
+
 class CheckTests(unittest.TestCase):
     def test_check_tidies_and_refuses_bad_cuts(self):
         ed = editor.check(CUT, 4.0, 20.0, {"max_s": 35})
@@ -89,6 +103,10 @@ class FlowTests(Base):
         self.assertGreater(m.calls[0]["images"], 0)  # the editor watched frames of the source
         self.assertGreater(m.calls[1]["images"], 0)  # and the critic watched the render
         self.assertIn("rough moments", m.calls[0]["text"])
+        # a passed Instagram Reel also gets its carousel and Story, queued for the runner
+        for kind in ("carousel", "story"):
+            c = db.get("variants", "variant_id", f"{VID}~{kind}")
+            self.assertEqual((c["post_type"], c["render_status"]), (kind, "queued"))
 
     def test_replay_crops_in_on_the_payoff(self):
         from pln_agent.media import probe_output, render_variant

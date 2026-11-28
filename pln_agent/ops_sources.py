@@ -237,11 +237,16 @@ def _fair_share(clips: list[dict], limit: int, min_score: int, priority_floor: i
 
 def import_ops_clips(db: DB, ops: DB, assets_bucket: str, limit: int = 100, min_score: int = 50,
                      properties: list[str] | None = None, actor: str = "ops-sync",
-                     priority_floor: int = PRIORITY_FLOOR, clip_ids: list[str] | None = None) -> dict:
-    """`clip_ids` imports exactly those clips (Viral Content Scout promotion) instead of the ranked top."""
+                     priority_floor: int = PRIORITY_FLOOR, clip_ids: list[str] | None = None,
+                     exclude: list[str] | None = None) -> dict:
+    """`clip_ids` imports exactly those clips (Viral Content Scout promotion) instead of the ranked top.
+    `exclude` skips clips already brought in, so the next best ones come through instead of the same top ones."""
     floor = min(min_score, priority_floor)
     where = ["superseded_by IS NULL", "status = 'tagged'", "highlight_score >= ?"]
     params: list = [floor]
+    if exclude:
+        where.append("id NOT IN (" + ",".join("?" for _ in exclude) + ")")
+        params += list(exclude)
     if clip_ids:
         where = ["superseded_by IS NULL", "id IN (" + ",".join("?" for _ in clip_ids) + ")"]
         params = list(clip_ids)
@@ -391,3 +396,26 @@ def repoint_retired_verticals(db: DB, ops: DB, assets_bucket: str, settings, act
     db.audit(actor, "retired_verticals_repointed", "assets", "", {"assets": len(rows), "reimported": r.get("imported"),
                                                                     "regenerated": regenerated})
     return {"repointed": len(rows), "regenerated": regenerated}
+
+
+NEW_PER_REFRESH = 6   # fresh clips brought in per refresh, for the leagues the team works
+NEW_PER_DAY = 24      # every new clip costs the editor and the critic model time: keep the daily intake modest
+
+
+def import_new_clips(db: DB, ops: DB, assets_bucket: str, actor: str = "ops-sync") -> dict:
+    """The regular import takes each league's top-ranked clips, which are the same clips every time; once they're all
+    drafted nothing new arrives. This brings in the next best clips nobody has drafted, for the worked leagues only."""
+    from .accounts import focus
+    worked = focus().get("worked") or []
+    brands = {a["brand_id"] for a in db.all("accounts") if a["account_id"] in worked} if worked else set()
+    props = [r["property"] for r in ops.query("SELECT DISTINCT property FROM clips WHERE property IS NOT NULL")
+             if (b := _brand(r["property"])) and (not brands or canonical_brand_id(b) in brands)]
+    key = f"new_clips:{date.today().isoformat()}"
+    done = int(db.kv_get(key, "0") or 0)
+    room = min(NEW_PER_REFRESH, NEW_PER_DAY - done)
+    if room <= 0 or not props:
+        return {"imported": 0, "why": "daily intake reached" if room <= 0 else "no worked leagues"}
+    have = [a["content_id"] for a in db.all("assets") if a.get("content_id")]
+    r = import_ops_clips(db, ops, assets_bucket, limit=room, min_score=60, properties=props, exclude=have, actor=actor)
+    db.kv_set(key, str(done + int(r.get("imported") or 0)), actor)
+    return r
