@@ -189,23 +189,30 @@ class TikTokAdapter(BaseAdapter):
     app_review_blockers = ["UNAUDITED clients can only post SELF_ONLY (private). Public posting requires TikTok's audit."]
 
     def plan_requests(self, v, account, media_url, token="{TOKEN}"):
+        from ..tiktok_post import chosen
         h = {"Authorization": f"Bearer {token}", "Content-Type": "application/json; charset=UTF-8"}
         flags = (v.get("risk_flags") or {}).get("review_flags", [])
-        audited = os.environ.get("TIKTOK_CLIENT_AUDITED", "false").lower() == "true"
+        # what a person chose on the TikTok post settings screen (pln_agent/tiktok_post.py); none = private, no interactions
+        s = chosen(v) or {"privacy_level": "SELF_ONLY", "disable_duet": True, "disable_comment": True, "disable_stitch": True}
         return [
             HttpRequest("POST", "https://open.tiktokapis.com/v2/post/publish/creator_info/query/", h, {}, "creator info"),
             HttpRequest("POST", "https://open.tiktokapis.com/v2/post/publish/video/init/", h, {
-                "post_info": {"title": _caption(v)[:2200], "privacy_level": "PUBLIC_TO_EVERYONE" if audited else "SELF_ONLY",
-                              "disable_duet": False, "disable_comment": False, "disable_stitch": False,
+                "post_info": {"title": _caption(v)[:2200], "privacy_level": s["privacy_level"],
+                              "disable_duet": s["disable_duet"], "disable_comment": s["disable_comment"],
+                              "disable_stitch": s["disable_stitch"],
                               "video_cover_timestamp_ms": int(1000 * (v.get("thumbnail") or {}).get("source_time", 0) -
                                                               1000 * ((v.get("edl") or {}).get("segments") or [{"source_in": 0}])[0]["source_in"]),
-                              "brand_content_toggle": "paid_partnership" in flags, "brand_organic_toggle": False,
+                              "brand_content_toggle": bool(s.get("brand_content_toggle")) or "paid_partnership" in flags,
+                              "brand_organic_toggle": bool(s.get("brand_organic_toggle")),
                               "is_aigc": bool({"ai_generated_person", "ai_generated"} & set(flags))},
                 "source_info": {"source": "PULL_FROM_URL", "video_url": media_url}}, "init direct post"),
             HttpRequest("POST", "https://open.tiktokapis.com/v2/post/publish/status/fetch/", h, {"publish_id": "{PUBLISH_ID}"}, "status"),
         ]
 
     def publish(self, v, account, idempotency_key):
+        from ..tiktok_post import chosen
+        if not chosen(v):  # TikTok's rules: a person picks who can watch, interactions and disclosure before posting
+            raise AdapterError("validation", "TikTok post settings haven't been chosen by a person for this caption")
         token = resolve_token(account["credential_ref"])
         info, init, _ = self.plan_requests(v, account, media_public_url(v), token)
         opts = self._send(info, "tiktok creator_info").body.get("data", {}).get("privacy_level_options", [])

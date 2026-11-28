@@ -1,0 +1,59 @@
+{% extends "base.html" %}{% block title %}TikTok post settings{% endblock %}{% block body %}
+<div class="ph"><div class="t"><div class="eyebrow">TikTok</div><h1>Post to TikTok</h1>
+<p>Choose how this video goes out. TikTok asks a person to make these choices for every post; nothing here is filled in for you.</p></div>
+<div class="acts"><a class="btn ghost" href="{{ base }}/variant/{{ v.variant_id }}">Back to the post</a></div></div>
+
+{% if problem %}<div class="card"><p><b>Can't post to this account right now:</b> {{ problem }}.</p>
+{% if 'connect' in problem %}<p><a class="btn" href="{{ base }}/accounts">Connect the TikTok account</a></p>{% endif %}</div>
+{% else %}
+<form method="post" action="{{ base }}/variant/{{ v.variant_id }}/tiktok" id="tt">
+<div class="grid2" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;align-items:start">
+<div class="card">{% if render_url %}<video src="{{ render_url }}" controls playsinline preload="metadata" style="width:100%;aspect-ratio:9/16;background:#000;border-radius:10px"></video>{% else %}<div class="empty">The video isn't rendered yet.</div>{% endif %}
+<p class="small muted">{% if duration %}{{ '%.0f'|format(duration) }} s{% endif %}{% if info.max_duration_s %} · this account can post up to {{ info.max_duration_s }} s{% endif %}</p></div>
+
+<div>
+<div class="card"><div style="display:flex;gap:10px;align-items:center">{% if info.avatar %}<img src="{{ info.avatar }}" alt="" style="width:44px;height:44px;border-radius:50%">{% endif %}
+<div><b>{{ info.nickname or info.username }}</b><span class="sub">Posting to @{{ info.username }}</span></div></div></div>
+
+<div class="card"><label for="title"><b>Title</b></label>
+<textarea name="title" id="title" rows="4" maxlength="2200" style="width:100%" required>{{ v.caption }}</textarea>
+<p class="faint small">Changing it here changes the approved text.</p></div>
+
+<div class="card"><b>Who can watch this video</b>
+{% if not audited %}<p class="small muted">Until TikTok approves the app, posts can only be private (Only me).</p>{% endif %}
+<div role="radiogroup" style="display:grid;gap:6px;margin-top:6px">
+{% for opt in info.privacy_options %}<label><input type="radio" name="privacy_level" value="{{ opt }}" required {{ 'disabled' if not audited and opt != 'SELF_ONLY' }}> {{ labels.get(opt, opt) }}{% if not audited and opt != 'SELF_ONLY' %} <span class="faint small">(after TikTok approves the app)</span>{% endif %}</label>{% endfor %}
+</div></div>
+
+<div class="card"><b>Allow people to</b>
+<div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:6px">
+{% for k, name in [('comment', 'Comment'), ('duet', 'Duet'), ('stitch', 'Stitch')] %}<label class="{{ 'faint' if info[k ~ '_disabled'] }}"><input type="checkbox" name="allow_{{ k }}" {{ 'disabled' if info[k ~ '_disabled'] }}> {{ name }}{% if info[k ~ '_disabled'] %} <span class="small">(turned off for this account in TikTok)</span>{% endif %}</label>{% endfor %}
+</div></div>
+
+<div class="card"><label><input type="checkbox" name="commercial" id="commercial"> <b>This is commercial content</b></label>
+<p class="faint small">Turn this on if the video promotes yourself, a third party, or both.</p>
+<div id="commercial-opts" hidden style="display:grid;gap:6px;margin-top:6px">
+<label><input type="checkbox" name="your_brand" id="your_brand"> Your brand <span class="faint small">— you're promoting yourself or your own business</span></label>
+<label><input type="checkbox" name="branded_content" id="branded"> Branded content <span class="faint small">— you're promoting another brand or a third party</span></label>
+<p class="small" id="label-note"></p></div></div>
+
+<div class="card"><p class="small" id="declaration">By posting, you agree to TikTok's <a href="{{ music_url }}" target="_blank" rel="noopener">Music Usage Confirmation</a>.</p>
+{% if not user %}<input name="actor" placeholder="Your name" required>{% endif %}
+<button class="primary" id="post" disabled>Approve &amp; post to TikTok</button>
+<p class="faint small">It goes out at the time you lock in on the run sheet. After it's sent, TikTok can take a few minutes to process the video before it appears on the profile.</p>
+{% if current %}<p class="small muted">Last chosen by {{ current.by }}: {{ labels.get(current.privacy_level) }}.</p>{% endif %}</div>
+</div></div></form>
+<script>(function(){
+var f=document.getElementById('tt'),c=document.getElementById('commercial'),opts=document.getElementById('commercial-opts'),
+yb=document.getElementById('your_brand'),bc=document.getElementById('branded'),note=document.getElementById('label-note'),
+dec=document.getElementById('declaration'),btn=document.getElementById('post');
+function u(){opts.hidden=!c.checked;var picked=f.querySelector('input[name=privacy_level]:checked');
+ var self=f.querySelector('input[name=privacy_level][value=SELF_ONLY]');
+ if(self){self.disabled=c.checked&&bc.checked; if(self.disabled&&self.checked){self.checked=false;picked=null}}
+ note.textContent=c.checked&&bc.checked?"Your video will be labeled 'Paid partnership'. Branded content can't be private.":(c.checked&&yb.checked?"Your video will be labeled 'Promotional content'.":(c.checked?"Choose at least one.":""));
+ dec.innerHTML=c.checked&&bc.checked?"By posting, you agree to TikTok's <a href='{{ branded_url }}' target='_blank' rel='noopener'>Branded Content Policy</a> and <a href='{{ music_url }}' target='_blank' rel='noopener'>Music Usage Confirmation</a>.":"By posting, you agree to TikTok's <a href='{{ music_url }}' target='_blank' rel='noopener'>Music Usage Confirmation</a>.";
+ btn.disabled=!picked||(c.checked&&!yb.checked&&!bc.checked);
+ btn.title=btn.disabled?(!picked?'Choose who can watch this video':'Say whether it promotes your brand, a third party, or both'):'';}
+f.addEventListener('change',u);u();})()</script>
+{% endif %}
+{% endblock %}

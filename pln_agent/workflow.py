@@ -233,6 +233,10 @@ def schedule(db: DB, vid: str, slot_at: datetime, actor: str) -> dict:
     v = _variant(db, vid)
     if v["state"] != "approved":
         raise WorkflowError(f"only approved variants can be scheduled (state={v['state']})")
+    if v.get("platform") == "tiktok":
+        from .tiktok_post import chosen
+        if not chosen(v):
+            raise WorkflowError("TikTok: choose who can watch, interactions and disclosure first (the post's TikTok settings)")
     key = idempotency_key(v)
     if db.one("SELECT job_id FROM publish_jobs WHERE idempotency_key=? AND state NOT IN ('cancelled')", [key]):
         raise WorkflowError("duplicate: an identical post for this account already has a publish job")

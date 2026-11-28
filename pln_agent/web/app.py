@@ -292,6 +292,43 @@ def queue_bulk(request: Request, pick: list[str] = Form([]), decision: str = For
                 "a moment. Sensitive posts and posts whose copy changed are skipped (see Audit log).")
 
 
+@app.get("/variant/{vid:path}/tiktok", response_class=HTMLResponse)
+def tiktok_settings_page(request: Request, vid: str):
+    """TikTok's posting rules: the person picks who can watch, interactions and disclosure before it posts."""
+    from .. import tiktok_post
+    v = db().get("variants", "variant_id", vid)
+    if not v or v.get("platform") != "tiktok":
+        return back(request, f"/variant/{vid}", err="Not a TikTok post.")
+    acc = db().get("accounts", "account_id", v["account_id"]) or {}
+    info, problem = None, ""
+    try:
+        info = tiktok_post.creator_info(acc)
+    except tiktok_post.TikTokPostError as e:
+        problem = str(e)
+    return page(request, "tiktok.html", v=v, acc=acc, info=info, problem=problem, labels=tiktok_post.PRIVACY_LABELS,
+                audited=tiktok_post.audited(), current=tiktok_post.chosen(v), duration=tiktok_post.duration(v),
+                render_url=_render_url(request, v) if v.get("render_status") == "rendered" else "",
+                music_url=tiktok_post.MUSIC_URL, branded_url=tiktok_post.BRANDED_URL)
+
+
+@app.post("/variant/{vid:path}/tiktok")
+async def tiktok_settings_save(request: Request, vid: str):
+    from .. import tiktok_post
+    form = dict(await request.form())
+    try:
+        reviewer = who(request, form.get("actor", ""))
+        v = db().get("variants", "variant_id", vid) or {}
+        info = tiktok_post.creator_info(db().get("accounts", "account_id", v.get("account_id", "")) or {})
+        tiktok_post.choose(db(), vid, form, info, reviewer)
+        v = db().get("variants", "variant_id", vid)
+        if v["state"] == "in_review":
+            approve(db(), vid, reviewer, note="TikTok post settings")
+    except (tiktok_post.TikTokPostError, WorkflowError) as e:
+        return back(request, f"/variant/{vid}/tiktok", err=str(e))
+    return back(request, "/runsheet", "TikTok settings saved and approved. Lock it in on the run sheet; once it posts, "
+                "TikTok can take a few minutes to process the video before it shows on the profile.")
+
+
 @app.get("/variant/{vid:path}", response_class=HTMLResponse)
 def variant(request: Request, vid: str):
     d = db()
@@ -674,9 +711,11 @@ def runsheet_page(request: Request, day: str = "", all: int = 0):
     except ValueError:
         d = today  # a mangled address shows today rather than an error page
     sheet = runsheet.day_sheet(db(), settings, d, focus=not all)
+    from ..tiktok_post import chosen as tiktok_chosen
     for r in sheet["rows"]:  # play-in-place preview, with sound, before approving
         v = db().get("variants", "variant_id", r["variant_id"]) or {}
         r["render_url"] = _render_url(request, v) if v.get("render_status") == "rendered" else ""
+        r["tiktok_settings"] = r.get("platform") == "tiktok" and not tiktok_chosen(v)  # a person picks these first
     from ..team_tasks import pins_for_day
     challenge_vids = {p["variant_id"] for p in pins_for_day(db(), d.isoformat(), settings.timezone)}
     props = [r for r in sheet["rows"] if r["kind"] == "proposed"]

@@ -222,6 +222,12 @@ class GateTests(unittest.TestCase):
     def setUp(self):
         self.db, self.s = make()
         self.cj_tt = f"{CJ}:carjitsu.tiktok.carjitsuchampionship"
+        # TikTok's rules: a person picks who can watch etc. before a TikTok post can be scheduled (tiktok_post.py)
+        from pln_agent import tiktok_post
+        info = {"username": "carjitsu", "nickname": "CarJitsu", "privacy_options": ["SELF_ONLY"], "comment_disabled": False,
+                "duet_disabled": False, "stitch_disabled": False, "max_duration_s": 600}
+        v = self.db.get("variants", "variant_id", self.cj_tt)
+        tiktok_post.choose(self.db, self.cj_tt, {"title": v["caption"], "privacy_level": "SELF_ONLY"}, info, "editor")
 
     def test_rights_gate_blocks_expired_and_unlicensed(self):
         for vid in (f"{WPL}:putt_tour.instagram.putttour", f"{SLAP}:slapfight.instagram.slapfight"):
