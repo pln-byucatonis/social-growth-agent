@@ -66,6 +66,11 @@ def _tick(db: DB, settings: Settings, do_ops: bool) -> dict:
             out["ai_inbox"] = ai_inbox.import_inbox(db, actor="worker")
         except Exception as e:  # noqa: BLE001: never let it stop the publisher loop
             out["ai_inbox"] = {"error": str(e)[:200]}
+        try:  # highlights from the pln-fast-aws episode pipeline (pln_agent/episode_inbox.py)
+            from . import episode_inbox
+            out["episode_inbox"] = episode_inbox.import_inbox(db, actor="worker")
+        except Exception as e:  # noqa: BLE001
+            out["episode_inbox"] = {"error": str(e)[:200]}
     try:  # follower history can't be fetched after the fact: one snapshot a day for the priority accounts
         from .insights import snapshot_followers_due
         out["followers"] = snapshot_followers_due(db)

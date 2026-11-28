@@ -242,13 +242,14 @@ def import_ops_clips(db: DB, ops: DB, assets_bucket: str, limit: int = 100, min_
     """`clip_ids` imports exactly those clips (Viral Content Scout promotion) instead of the ranked top.
     `exclude` skips clips already brought in, so the next best ones come through instead of the same top ones."""
     floor = min(min_score, priority_floor)
-    where = ["superseded_by IS NULL", "status = 'tagged'", "highlight_score >= ?"]
+    # pipeline highlights (ep-<episode>-hN) come through the episode inbox with their captioned vertical and rights
+    where = ["superseded_by IS NULL", "status = 'tagged'", "highlight_score >= ?", "id NOT LIKE 'ep-%'"]
     params: list = [floor]
     if exclude:
         where.append("id NOT IN (" + ",".join("?" for _ in exclude) + ")")
         params += list(exclude)
     if clip_ids:
-        where = ["superseded_by IS NULL", "id IN (" + ",".join("?" for _ in clip_ids) + ")"]
+        where = ["superseded_by IS NULL", "id NOT LIKE 'ep-%'", "id IN (" + ",".join("?" for _ in clip_ids) + ")"]
         params = list(clip_ids)
         limit = len(clip_ids)
     if properties:
