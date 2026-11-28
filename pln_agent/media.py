@@ -172,6 +172,12 @@ def subject_x(src: str, segments: list[dict], timeout: int = 60) -> tuple[float,
     return round(fx, 4), f"crop centred on motion at {fx:.0%} of frame width"
 
 
+def captions_burned_in(asset: dict) -> bool:
+    """An episode-pipeline vertical already has its captions (and the scorebug panel) in the picture: don't add a
+    second caption layer, and don't punch in (it would crop the captions)."""
+    return bool(((asset.get("probe") or {}).get("episode") or {}).get("captions_burned_in"))
+
+
 def _srt_time(t: float) -> str:
     h, rem = divmod(t, 3600)
     m, s = divmod(rem, 60)
@@ -295,7 +301,7 @@ def render_variant(db: DB, variant_id: str, settings: Settings, actor: str = "re
         payoff, beats = edit_fx.payoff_time(v, asset, segs, cut)
         W, H = out["w"], out["h"]
         vlabel, alabel, fx_used, n_in = "base", "ca", [], len(segs)
-        pin = edit_fx.punch_in_filter(payoff, efx, W, H)
+        pin = None if captions_burned_in(asset) else edit_fx.punch_in_filter(payoff, efx, W, H)
         if pin:
             parts.append(f"[base]{pin}[basep]")
             vlabel = "basep"
@@ -377,7 +383,8 @@ def render_variant(db: DB, variant_id: str, settings: Settings, actor: str = "re
                 # frames at each moment and through the ~1.3 s a word stays up after it
                 marks = [t for t in [payoff, *[b["t"] for b in beats]] if t is not None]
                 looks = art_director.analyze(str(clean), duration, sorted({round(m + d, 2) for m in marks for d in (0, 0.65, 1.3)}))
-                styled = overlays.build(v, build_caption_track(v, asset), duration, out["w"], out["h"], outdir, payoff, beats, looks,
+                track = [] if captions_burned_in(asset) else build_caption_track(v, asset)
+                styled = overlays.build(v, track, duration, out["w"], out["h"], outdir, payoff, beats, looks,
                                         layout=layout)
                 ins, ps, final = overlays.ffmpeg_graph("base", 1, styled["layers"], styled["countdown"], out["w"], out["h"])
                 overlay_style, overlay_words, overlay_plan = styled["style_id"], styled.get("words") or {}, styled.get("plan") or []

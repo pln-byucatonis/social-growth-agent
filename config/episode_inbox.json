@@ -1,0 +1,8 @@
+{
+  "_note": "Episode inbox (pln_agent/episode_inbox.py). The pln-fast-aws episode pipeline writes one sidecar per top highlight of each new episode here. PLN owns the masters and all rights (by@proleaguenetwork.com, 2026-11-27); all PLN athletes sign likeness releases (2026-10-21), so people are verified. A clip whose editor notes mention possibly copyrighted music comes in with music not cleared (blocked until someone clears it). Approval before posting stays. Decided by by@proleaguenetwork.com, 2026-11-28.",
+  "inbox_prefix": "social-agent/episodes/inbox/",
+  "owner": "Pro League Network",
+  "territory": ["WORLDWIDE"],
+  "gambling_words": ["roobet", "gambling", "sportsbook", "casino", "betting", "wager"],
+  "music_risk_words": ["copyright", "licensed music", "music that may"]
+}
